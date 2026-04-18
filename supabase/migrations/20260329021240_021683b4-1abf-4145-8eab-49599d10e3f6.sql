@@ -139,6 +139,22 @@ CREATE POLICY "Users can view own memberships" ON public.memberships
 CREATE POLICY "Users can insert own memberships" ON public.memberships
   FOR INSERT WITH CHECK (auth.uid() = user_id);
 
+-- Studio config table (branding, name, location per deployment)
+CREATE TABLE public.studio_config (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  studio_name TEXT NOT NULL,
+  location TEXT NOT NULL,
+  primary_color TEXT DEFAULT '#000000',
+  logo_url TEXT,
+  contact_email TEXT
+);
+
+-- Only one row expected per deployment; readable by anyone (public site)
+ALTER TABLE public.studio_config ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Studio config is publicly readable" ON public.studio_config
+  FOR SELECT TO authenticated, anon USING (true);
+
 -- Increment sessions helper function
 CREATE OR REPLACE FUNCTION public.increment_user_sessions(p_user_id UUID)
 RETURNS void AS $$

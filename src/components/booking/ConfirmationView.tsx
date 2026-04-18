@@ -1,4 +1,4 @@
-import { Check, Calendar } from "lucide-react";
+import { Check } from "lucide-react";
 import { Link } from "react-router-dom";
 import type { Tables } from "@/integrations/supabase/types";
 
@@ -12,7 +12,7 @@ interface ConfirmationViewProps {
 }
 
 const ConfirmationView = ({ session, selectedDate, email, onClose }: ConfirmationViewProps) => {
-  const dateStr = selectedDate.toLocaleDateString("en-US", {
+  const dateStr = selectedDate.toLocaleDateString("nb-NO", {
     weekday: "long",
     month: "long",
     day: "numeric",
@@ -31,9 +31,11 @@ const ConfirmationView = ({ session, selectedDate, email, onClose }: Confirmatio
           <p className="text-muted-foreground text-sm font-sans">{dateStr} · {session.time}</p>
           <p className="text-muted-foreground text-sm font-sans">{session.location}</p>
         </div>
-        <p className="text-xs text-muted-foreground font-sans mt-4">
-          Confirmation sent to {email}
-        </p>
+        {email && (
+          <p className="text-xs text-muted-foreground font-sans mt-4">
+            See you there! We'll be in touch at {email}
+          </p>
+        )}
       </div>
 
       <div className="space-y-3 w-full">
@@ -44,10 +46,6 @@ const ConfirmationView = ({ session, selectedDate, email, onClose }: Confirmatio
         >
           View My Sessions
         </Link>
-        <button className="w-full flex items-center justify-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors font-sans">
-          <Calendar className="w-4 h-4" />
-          Add to Calendar
-        </button>
       </div>
     </div>
   );

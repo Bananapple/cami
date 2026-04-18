@@ -9,7 +9,7 @@ interface OrderSummaryProps {
 }
 
 const OrderSummary = ({ session, selectedDate }: OrderSummaryProps) => {
-  const dateStr = selectedDate.toLocaleDateString("en-US", {
+  const dateStr = selectedDate.toLocaleDateString("nb-NO", {
     weekday: "short",
     month: "short",
     day: "numeric",
@@ -28,7 +28,7 @@ const OrderSummary = ({ session, selectedDate }: OrderSummaryProps) => {
         <p className="text-xs font-sans font-medium uppercase tracking-wider text-foreground/60">
           (1) Drop In — 1 Class
         </p>
-        <p className="text-xs font-sans text-foreground/60">Seattle</p>
+        <p className="text-xs font-sans text-foreground/60">{session.location}</p>
         <div className="flex items-center gap-1.5 text-xs text-foreground/60">
           <Clock className="w-3 h-3" />
           Valid for 1 month
@@ -59,7 +59,7 @@ const OrderSummary = ({ session, selectedDate }: OrderSummaryProps) => {
           Total
         </span>
         <span className="text-2xl font-serif text-foreground">
-          ${session.price ?? 30}
+          kr {(session.price ?? 250).toLocaleString("nb-NO")}
         </span>
       </div>
     </div>

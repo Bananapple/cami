@@ -18,7 +18,13 @@ const avatarColors = [
 ];
 
 const SessionList = ({ sessions, selectedDate, onSelectSession }: SessionListProps) => {
-  const dateLabel = selectedDate.toLocaleDateString("en-US", {
+  const dayOfWeek = selectedDate.getDay();
+  // Sessions with an empty or null day_of_week show on every day (legacy/unset rows)
+  const filtered = sessions.filter(
+    (s) => !s.day_of_week || s.day_of_week.length === 0 || s.day_of_week.includes(dayOfWeek)
+  );
+
+  const dateLabel = selectedDate.toLocaleDateString("nb-NO", {
     weekday: "long",
     month: "long",
     day: "numeric",
@@ -30,13 +36,13 @@ const SessionList = ({ sessions, selectedDate, onSelectSession }: SessionListPro
         Sessions for {dateLabel}
       </p>
 
-      {sessions.length === 0 ? (
+      {filtered.length === 0 ? (
         <p className="text-sm text-muted-foreground font-serif py-8 text-center">
           No sessions available for this date.
         </p>
       ) : (
         <div className="space-y-2">
-          {sessions.map((session, i) => (
+          {filtered.map((session, i) => (
             <button
               key={session.id}
               onClick={() => onSelectSession(session)}

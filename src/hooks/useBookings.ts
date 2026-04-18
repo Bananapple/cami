@@ -46,8 +46,6 @@ export function useBookings() {
         .select()
         .single();
       if (error) throw error;
-
-      await supabase.rpc("increment_user_sessions", { p_user_id: user!.id });
       return data;
     },
     onSuccess: () => {
@@ -58,6 +56,7 @@ export function useBookings() {
 
   const cancelBooking = useMutation({
     mutationFn: async (bookingId: string) => {
+      if (!user) throw new Error("Not authenticated");
       const { error } = await supabase
         .from("bookings")
         .update({ status: "cancelled", cancelled_at: new Date().toISOString() })

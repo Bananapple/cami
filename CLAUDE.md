@@ -25,6 +25,22 @@ npm run test -- src/test/some.test.ts  # Run a single test file
 
 Automates: Supabase project creation (eu-north-1), migration push, `studio_config` seed, and generates `.env.<studio-slug>`. Requires `supabase` CLI and `jq` installed, and `supabase login` already run.
 
+### Seeding Sessions
+
+After provisioning, insert sessions via the Supabase dashboard or SQL. The `day_of_week` column controls which days a class appears in the booking UI. Values follow JS `Date.getDay()`: 0=Sunday, 1=Monday, ..., 6=Saturday.
+
+```sql
+-- Vinyasa Flow: Mon/Wed/Fri at 07:00
+INSERT INTO sessions (class_name, practitioner_name, practitioner_initials, time, duration, level, location, price, day_of_week)
+VALUES ('Vinyasa Flow', 'Anne Bakke', 'AB', '07:00', 60, 'All levels', 'Studio 1', 250, '{1,3,5}');
+
+-- Yin Yoga: Tue/Thu at 18:00
+INSERT INTO sessions (class_name, practitioner_name, practitioner_initials, time, duration, level, location, price, day_of_week)
+VALUES ('Yin Yoga', 'Erik Lie', 'EL', '18:00', 75, 'Beginner', 'Studio 2', 250, '{2,4}');
+```
+
+Sessions with an empty `day_of_week` (`'{}'`) appear on every day — use this only as a temporary placeholder. Always set real days before going live.
+
 ## Architecture
 
 ### Stack
@@ -48,30 +64,34 @@ Key hooks:
 
 ### Booking Flow (`src/components/BookingSheet.tsx`)
 
-The core feature. A slide-in Sheet with a 7-step wizard:
+The core feature. A slide-in Sheet with a 6-step wizard:
 
 ```
-date → confirm → billing → auth → payment → addCard → success
+date → confirm → auth → payment → addCard → success
 ```
 
-State machine lives entirely in `BookingSheet.tsx`. Each step renders a sub-component from `src/components/booking/`. Steps `billing`, `auth`, `payment`, and `addCard` use a split layout (order summary left, form right).
+State machine lives entirely in `BookingSheet.tsx`. Each step renders a sub-component from `src/components/booking/`. Steps `auth`, `payment`, and `addCard` use a split layout (order summary left, form right).
 
-`handlePaymentComplete(last4)` is the convergence point — called by both `PaymentSelector` (existing card) and `StripeCardForm` (new card). It calls `createBooking.mutateAsync()` then advances to `success`.
+`handlePaymentComplete(last4)` is the convergence point — called by both `PaymentSelector` (existing card) and `StripeCardForm` (new card). It calls `createBooking.mutateAsync()` and advances to `success` only on success. On failure it sets `bookingError` state and stays on the payment step.
 
 ### Database Schema
 
-Single migration: `supabase/migrations/20260329021240_*.sql`
+Migrations in `supabase/migrations/`:
+- `20260329021240_*` — initial schema
+- `20260416000000_*` — adds `day_of_week` to sessions
+- `20260416000001_*` — replaces `increment_user_sessions` RPC with DB trigger
+- `20260416000002_*` — adds UNIQUE constraint on bookings `(user_id, session_id, session_date)`
 
 | Table | Purpose | RLS |
 |---|---|---|
 | `profiles` | Extends auth.users (name, initials, level, total_sessions) | Own row only |
-| `sessions` | Yoga classes (name, instructor, time, duration, level, price) | Public read |
+| `sessions` | Yoga classes (name, instructor, time, duration, level, price, day_of_week) | Public read |
 | `bookings` | User reservations (session_id, session_date, status, amount_paid) | Own rows only |
 | `payment_methods` | Saved Stripe cards (brand, last4, expiry) | Own rows only |
 | `memberships` | Subscription plans | Own rows only |
 | `studio_config` | Per-deployment branding (studio_name, location, logo_url, primary_color) | Public read |
 
-Auto-trigger `handle_new_user()` creates a `profiles` row on signup. RPC `increment_user_sessions()` bumps `profiles.total_sessions` after a booking.
+Auto-trigger `handle_new_user()` creates a `profiles` row on signup. DB trigger `trg_increment_sessions` bumps `profiles.total_sessions` after a confirmed booking INSERT (replaced the old `increment_user_sessions` RPC which had a privilege escalation vulnerability).
 
 ### Per-Studio Branding
 

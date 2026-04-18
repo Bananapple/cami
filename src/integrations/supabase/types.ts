@@ -192,10 +192,38 @@ export type Database = {
         }
         Relationships: []
       }
+      studio_config: {
+        Row: {
+          contact_email: string | null
+          id: string
+          location: string
+          logo_url: string | null
+          primary_color: string | null
+          studio_name: string
+        }
+        Insert: {
+          contact_email?: string | null
+          id?: string
+          location: string
+          logo_url?: string | null
+          primary_color?: string | null
+          studio_name: string
+        }
+        Update: {
+          contact_email?: string | null
+          id?: string
+          location?: string
+          logo_url?: string | null
+          primary_color?: string | null
+          studio_name?: string
+        }
+        Relationships: []
+      }
       sessions: {
         Row: {
           class_name: string
           created_at: string
+          day_of_week: number[] | null
           duration: number
           id: string
           level: string
@@ -208,6 +236,7 @@ export type Database = {
         Insert: {
           class_name: string
           created_at?: string
+          day_of_week?: number[] | null
           duration: number
           id?: string
           level: string
@@ -220,6 +249,7 @@ export type Database = {
         Update: {
           class_name?: string
           created_at?: string
+          day_of_week?: number[] | null
           duration?: number
           id?: string
           level?: string

@@ -7,16 +7,15 @@ import { useBookings } from "@/hooks/useBookings";
 import DateStrip from "@/components/booking/DateStrip";
 import SessionList from "@/components/booking/SessionList";
 import OrderSummary from "@/components/booking/OrderSummary";
-import BillingForm from "@/components/booking/BillingForm";
 import AuthForm from "@/components/booking/AuthForm";
 import PaymentSelector from "@/components/booking/PaymentSelector";
 import StripeCardForm from "@/components/booking/StripeCardForm";
 import ConfirmationView from "@/components/booking/ConfirmationView";
 import type { Tables } from "@/integrations/supabase/types";
-import type { BillingData } from "@/components/booking/BillingForm";
+import { useStudioConfig } from "@/hooks/useStudioConfig";
 
 type Session = Tables<"sessions">;
-type Step = "date" | "confirm" | "billing" | "auth" | "payment" | "addCard" | "success";
+type Step = "date" | "confirm" | "auth" | "payment" | "addCard" | "success";
 
 interface BookingSheetProps {
   isOpen: boolean;
@@ -27,18 +26,19 @@ const BookingSheet = ({ isOpen, onClose }: BookingSheetProps) => {
   const [step, setStep] = useState<Step>("date");
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [selectedSession, setSelectedSession] = useState<Session | null>(null);
-  const [billingData, setBillingData] = useState<BillingData | null>(null);
+  const [bookingError, setBookingError] = useState<string | null>(null);
 
   const { sessions } = useSessions();
   const { isAuthenticated, user } = useAuth();
   const { createBooking } = useBookings();
+  const { studioName, location } = useStudioConfig();
 
   const handleClose = () => {
     onClose();
     setTimeout(() => {
       setStep("date");
       setSelectedSession(null);
-      setBillingData(null);
+      setBookingError(null);
     }, 300);
   };
 
@@ -47,12 +47,7 @@ const BookingSheet = ({ isOpen, onClose }: BookingSheetProps) => {
     setStep("confirm");
   };
 
-  const handleContinueToCheckout = () => {
-    setStep("billing");
-  };
-
-  const handleBillingSubmit = (data: BillingData) => {
-    setBillingData(data);
+  const handleContinueFromConfirm = () => {
     if (isAuthenticated) {
       setStep("payment");
     } else {
@@ -65,18 +60,21 @@ const BookingSheet = ({ isOpen, onClose }: BookingSheetProps) => {
   };
 
   const handlePaymentComplete = async (last4: string) => {
-    if (selectedSession) {
-      try {
-        await createBooking.mutateAsync({
-          sessionId: selectedSession.id,
-          sessionDate: selectedDate.toISOString().split("T")[0],
-          paymentMethodLast4: last4,
-          amountPaid: selectedSession.price ?? 30,
-        });
-      } catch {
-        // booking saved even if increment fails
-      }
+    if (!selectedSession) return;
+    setBookingError(null);
+
+    try {
+      await createBooking.mutateAsync({
+        sessionId: selectedSession.id,
+        sessionDate: selectedDate.toISOString().split("T")[0],
+        paymentMethodLast4: last4,
+        amountPaid: selectedSession.price ?? 250,
+      });
+    } catch (err: any) {
+      setBookingError(err.message || "Booking failed. Please try again.");
+      return;
     }
+
     setStep("success");
   };
 
@@ -85,14 +83,11 @@ const BookingSheet = ({ isOpen, onClose }: BookingSheetProps) => {
       case "confirm":
         setStep("date");
         break;
-      case "billing":
+      case "auth":
         setStep("confirm");
         break;
-      case "auth":
-        setStep("billing");
-        break;
       case "payment":
-        setStep("billing");
+        setStep("confirm");
         break;
       case "addCard":
         setStep("payment");
@@ -104,7 +99,6 @@ const BookingSheet = ({ isOpen, onClose }: BookingSheetProps) => {
     switch (step) {
       case "date": return "Select a Date";
       case "confirm": return "Session Details";
-      case "billing": return "Billing";
       case "auth": return "Sign In";
       case "payment": return "Payment";
       case "addCard": return "Add Card";
@@ -113,7 +107,7 @@ const BookingSheet = ({ isOpen, onClose }: BookingSheetProps) => {
   };
 
   const showBack = step !== "date" && step !== "success";
-  const showSplitLayout = ["billing", "auth", "payment", "addCard"].includes(step);
+  const showSplitLayout = ["auth", "payment", "addCard"].includes(step);
 
   return (
     <Sheet open={isOpen} onOpenChange={(open) => !open && handleClose()}>
@@ -144,9 +138,9 @@ const BookingSheet = ({ isOpen, onClose }: BookingSheetProps) => {
         {step === "date" && (
           <div className="px-6 py-6 space-y-6">
             <div>
-              <h2 className="text-2xl font-serif text-foreground">VitalPath</h2>
+              <h2 className="text-2xl font-serif text-foreground">{studioName}</h2>
               <p className="text-sm text-muted-foreground font-serif mt-1">
-                Upcoming sessions in Seattle
+                {location ? `Upcoming sessions in ${location}` : "Upcoming sessions"}
               </p>
             </div>
             <DateStrip selectedDate={selectedDate} onSelectDate={setSelectedDate} />
@@ -170,7 +164,7 @@ const BookingSheet = ({ isOpen, onClose }: BookingSheetProps) => {
               </p>
               <div className="border-t border-border pt-4 space-y-2 text-sm text-muted-foreground font-sans">
                 <p>
-                  {selectedDate.toLocaleDateString("en-US", {
+                  {selectedDate.toLocaleDateString("nb-NO", {
                     weekday: "short",
                     month: "short",
                     day: "numeric",
@@ -185,12 +179,12 @@ const BookingSheet = ({ isOpen, onClose }: BookingSheetProps) => {
             <div className="flex items-center justify-between py-3 border-y border-border">
               <span className="text-sm text-muted-foreground font-sans">Drop-in</span>
               <span className="text-lg font-serif text-foreground">
-                ${selectedSession.price ?? 30}
+                kr {(selectedSession.price ?? 250).toLocaleString("nb-NO")}
               </span>
             </div>
 
             <button
-              onClick={handleContinueToCheckout}
+              onClick={handleContinueFromConfirm}
               className="w-full bg-primary hover:bg-primary/80 text-primary-foreground py-3.5 font-sans font-medium text-sm uppercase tracking-[0.15em] rounded-lg transition-all duration-200"
             >
               Continue to Checkout →
@@ -215,17 +209,31 @@ const BookingSheet = ({ isOpen, onClose }: BookingSheetProps) => {
 
             {/* Right: Form */}
             <div className="flex-1 p-6 bg-background border-t sm:border-t-0 sm:border-l border-border">
-              {step === "billing" && (
-                <BillingForm onSubmit={handleBillingSubmit} initialData={billingData ?? undefined} />
-              )}
               {step === "auth" && <AuthForm onSuccess={handleAuthSuccess} />}
               {step === "payment" && (
-                <PaymentSelector
-                  onSelectPayment={handlePaymentComplete}
-                  onAddNew={() => setStep("addCard")}
-                />
+                <>
+                  <PaymentSelector
+                    onSelectPayment={handlePaymentComplete}
+                    onAddNew={() => setStep("addCard")}
+                    loading={createBooking.isPending}
+                  />
+                  {bookingError && (
+                    <p className="text-sm text-destructive mt-4 text-center font-sans">
+                      {bookingError}
+                    </p>
+                  )}
+                </>
               )}
-              {step === "addCard" && <StripeCardForm onSuccess={handlePaymentComplete} />}
+              {step === "addCard" && (
+                <>
+                  <StripeCardForm onSuccess={handlePaymentComplete} />
+                  {bookingError && (
+                    <p className="text-sm text-destructive mt-4 text-center font-sans">
+                      {bookingError}
+                    </p>
+                  )}
+                </>
+              )}
             </div>
           </div>
         )}

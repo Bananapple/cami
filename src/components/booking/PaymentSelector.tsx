@@ -5,9 +5,10 @@ import { usePaymentMethods } from "@/hooks/usePaymentMethods";
 interface PaymentSelectorProps {
   onSelectPayment: (last4: string) => void;
   onAddNew: () => void;
+  loading?: boolean;
 }
 
-const PaymentSelector = ({ onSelectPayment, onAddNew }: PaymentSelectorProps) => {
+const PaymentSelector = ({ onSelectPayment, onAddNew, loading }: PaymentSelectorProps) => {
   const { paymentMethods, isLoading } = usePaymentMethods();
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
@@ -70,9 +71,10 @@ const PaymentSelector = ({ onSelectPayment, onAddNew }: PaymentSelectorProps) =>
         <>
           <button
             onClick={handleConfirm}
-            className="w-full bg-primary hover:bg-primary/80 text-primary-foreground py-3.5 font-sans font-medium text-sm uppercase tracking-[0.15em] rounded-lg transition-all duration-200"
+            disabled={loading}
+            className="w-full bg-primary hover:bg-primary/80 text-primary-foreground py-3.5 font-sans font-medium text-sm uppercase tracking-[0.15em] rounded-lg transition-all duration-200 disabled:opacity-50"
           >
-            Confirm & Pay →
+            {loading ? "Processing..." : "Confirm & Pay →"}
           </button>
           <p className="text-xs text-center text-muted-foreground font-sans">
             By confirming, you agree to our Terms of Service
