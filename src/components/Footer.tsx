@@ -1,46 +1,55 @@
 import { Link } from "react-router-dom";
-import { toast } from "sonner";
 
-const Footer = ({ tagline }: { tagline?: string }) => {
+const Footer = () => {
   return (
     <footer className="bg-card border-t border-border py-16 lg:py-20">
       <div className="max-w-7xl mx-auto px-6 lg:px-8">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-start">
-          {/* Left — Brand */}
-          <div className="space-y-4">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-12 lg:gap-20 items-start">
+          {/* Brand */}
+          <div className="space-y-3">
             <Link to="/" className="text-3xl font-serif text-foreground inline-block">
-              VitalPath
+              YogaBrie
             </Link>
-            {tagline && <p className="text-lg text-muted-foreground font-serif">{tagline}</p>}
-            <p className="text-muted-foreground font-serif leading-relaxed max-w-md">
-              A holistic wellness platform empowering you to build sustainable health habits that enhance every aspect of your life.
+            <p className="text-muted-foreground font-serif leading-relaxed">
+              Yoga & Pilates in the heart of Oslo.
             </p>
           </div>
 
-          {/* Right — Newsletter */}
-          <div className="space-y-4">
-            <p className="text-sm uppercase tracking-[0.2em] text-muted-foreground font-sans font-medium">Subscribe to our newsletter</p>
-            <form className="flex gap-3" onSubmit={(e) => { e.preventDefault(); toast("Subscribed! Check your inbox."); }}>
-              <input
-                type="email"
-                placeholder="Enter your email"
-                className="flex-1 px-5 py-3 border border-border bg-transparent text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none rounded-md transition-all font-sans"
-              />
-              <button
-                type="submit"
-                className="bg-primary hover:bg-primary/80 text-primary-foreground px-6 py-3 font-sans font-medium text-sm uppercase tracking-wider rounded-lg transition-all whitespace-nowrap"
-              >
-                Subscribe
-              </button>
-            </form>
+          {/* Contact */}
+          <div className="space-y-3">
+            <p className="text-sm uppercase tracking-[0.2em] text-muted-foreground font-sans font-medium">Contact</p>
+            <address className="not-italic space-y-1 text-foreground font-sans text-sm leading-relaxed">
+              <p>Brageveien 5 A</p>
+              <p>0358 Oslo, Norway</p>
+              <p className="pt-1">
+                <a href="tel:+4745501078" className="hover:text-primary transition-colors">+47 455 01 078</a>
+              </p>
+              <p>
+                <a href="mailto:contact@yogabrie.com" className="hover:text-primary transition-colors">contact@yogabrie.com</a>
+              </p>
+            </address>
+          </div>
+
+          {/* Links */}
+          <div className="space-y-3">
+            <p className="text-sm uppercase tracking-[0.2em] text-muted-foreground font-sans font-medium">Studio</p>
+            <nav className="flex flex-col space-y-2 text-sm font-sans">
+              <Link to="/classes" className="text-foreground hover:text-primary transition-colors">Classes</Link>
+              <Link to="/teachers" className="text-foreground hover:text-primary transition-colors">Instructors</Link>
+              <Link to="/joinnow" className="text-foreground hover:text-primary transition-colors">Memberships</Link>
+              <Link to="/dashboard" className="text-foreground hover:text-primary transition-colors">My bookings</Link>
+            </nav>
+            <div className="flex gap-4 pt-2">
+              <a href="https://www.instagram.com/yogabrie" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors text-sm font-sans">Instagram</a>
+              <a href="https://www.facebook.com/yogabrie" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors text-sm font-sans">Facebook</a>
+            </div>
           </div>
         </div>
 
         <div className="mt-16 pt-8 border-t border-border text-sm text-muted-foreground font-sans flex justify-between items-center">
-          <span>© 2024 VitalPath</span>
+          <span>© 2026 YogaBrie</span>
           <div className="flex gap-6">
             <a href="#" className="hover:text-foreground transition-colors">Privacy</a>
-            <a href="#" className="hover:text-foreground transition-colors">Terms</a>
           </div>
         </div>
       </div>

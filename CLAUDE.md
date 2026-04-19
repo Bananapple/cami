@@ -30,13 +30,24 @@ Automates: Supabase project creation (eu-north-1), migration push, `studio_confi
 After provisioning, insert sessions via the Supabase dashboard or SQL. The `day_of_week` column controls which days a class appears in the booking UI. Values follow JS `Date.getDay()`: 0=Sunday, 1=Monday, ..., 6=Saturday.
 
 ```sql
--- Vinyasa Flow: Mon/Wed/Fri at 07:00
+-- YogaBrie full session seed (adapt times/days per studio)
 INSERT INTO sessions (class_name, practitioner_name, practitioner_initials, time, duration, level, location, price, day_of_week)
-VALUES ('Vinyasa Flow', 'Anne Bakke', 'AB', '07:00', 60, 'All levels', 'Studio 1', 250, '{1,3,5}');
-
--- Yin Yoga: Tue/Thu at 18:00
-INSERT INTO sessions (class_name, practitioner_name, practitioner_initials, time, duration, level, location, price, day_of_week)
-VALUES ('Yin Yoga', 'Erik Lie', 'EL', '18:00', 75, 'Beginner', 'Studio 2', 250, '{2,4}');
+VALUES
+  ('Ashtanga Mysore', 'Brinkela Gjokaj', 'BG', '07:00', 110, 'All levels', 'Studio', 250, '{1,2,3,4,5}'),
+  ('Ashtanga Mysore', 'Brinkela Gjokaj', 'BG', '09:00', 45, 'All levels', 'Studio', 250, '{0}'),
+  ('Pilates', 'Brinkela Gjokaj', 'BG', '09:00', 45, 'All levels', 'Studio', 250, '{1,2,3,4,5}'),
+  ('Pilates', 'Brinkela Gjokaj', 'BG', '11:00', 45, 'All levels', 'Studio', 250, '{0,6}'),
+  ('Pilates', 'Brinkela Gjokaj', 'BG', '18:00', 45, 'All levels', 'Studio', 250, '{1,2,3,4}'),
+  ('Mama & Baby Pilates', 'Brinkela Gjokaj', 'BG', '11:00', 45, 'All levels', 'Studio', 250, '{1,4}'),
+  ('Mama & Baby Pilates', 'Brinkela Gjokaj', 'BG', '14:00', 45, 'All levels', 'Studio', 250, '{6}'),
+  ('Ashtanga for Parents', 'Brinkela Gjokaj', 'BG', '11:00', 45, 'All levels', 'Studio', 250, '{2,5}'),
+  ('Ashtanga Full Led', 'Brinkela Gjokaj', 'BG', '16:30', 90, 'Intermediate', 'Studio', 250, '{5}'),
+  ('Ashtanga Full Led', 'Brinkela Gjokaj', 'BG', '09:30', 90, 'Intermediate', 'Studio', 250, '{6}'),
+  ('Yin Yoga', 'Julie', 'J', '18:50', 50, 'All levels', 'Studio', 250, '{1,3}'),
+  ('Yin Yoga', 'Julie', 'J', '18:00', 50, 'All levels', 'Studio', 250, '{5}'),
+  ('Gentle Flow', 'Olga Kotsi', 'OK', '18:50', 50, 'All levels', 'Studio', 250, '{2}'),
+  ('Ashtanga Led Standing', 'Brinkela Gjokaj', 'BG', '18:50', 50, 'All levels', 'Studio', 250, '{4}'),
+  ('Bootylicious', 'Olga Kotsi', 'OK', '11:50', 30, 'All levels', 'Studio', 250, '{0}');
 ```
 
 Sessions with an empty `day_of_week` (`'{}'`) appear on every day — use this only as a temporary placeholder. Always set real days before going live.

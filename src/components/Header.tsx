@@ -6,10 +6,8 @@ import BookingSheet from "@/components/BookingSheet";
 import { useAuth } from "@/hooks/useAuth";
 
 const navItems = [
-  { label: "Programs", path: "/classes" },
-  { label: "Coaches", path: "/teachers" },
-  { label: "Certification", path: "/joinnow" },
-  { label: "Blog", path: "/journal" },
+  { label: "Classes", path: "/classes" },
+  { label: "Instructors", path: "/teachers" },
 ];
 
 const Header = () => {
@@ -24,7 +22,7 @@ const Header = () => {
       <header className="bg-header border-b border-border sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-6 lg:px-8 flex items-center justify-between py-5">
           <Link to="/" className="text-2xl font-serif text-foreground">
-            VitalPath
+            YogaBrie
           </Link>
 
           <nav className="hidden lg:flex items-center space-x-8">
@@ -44,27 +42,20 @@ const Header = () => {
           </nav>
 
           <div className="hidden lg:flex items-center gap-3">
-            <button
-              onClick={() => setBookingOpen(true)}
-              className="border border-foreground/30 hover:border-primary text-foreground px-5 py-2.5 font-sans font-medium text-sm uppercase tracking-wider rounded-lg transition-all duration-200"
-            >
-              Book a Session
-            </button>
             {isAuthenticated ? (
               <Link
                 to="/dashboard"
-                className="bg-primary hover:bg-primary/80 text-primary-foreground px-6 py-2.5 font-sans font-medium text-sm uppercase tracking-wider rounded-lg transition-all duration-200"
+                className="border border-foreground/30 hover:border-primary text-foreground px-5 py-2.5 font-sans font-medium text-sm uppercase tracking-wider rounded-lg transition-all duration-200"
               >
                 Dashboard
               </Link>
-            ) : (
-              <button
-                onClick={() => setSheetOpen(true)}
-                className="bg-primary hover:bg-primary/80 text-primary-foreground px-6 py-2.5 font-sans font-medium text-sm uppercase tracking-wider rounded-lg transition-all duration-200"
-              >
-                Start Free Trial
-              </button>
-            )}
+            ) : null}
+            <button
+              onClick={() => setBookingOpen(true)}
+              className="bg-primary hover:bg-primary/80 text-primary-foreground px-6 py-2.5 font-sans font-medium text-sm uppercase tracking-wider rounded-lg transition-all duration-200"
+            >
+              Book a Session
+            </button>
           </div>
 
           <button
@@ -99,7 +90,7 @@ const Header = () => {
                   setMobileOpen(false);
                   setBookingOpen(true);
                 }}
-                className="border border-foreground/30 text-foreground px-6 py-3 font-sans font-medium text-center text-sm uppercase tracking-wider rounded-lg"
+                className="bg-primary text-primary-foreground px-6 py-3 font-sans font-medium text-center text-sm uppercase tracking-wider rounded-lg"
               >
                 Book a Session
               </button>
@@ -107,21 +98,11 @@ const Header = () => {
                 <Link
                   to="/dashboard"
                   onClick={() => setMobileOpen(false)}
-                  className="bg-primary text-primary-foreground px-6 py-3 font-sans font-medium text-center text-sm uppercase tracking-wider rounded-lg"
+                  className="border border-foreground/30 text-foreground px-6 py-3 font-sans font-medium text-center text-sm uppercase tracking-wider rounded-lg"
                 >
                   Dashboard
                 </Link>
-              ) : (
-                <button
-                  onClick={() => {
-                    setMobileOpen(false);
-                    setSheetOpen(true);
-                  }}
-                  className="bg-primary text-primary-foreground px-6 py-3 font-sans font-medium text-center text-sm uppercase tracking-wider rounded-lg"
-                >
-                  Start Free Trial
-                </button>
-              )}
+              ) : null}
             </nav>
           </div>
         )}

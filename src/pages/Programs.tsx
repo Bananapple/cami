@@ -2,53 +2,90 @@ import { useState } from "react";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import BookingSheet from "@/components/BookingSheet";
-import program1 from "@/assets/program-1.webp";
-import program2 from "@/assets/program-2.webp";
-import program3 from "@/assets/program-3.webp";
-import program4 from "@/assets/program-4.webp";
-import program5 from "@/assets/program-5.webp";
-import program6 from "@/assets/program-6.webp";
-import program7 from "@/assets/program-7.webp";
-import program8 from "@/assets/program-8.webp";
-import program9 from "@/assets/program-9.webp";
-import gallery1 from "@/assets/gallery-1.webp";
-import gallery2 from "@/assets/gallery-2.webp";
-import plan1 from "@/assets/plan-1.webp";
-import plan2 from "@/assets/plan-2.webp";
-import featureBg from "@/assets/feature-bg.webp";
 
-const programs = [
-  { img: program1, title: "Finding your focus", coach: "Natalie", style: "Vinyasa", duration: "60 min", level: "Level 2" },
-  { img: program2, title: "Move towards grace", coach: "Stefanie", style: "Vinyasa", duration: "90 min", level: "Level 3" },
-  { img: program3, title: "Slow an anxious mind", coach: "Kelsey", style: "Meditation", duration: "25 min", level: "Level 1" },
-  { img: program4, title: "Unlock your flexibility", coach: "Natalie", style: "Breathwork", duration: "30 min", level: "Level 1" },
-  { img: program5, title: "Learn to fly", coach: "Damien", style: "Vinyasa", duration: "90 min", level: "Level 2" },
+const classes = [
+  {
+    img: "/images/classes/Mysore.png",
+    name: "Ashtanga Mysore",
+    instructor: "Brinkela Gjokaj",
+    duration: "Up to 110 min",
+    level: "All levels",
+    schedule: "Mon–Fri 7:00–8:50 · Sun 9:00–10:45",
+    desc: "Traditional self-paced Ashtanga practice. Each student works through the sequence at their own pace with individual guidance from the teacher. No prior experience needed — everyone starts from the beginning.",
+  },
+  {
+    img: "/images/classes/Ashtanga-clean.png",
+    name: "Pilates (Mat)",
+    instructor: "Brinkela Gjokaj",
+    duration: "45 min",
+    level: "All levels",
+    schedule: "Mon–Fri 9:00 · Sat–Sun 11:00 · Mon–Thu 18:00",
+    desc: "Full-body movement focusing on core strength, breath, and body awareness. Suitable for all fitness levels and particularly good for building a strong foundation.",
+  },
+  {
+    img: "/images/classes/mamma.png",
+    name: "Mama & Baby Pilates",
+    instructor: "Brinkela Gjokaj",
+    duration: "45 min",
+    level: "All levels",
+    schedule: "Mon & Thu 11:00 · Sat 14:00",
+    desc: "Gentle postpartum class for new mothers with infants. Focuses on recovery, core reconnection, and bonding. Babies are welcome on the mat.",
+  },
+  {
+    img: "/images/classes/Ashtanga.png",
+    name: "Ashtanga for Parents",
+    instructor: "Brinkela Gjokaj",
+    duration: "45 min",
+    level: "All levels",
+    schedule: "Tue & Fri 11:00",
+    desc: "Practice the Primary Series while caring for your children. A supportive environment where babies and small children are welcome to be present.",
+  },
+  {
+    img: "/images/classes/Ashtanga.png",
+    name: "Ashtanga Full Led",
+    instructor: "Brinkela Gjokaj",
+    duration: "90 min",
+    level: "Intermediate",
+    schedule: "Fri 16:30 · Sat 9:30",
+    desc: "Teacher-led complete Primary Series using the traditional Sanskrit count. All movements are called by the teacher. Some prior Mysore experience recommended.",
+  },
+  {
+    img: "/images/classes/Yinyoga.png",
+    name: "Yin Yoga",
+    instructor: "Julie",
+    duration: "50 min",
+    level: "All levels",
+    schedule: "Mon & Wed 18:50 · Fri 18:00",
+    desc: "Slow, meditative practice with longer-held poses targeting the deep connective tissues. A perfect counterbalance to the dynamic Ashtanga and Pilates classes.",
+  },
+  {
+    img: "/images/classes/Ashtanga-clean.png",
+    name: "Gentle Flow",
+    instructor: "Olga Kotsi",
+    duration: "50 min",
+    level: "All levels",
+    schedule: "Tue 18:50",
+    desc: "Soft, fluid movement for tension release and increased flexibility. Accessible for beginners and those recovering from injury.",
+  },
+  {
+    img: "/images/classes/Ashtanga.png",
+    name: "Ashtanga Led Standing",
+    instructor: "Brinkela Gjokaj",
+    duration: "50 min",
+    level: "All levels",
+    schedule: "Thu 18:50",
+    desc: "Guided standing sequence from the Primary Series with step-by-step instruction. Great for beginners building familiarity with the Ashtanga method.",
+  },
+  {
+    img: "/images/classes/Ashtanga-clean.png",
+    name: "Bootylicious",
+    instructor: "Olga Kotsi",
+    duration: "30 min",
+    level: "All levels",
+    schedule: "Sun 11:50",
+    desc: "Lower-body focused strength and cardio blend. Short, effective, and fun.",
+  },
 ];
-
-const morePrograms = [
-  { img: program6, title: "Find your midline", coach: "Natalie", style: "Vinyasa", duration: "90 min", level: "Level 2" },
-  { img: program7, title: "Quiet your body", coach: "Audrey", style: "Restorative", duration: "20 min", level: "Level 1" },
-  { img: program8, title: "Cooling breath", coach: "Natalie", style: "Breathwork", duration: "5 min", level: "Level 1" },
-  { img: program9, title: "Rooting down", coach: "Jaqui", style: "Prenatal", duration: "60 min", level: "Level 2" },
-];
-
-const collections = [
-  { img: gallery1, title: "Yoga principles", desc: "Deepen your understanding of the foundational principles of yoga in this class designed for both beginners and experienced practitioners.", count: "12 classes" },
-  { img: gallery2, title: "Rise & shine", desc: "An ideal choice for meditation beginners, Rise & Shine is a week-long program designed to help you greet the day with deeper clarity and vision.", count: "7 classes" },
-  { img: plan1, title: "Go with the flow", desc: "This power flow collection incorporates over 84 traditional Hatha poses to maximize your flow experience and promote full body flexibility.", count: "18 classes" },
-  { img: plan2, title: "Breaking barriers", desc: "Challenge yourself to better hold poses and deepen your stretches with this yin-focused yoga collection. All levels welcome.", count: "24 classes" },
-];
-
-const ClassDetail = ({ coach, style, duration, level }: { coach: string; style: string; duration: string; level: string }) => (
-  <div className="space-y-1">
-    <p className="text-sm text-foreground font-serif">
-      {style} <em className="font-serif">with</em> {coach}
-    </p>
-    <p className="text-sm text-muted-foreground font-sans">
-      {duration} · {level}
-    </p>
-  </div>
-);
 
 const Programs = () => {
   const [bookingOpen, setBookingOpen] = useState(false);
@@ -57,101 +94,55 @@ const Programs = () => {
     <div className="min-h-screen bg-background">
       <Header />
 
-      <section className="py-24 lg:py-36">
-        <div className="max-w-5xl mx-auto px-6 lg:px-8">
-          <h1 className="text-2xl lg:text-4xl font-serif text-foreground leading-relaxed animate-fade-in max-w-4xl">
-            Whether you're looking to try a beginner-level class or gain unlimited access to our library, we've got options to flex with your unique practice goals.
-          </h1>
-        </div>
+      <section className="max-w-5xl mx-auto px-6 lg:px-8 py-20 lg:py-32 text-center">
+        <p className="text-sm uppercase tracking-[0.2em] text-muted-foreground font-sans font-medium mb-4">What we offer</p>
+        <h1 className="text-3xl lg:text-5xl font-serif text-foreground leading-relaxed mb-6">
+          Classes for every body, every level.
+        </h1>
+        <p className="text-lg text-muted-foreground font-serif max-w-2xl mx-auto">
+          From traditional Ashtanga Mysore to Pilates, Yin Yoga, and specialist classes for parents and new mothers. Book any class through our booking flow.
+        </p>
       </section>
 
       <section className="max-w-7xl mx-auto px-6 lg:px-8 pb-24 lg:pb-36">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
-          <div className="lg:col-span-5 lg:row-span-2">
-            <div className="group">
-              <img src={programs[0].img} alt={programs[0].title} className="w-full aspect-[3/4] object-cover hover:opacity-90 transition-opacity" loading="lazy" />
-              <h3 className="text-2xl font-serif text-foreground mt-5 mb-3">{programs[0].title}</h3>
-              <ClassDetail {...programs[0]} />
-            </div>
-          </div>
-          <div className="lg:col-span-7 grid grid-cols-2 gap-6 lg:gap-8 content-start">
-            {programs.slice(1, 3).map((p) => (
-              <div key={p.title} className="group">
-                <img src={p.img} alt={p.title} className="w-full aspect-[4/3] object-cover hover:opacity-90 transition-opacity" loading="lazy" />
-                <h3 className="text-xl font-serif text-foreground mt-4 mb-2">{p.title}</h3>
-                <ClassDetail {...p} />
+        <div className="space-y-6">
+          {classes.map((cls) => (
+            <div
+              key={cls.name}
+              className="grid grid-cols-1 lg:grid-cols-[280px_1fr_auto] gap-6 items-center bg-card rounded-xl p-6 lg:p-8"
+            >
+              <img
+                src={cls.img}
+                alt={cls.name}
+                className="w-full lg:w-[280px] aspect-[4/3] object-cover rounded-lg"
+                loading="lazy"
+              />
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center gap-3 mb-2">
+                  <h2 className="text-xl lg:text-2xl font-serif text-card-foreground">{cls.name}</h2>
+                  <span className="text-xs font-sans font-medium uppercase tracking-wider bg-secondary text-foreground px-3 py-1 rounded-full">
+                    {cls.level}
+                  </span>
+                </div>
+                <p className="text-sm text-muted-foreground font-sans leading-relaxed">{cls.desc}</p>
+                <div className="flex flex-wrap gap-4 pt-2 text-xs font-sans text-muted-foreground">
+                  <span><span className="font-medium text-foreground">Instructor:</span> {cls.instructor}</span>
+                  <span><span className="font-medium text-foreground">Duration:</span> {cls.duration}</span>
+                </div>
+                <p className="text-xs font-sans text-muted-foreground pt-1">
+                  <span className="font-medium text-foreground">Schedule:</span> {cls.schedule}
+                </p>
               </div>
-            ))}
-            {programs.slice(3, 5).map((p) => (
-              <div key={p.title} className="group">
-                <img src={p.img} alt={p.title} className="w-full aspect-[4/3] object-cover hover:opacity-90 transition-opacity" loading="lazy" />
-                <h3 className="text-xl font-serif text-foreground mt-4 mb-2">{p.title}</h3>
-                <ClassDetail {...p} />
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="bg-warm-olive py-24 lg:py-36">
-        <div className="max-w-7xl mx-auto px-6 lg:px-8">
-          <h2 className="text-3xl lg:text-5xl font-serif text-white mb-16">Collections</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-6">
-            {collections.map((c) => (
-              <div key={c.title} className="group">
-                <img src={c.img} alt={c.title} className="w-full aspect-[3/4] object-cover hover:opacity-90 transition-opacity" loading="lazy" />
-                <h3 className="text-xl font-serif text-white mt-6 mb-3 group-hover:opacity-80 transition-opacity">{c.title}</h3>
-                <p className="text-sm text-white/80 leading-relaxed font-serif mb-3">{c.desc}</p>
-                <p className="text-sm text-white/60 italic font-serif">{c.count}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="max-w-7xl mx-auto px-6 lg:px-8 py-24 lg:py-36">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
-          <div className="lg:col-span-7 grid grid-cols-2 gap-6 lg:gap-8 content-start">
-            {morePrograms.slice(0, 4).map((p) => (
-              <div key={p.title} className="group">
-                <img src={p.img} alt={p.title} className="w-full aspect-[4/3] object-cover hover:opacity-90 transition-opacity" loading="lazy" />
-                <h3 className="text-xl font-serif text-foreground mt-4 mb-2">{p.title}</h3>
-                <ClassDetail {...p} />
-              </div>
-            ))}
-          </div>
-          <div className="lg:col-span-5">
-            <div className="group">
-              <img src={featureBg} alt="Clearing away the fog" className="w-full aspect-[3/4] lg:aspect-auto lg:h-full object-cover hover:opacity-90 transition-opacity" loading="lazy" />
-              <h3 className="text-2xl font-serif text-foreground mt-5 mb-3">Clearing away the fog</h3>
-              <ClassDetail coach="Gabbi" style="Sound bath" duration="45 min" level="Level 1" />
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="relative mx-6 lg:mx-8 mb-24 lg:mb-36">
-        <div className="max-w-7xl mx-auto overflow-hidden">
-          <div className="relative">
-            <img src={gallery1} alt="" className="w-full h-[400px] lg:h-[500px] object-cover" aria-hidden="true" />
-            <div className="absolute inset-0 bg-foreground/30" />
-            <div className="absolute inset-0 flex items-center justify-between px-8 lg:px-16">
-              <h2 className="text-2xl lg:text-4xl font-serif text-white leading-tight max-w-md italic">
-                Get unlimited access to each of these featured classes and more.
-              </h2>
-              <div className="text-right space-y-4">
-                <h3 className="text-xl lg:text-2xl font-serif text-white">Unlimited Yoga & Meditation</h3>
-                <p className="text-white/80 font-serif text-sm">Improve your practice at your own pace.</p>
-                <p className="text-3xl lg:text-4xl font-serif text-white">$49/mo</p>
+              <div className="lg:self-center">
                 <button
                   onClick={() => setBookingOpen(true)}
-                  className="inline-block bg-warm-blush hover:bg-warm-blush/80 text-foreground px-8 py-3 font-sans font-medium text-sm uppercase tracking-wider transition-all"
+                  className="w-full lg:w-auto whitespace-nowrap bg-primary hover:bg-primary/80 text-primary-foreground px-6 py-3 font-sans font-medium text-sm uppercase tracking-wider rounded-lg transition-all duration-200"
                 >
-                  Book a Session
+                  Book
                 </button>
               </div>
             </div>
-          </div>
+          ))}
         </div>
       </section>
 

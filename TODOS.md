@@ -49,3 +49,31 @@ Deferred work captured during /plan-eng-review on 2026-04-15.
 **Context:** `new-studio.sh` provisions fresh projects from scratch and runs migrations. No "apply to existing studios" script exists. Supabase project refs are embedded in `.env.<slug>` files.
 
 **Depends on:** Not blocking. Relevant after 3rd studio is live.
+
+---
+
+## YogaBrie: Seed sessions in Supabase
+
+**What:** Run the session INSERT SQL against the live YogaBrie Supabase project (project ref: xskqpxfjhhxontirezjd). The full SQL is in CLAUDE.md under "Seeding Sessions".
+
+**Why:** The booking flow shows no sessions until the sessions table has rows. The site is live but `Book a Session` will return an empty class list.
+
+**How:** Open the Supabase dashboard → SQL editor → paste and run the INSERT block from CLAUDE.md. Verify by opening the booking sheet and browsing dates.
+
+**Depends on:** Nothing. Do this before showing the site to Brinkela.
+
+---
+
+## Shop / Membership purchasing
+
+**What:** The `/joinnow` page currently shows all 7 products with prices but has no purchase flow. Students can browse but must contact the studio to actually buy.
+
+**Why:** Conversion drops when there's no buy button. For memberships and clip cards, an online purchase flow (Vipps or Stripe) removes friction.
+
+**Pros:** Self-serve purchasing, less admin for the studio owner.
+
+**Cons:** Requires Vipps integration (Phase 2) or Stripe checkout session from an Edge Function. Not a simple frontend change.
+
+**Context:** Products and prices are hardcoded in `src/pages/JoinNow.tsx`. For now, the CTA is `contact@yogabrie.com`. Phase 2 will add a `products` table in Supabase and a checkout flow.
+
+**Depends on:** Vipps integration (Phase 2) or Stripe Checkout (simpler interim option).
