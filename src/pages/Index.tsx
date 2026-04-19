@@ -94,14 +94,17 @@ const Index = () => {
 
       {/* Hero — full-bleed photo */}
       <section className="relative min-h-screen overflow-hidden">
-        <img
-          src="/images/hero/hero1.avif"
-          alt="YogaBrie studio"
-          className="absolute inset-0 w-full h-full object-cover"
-        />
+        <picture>
+          <source media="(max-width: 767px)" srcSet="/images/hero/hero2.avif" />
+          <img
+            src="/images/hero/hero1.avif"
+            alt="YogaBrie studio"
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+        </picture>
         <div className="absolute inset-0 bg-foreground/40" />
-        <div className="relative z-10 flex items-center min-h-screen px-8 lg:px-16">
-          <div className="max-w-2xl">
+        <div className="relative z-10 flex items-center justify-center md:justify-start min-h-screen px-8 lg:px-16">
+          <div className="max-w-2xl text-center md:text-left">
             <p className="text-sm font-sans font-medium uppercase tracking-[0.2em] text-primary-foreground/70 mb-4">
               Brageveien 5 A · Oslo
             </p>
@@ -110,7 +113,7 @@ const Index = () => {
             </h1>
             <button
               onClick={() => setBookingOpen(true)}
-              className="bg-primary hover:bg-primary/80 text-primary-foreground px-10 py-4 font-sans font-medium text-sm uppercase tracking-wider rounded-lg transition-all duration-200"
+              className="block mx-auto md:inline-block md:mx-0 bg-primary hover:bg-primary/80 text-primary-foreground px-10 py-4 font-sans font-medium text-sm uppercase tracking-wider rounded-lg transition-all duration-200"
             >
               Book a Session
             </button>
