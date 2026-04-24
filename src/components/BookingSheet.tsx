@@ -62,11 +62,13 @@ const BookingSheet = ({ isOpen, onClose }: BookingSheetProps) => {
 
     try {
       const returnUrl = window.location.origin;
+      const { data: { session } } = await supabase.auth.getSession();
       const { data, error } = await supabase.functions.invoke("create-checkout", {
         body: {
           class_instance_id: selectedSession.id,
           return_url: returnUrl,
         },
+        headers: session ? { Authorization: `Bearer ${session.access_token}` } : {},
       });
 
       if (error || !data?.checkout_url) {
