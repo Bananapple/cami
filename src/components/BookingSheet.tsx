@@ -70,7 +70,12 @@ const BookingSheet = ({ isOpen, onClose }: BookingSheetProps) => {
       });
 
       if (error || !data?.checkout_url) {
-        const message = error?.message ?? data?.error ?? "Unable to start checkout. Please try again.";
+        let message = data?.error ?? "Unable to start checkout. Please try again.";
+        if (error?.context) {
+          try { const body = await error.context.json(); message = body.error ?? message; } catch {}
+        } else if (error?.message) {
+          message = error.message;
+        }
         setCheckoutError(message);
         return;
       }
