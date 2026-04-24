@@ -16,7 +16,7 @@ Deferred work captured during /plan-eng-review on 2026-04-15.
 
 **Context:** `cancelBooking` mutation in `useBookings.ts:59` currently sets `status='cancelled'` and `cancelled_at`. In v2 it should also call `/functions/v1/issue-refund` when cancelling within the window, and update `bookings.status='cancelled'` only after the refund is initiated (or queued). Schema already ready: `bookings.payment_id` → `payments.provider_payment_id` exists in `0005_payments_provider_agnostic.sql`. Refund contract in `src/types/database.ts` under `EdgeFunctions.IssueRefundRequest`.
 
-**Depends on:** v2 payment layer applied; `issue-refund` Edge Function built.
+**Depends on:** ~~v2 payment layer applied~~ ✅; ~~`issue-refund` Edge Function built~~ ✅. Ready to implement.
 
 ---
 
@@ -38,17 +38,9 @@ Deferred work captured during /plan-eng-review on 2026-04-15.
 
 ## Multi-studio migration management
 
-**What:** A script (e.g., `./scripts/migrate-all.sh`) that reads all provisioned studio `.env.*` files, runs `supabase db push --project-ref <ref>` against each project, and reports pass/fail per studio. Optionally: a `studio_registry.json` that tracks studio slug → Supabase project ref → last migrated schema version.
+## ~~Multi-studio migration management~~ — OBSOLETE
 
-**Why:** As the schema evolves (adding `day_of_week`, `max_capacity`, `events` table, etc.), each existing studio must have migrations applied. With 3 studios this is manual. With 5+ it becomes error-prone and will eventually cause schema drift between studios.
-
-**Pros:** Prevents "studio 1 has max_capacity, studio 3 doesn't" bugs. Makes migrations auditable.
-
-**Cons:** Over-engineering for 3 studios. Manual per-studio migration is fine until 5th studio is onboarded.
-
-**Context:** `new-studio.sh` provisions fresh projects from scratch and runs migrations. No "apply to existing studios" script exists. Supabase project refs are embedded in `.env.<slug>` files.
-
-**Depends on:** Not blocking. Relevant after 3rd studio is live.
+Retired with the v2 multi-tenant cutover. All studios now share one Supabase project (`xskqpxfjhhxontirezjd`). Schema migrations run once against the shared project, not per-studio.
 
 ---
 
@@ -71,7 +63,7 @@ Deferred work captured during /plan-eng-review on 2026-04-15.
 
 **Context:** Products and prices are hardcoded in `src/pages/JoinNow.tsx`. For now, the CTA is `contact@yogabrie.com`. The Edge Function contract is defined in `docs/MIGRATION-MULTITENANT.md` §4 and typed in `src/types/database.ts` under `EdgeFunctions.CreateCheckoutRequest`.
 
-**Depends on:** `create-checkout` Edge Function built + provider-agnostic payment schema applied (`supabase/migrations-v2/0005_payments_provider_agnostic.sql`). No more Stripe-specific code required — adding Frisbii or Vipps later is a pure adapter swap.
+**Depends on:** ~~`create-checkout` Edge Function built~~ ✅; ~~`0005_payments_provider_agnostic.sql` applied~~ ✅. Ready to implement. Note: `/joinnow` prices are still hardcoded — move to DB before wiring checkout.
 
 ---
 

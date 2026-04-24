@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is a **multi-tenant SaaS platform** for Norwegian yoga studios. A single Supabase project serves all studios, with every tenanted table scoped by `studio_id` and RLS enforcing isolation. The owner sells websites + booking engines as a flat monthly SaaS fee. Student payments flow directly to each studio (no marketplace layer) via a **provider-agnostic adapter pattern** — Stripe Checkout in MVP, Frisbii next (Brie already uses it), Vipps later for Norwegian market fit. Adding a provider is an adapter file + one enum value; no schema changes.
 
-**Architectural state**: The current live YogaBrie deployment still runs on the legacy "one Supabase project per studio" model. The v2 multi-tenant schema is staged in `supabase/migrations-v2/` and documented in `docs/MIGRATION-MULTITENANT.md`. Cutover is pending — see that document for the execution order.
+**Architectural state**: YogaBrie (`xskqpxfjhhxontirezjd`, eu-north-1) has completed the v2 cutover as of 2026-04-24. The multi-tenant schema is live. The legacy `sessions` table and `session_id`/`session_date` columns on `bookings` are still present but inert — drop them once rollback confidence is established. The migration SQL is in `supabase/migrations-v2/` and the execution record is in `docs/MIGRATION-MULTITENANT.md`.
 
 ## Commands
 
@@ -21,43 +21,14 @@ npm run test -- src/test/some.test.ts  # Run a single test file
 
 ## Provisioning a New Studio
 
-**Legacy (current, being retired)**: `./scripts/new-studio.sh` creates a new Supabase project per studio. This model is deprecated but remains in place until the v2 cutover.
-
-**Target (v2, documented in `docs/MIGRATION-MULTITENANT.md`)**: adding a studio is a row INSERT into `studios` + Stripe Connect (or Frisbii / Vipps) onboarding. Schedule is built via `class_templates` + `schedule_rules` instead of the flat `sessions` table.
-
-### Seeding Sessions (legacy)
-
-For studios still on the legacy schema, insert sessions via the Supabase dashboard or SQL. The `day_of_week` column controls which days a class appears in the booking UI. Values follow JS `Date.getDay()`: 0=Sunday, 1=Monday, ..., 6=Saturday.
-
-```sql
--- YogaBrie full session seed (adapt times/days per studio)
-INSERT INTO sessions (class_name, practitioner_name, practitioner_initials, time, duration, level, location, price, day_of_week)
-VALUES
-  ('Ashtanga Mysore', 'Brinkela Gjokaj', 'BG', '07:00', 110, 'All levels', 'Studio', 250, '{1,2,3,4,5}'),
-  ('Ashtanga Mysore', 'Brinkela Gjokaj', 'BG', '09:00', 45, 'All levels', 'Studio', 250, '{0}'),
-  ('Pilates', 'Brinkela Gjokaj', 'BG', '09:00', 45, 'All levels', 'Studio', 250, '{1,2,3,4,5}'),
-  ('Pilates', 'Brinkela Gjokaj', 'BG', '11:00', 45, 'All levels', 'Studio', 250, '{0,6}'),
-  ('Pilates', 'Brinkela Gjokaj', 'BG', '18:00', 45, 'All levels', 'Studio', 250, '{1,2,3,4}'),
-  ('Mama & Baby Pilates', 'Brinkela Gjokaj', 'BG', '11:00', 45, 'All levels', 'Studio', 250, '{1,4}'),
-  ('Mama & Baby Pilates', 'Brinkela Gjokaj', 'BG', '14:00', 45, 'All levels', 'Studio', 250, '{6}'),
-  ('Ashtanga for Parents', 'Brinkela Gjokaj', 'BG', '11:00', 45, 'All levels', 'Studio', 250, '{2,5}'),
-  ('Ashtanga Full Led', 'Brinkela Gjokaj', 'BG', '16:30', 90, 'Intermediate', 'Studio', 250, '{5}'),
-  ('Ashtanga Full Led', 'Brinkela Gjokaj', 'BG', '09:30', 90, 'Intermediate', 'Studio', 250, '{6}'),
-  ('Yin Yoga', 'Julie', 'J', '18:50', 50, 'All levels', 'Studio', 250, '{1,3}'),
-  ('Yin Yoga', 'Julie', 'J', '18:00', 50, 'All levels', 'Studio', 250, '{5}'),
-  ('Gentle Flow', 'Olga Kotsi', 'OK', '18:50', 50, 'All levels', 'Studio', 250, '{2}'),
-  ('Ashtanga Led Standing', 'Brinkela Gjokaj', 'BG', '18:50', 50, 'All levels', 'Studio', 250, '{4}'),
-  ('Bootylicious', 'Olga Kotsi', 'OK', '11:50', 30, 'All levels', 'Studio', 250, '{0}');
-```
-
-Sessions with an empty `day_of_week` (`'{}'`) appear on every day — use this only as a temporary placeholder. Always set real days before going live.
+**v2 (live)**: Adding a studio is a row INSERT into `studios` + payment provider onboarding. Schedule is built via `class_templates` + `schedule_rules`; `materialize_class_instances()` populates the 90-day rolling window. `scripts/new-studio.sh` is retired.
 
 ## Architecture
 
 ### Stack
 - React 18 + TypeScript + Vite (SWC), React Router v6
 - Tailwind CSS + shadcn/ui (Radix UI primitives)
-- Supabase — single multi-tenant project in the v2 target (currently still per-studio on legacy YogaBrie)
+- Supabase — single multi-tenant project (`xskqpxfjhhxontirezjd`), v2 schema live
 - TanStack Query for server state
 - react-hook-form + zod for forms
 - **Provider-agnostic payment layer**: canonical `payments` table + `PaymentProviderAdapter` interface. MVP adapter = Stripe Checkout; adapters planned for Frisbii and Vipps. Secrets (API keys, webhook secrets) live in Supabase Edge Function env, never in frontend or DB.
@@ -67,7 +38,7 @@ All Supabase access goes through the client in `src/integrations/supabase/client
 
 Key hooks (current):
 - `useAuth()` — passwordless OTP (`sendOtp`, `verifyOtp`), `signOut`, current user/session
-- `useSessions()` — available yoga classes (legacy; v2 uses `useClassInstances()`)
+- `useClassInstances()` — fetches 14-day window of scheduled class instances with joined template/instructor/location data
 - `useBookings()` — user's bookings + `cancelBooking` mutation (booking creation is now handled server-side by the `create-checkout` Edge Function)
 - `usePaymentMethods()` — saved payment methods
 - `useStudioConfig()` — studio branding (legacy; v2 replaces this with `StudioContext`)
@@ -96,7 +67,7 @@ Key hooks (current):
 | `memberships` | Subscription plans |
 | `studio_config` | Per-deployment branding (one row) |
 
-**v2 (staged in `supabase/migrations-v2/`, not yet applied)** — full design in `docs/MIGRATION-MULTITENANT.md`:
+**v2 (live as of 2026-04-24)** — full design in `docs/MIGRATION-MULTITENANT.md`:
 
 | v2 Table | Purpose |
 |---|---|

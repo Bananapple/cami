@@ -1,6 +1,6 @@
 # Feature Roadmap
 
-Architecture assessment conducted 2026-04-23. Nothing below is applied to production yet. The target schema is staged in `supabase/migrations-v2/` with the full design in `docs/MIGRATION-MULTITENANT.md`.
+Architecture assessment conducted 2026-04-23. v2 cutover completed 2026-04-24 — all migrations live on `xskqpxfjhhxontirezjd`. Schema in `supabase/migrations-v2/`, full design in `docs/MIGRATION-MULTITENANT.md`.
 
 ---
 
@@ -19,12 +19,12 @@ Architecture assessment conducted 2026-04-23. Nothing below is applied to produc
 ### ✅ Edge Functions — RESOLVED (2026-04-23) — built and tested locally
 **Decision**: Three Deno Edge Functions + shared provider adapter layer. Stripe adapter implemented.
 **Artifacts**: `supabase/functions/create-checkout/`, `supabase/functions/payment-webhook/`, `supabase/functions/issue-refund/`, `supabase/functions/_shared/providers/` (types, index, stripe adapter).
-**Implication**: All payment logic runs server-side. Frontend calls `supabase.functions.invoke('create-checkout')` and redirects. Webhook at `/payment-webhook/stripe` handles confirmation. Pending: deploy to production + set Supabase secrets + apply v2 migrations so `class_instances` table exists.
+**Implication**: All payment logic runs server-side. Frontend calls `supabase.functions.invoke('create-checkout')` and redirects. Webhook at `/payment-webhook/stripe` handles confirmation. All three functions deployed to production; secrets set.
 
 ### ✅ Passwordless Auth (Email OTP) — RESOLVED (2026-04-24)
 **Decision**: Replace email + password with a two-phase OTP flow. Single email field → 6-digit code sent to inbox → verified in-sheet via `supabase.auth.verifyOtp`. `shouldCreateUser: true` handles both new and returning users with one call.
 **Artifacts**: `src/hooks/useAuth.ts` (`sendOtp`, `verifyOtp`), `src/components/booking/AuthForm.tsx` (two-phase form with 30s resend cooldown).
-**Implication**: No password storage, no password reset flow. `handle_new_user` trigger unchanged — handles empty `full_name` gracefully. SMS OTP via Twilio deferred to Phase 2 (see TODOS.md).
+**Implication**: No password storage, no password reset flow. `handle_new_user` trigger updated to also auto-enroll new users in all active studios via `studio_members`. SMS OTP via Twilio deferred to Phase 2 (see TODOS.md).
 
 ---
 
