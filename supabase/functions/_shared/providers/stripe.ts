@@ -20,6 +20,7 @@ export class StripeProvider implements PaymentProviderAdapter {
       {
         payment_method_types: ["card"],
         mode: "payment",
+        ...(params.customer_email ? { customer_email: params.customer_email } : {}),
         line_items: [
           {
             price_data: {

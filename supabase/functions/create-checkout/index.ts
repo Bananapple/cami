@@ -2,6 +2,7 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 import { getProvider } from "../_shared/providers/index.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const APP_URL = Deno.env.get("APP_URL") ?? "https://brie-alpha.vercel.app";
 
@@ -18,15 +19,19 @@ Deno.serve(async (req) => {
 
   try {
     // --- Auth: require a valid Supabase JWT ---
+    console.log("create-checkout called, method:", req.method);
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
       return json({ error: "Missing authorization header" }, 401);
     }
     const jwt = authHeader.slice(7);
 
-    // Verify the JWT and get the user (pass token explicitly — createClient uses it as apikey, not auth header)
-    const userClient = createClient(SUPABASE_URL, jwt);
-    const { data: { user }, error: authError } = await userClient.auth.getUser(jwt);
+    // User-scoped client: anon key as API key, user JWT as auth header
+    const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      global: { headers: { Authorization: `Bearer ${jwt}` } },
+    });
+    const { data: { user }, error: authError } = await userClient.auth.getUser();
+    console.log("getUser:", user?.id ?? "null", "authError:", authError?.message ?? "none");
     if (authError || !user) return json({ error: "Unauthorized" }, 401);
 
     // Service-role client for writing (bypasses RLS — used only for inserts we control)
@@ -98,6 +103,7 @@ Deno.serve(async (req) => {
       .select("id")
       .single();
     if (bookingErr || !booking) {
+      console.error("Booking insert error:", bookingErr?.code, bookingErr?.message, bookingErr?.details);
       // Clean up the payment row before returning
       await adminClient.from("payments").update({ status: "failed" }).eq("id", payment.id);
       return json({ error: "Failed to create booking record" }, 500);
@@ -111,6 +117,7 @@ Deno.serve(async (req) => {
     try {
       checkoutResult = await adapter.createCheckoutSession({
         studio_provider_account_id: providerRow.provider_account_id,
+        customer_email: user.email,
         amount: Math.round(instance.price * 100),  // convert NOK → øre
         currency: "NOK",
         description: `Class booking`,
