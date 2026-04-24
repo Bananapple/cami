@@ -19,7 +19,6 @@ Deno.serve(async (req) => {
 
   try {
     // --- Auth: require a valid Supabase JWT ---
-    console.log("create-checkout called, method:", req.method);
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
       return json({ error: "Missing authorization header" }, 401);
@@ -31,7 +30,6 @@ Deno.serve(async (req) => {
       global: { headers: { Authorization: `Bearer ${jwt}` } },
     });
     const { data: { user }, error: authError } = await userClient.auth.getUser();
-    console.log("getUser:", user?.id ?? "null", "authError:", authError?.message ?? "none");
     if (authError || !user) return json({ error: "Unauthorized" }, 401);
 
     // Service-role client for writing (bypasses RLS — used only for inserts we control)
@@ -103,7 +101,6 @@ Deno.serve(async (req) => {
       .select("id")
       .single();
     if (bookingErr || !booking) {
-      console.error("Booking insert error:", bookingErr?.code, bookingErr?.message, bookingErr?.details);
       // Clean up the payment row before returning
       await adminClient.from("payments").update({ status: "failed" }).eq("id", payment.id);
       return json({ error: "Failed to create booking record" }, 500);
