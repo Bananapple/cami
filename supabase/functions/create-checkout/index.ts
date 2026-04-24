@@ -24,9 +24,9 @@ Deno.serve(async (req) => {
     }
     const jwt = authHeader.slice(7);
 
-    // User-scoped client for reading (respects RLS)
+    // Verify the JWT and get the user (pass token explicitly — createClient uses it as apikey, not auth header)
     const userClient = createClient(SUPABASE_URL, jwt);
-    const { data: { user }, error: authError } = await userClient.auth.getUser();
+    const { data: { user }, error: authError } = await userClient.auth.getUser(jwt);
     if (authError || !user) return json({ error: "Unauthorized" }, 401);
 
     // Service-role client for writing (bypasses RLS — used only for inserts we control)
