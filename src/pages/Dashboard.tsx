@@ -7,7 +7,7 @@ import { Link, Navigate } from "react-router-dom";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import BookingSheet from "@/components/BookingSheet";
-import { Calendar, MapPin, LogOut, CreditCard, User, X } from "lucide-react";
+import { LogOut, CreditCard, User, X } from "lucide-react";
 import { toast } from "sonner";
 
 const Dashboard = () => {
@@ -35,8 +35,16 @@ const Dashboard = () => {
   };
 
   const handleCancelBooking = async (id: string) => {
-    await cancelBooking.mutateAsync(id);
-    toast("Booking cancelled.");
+    const result = await cancelBooking.mutateAsync(id);
+    if (result?.refunded) {
+      toast(`Booking cancelled. A refund of NOK ${result.refund_amount} is on its way.`);
+    } else if (result?.reason === "inside_cancellation_window") {
+      toast("Booking cancelled. No refund — cancellation is within 24 hours of class.");
+    } else if (result?.reason === "refund_failed") {
+      toast("Booking cancelled. Refund could not be processed automatically — we'll follow up.");
+    } else {
+      toast("Booking cancelled.");
+    }
   };
 
   const greeting = () => {
@@ -122,29 +130,29 @@ const Dashboard = () => {
                 </p>
               ) : (
                 <div className="space-y-3">
-                  {bookings.map((booking: any) => (
+                  {bookings.map((booking: any) => {
+                    const ci = booking.class_instances;
+                    const startsAt = ci?.starts_at ? new Date(ci.starts_at) : null;
+                    return (
                     <div
                       key={booking.id}
                       className="flex items-center gap-4 p-4 rounded-lg border border-border"
                     >
                       <div className="text-center min-w-[50px]">
                         <p className="text-xs font-sans font-medium uppercase text-muted-foreground">
-                          {new Date(booking.session_date).toLocaleDateString("en-US", { weekday: "short" })}
+                          {startsAt?.toLocaleDateString("en-US", { weekday: "short" }) ?? "—"}
                         </p>
                         <p className="text-lg font-serif text-foreground">
-                          {new Date(booking.session_date).getDate()}
+                          {startsAt?.getDate() ?? "—"}
                         </p>
                       </div>
                       <div className="flex-1">
                         <p className="text-sm font-serif text-foreground">
-                          {booking.session?.class_name}
+                          {ci?.class_templates?.name ?? "Class"}
                         </p>
                         <p className="text-xs text-muted-foreground font-sans">
-                          {booking.session?.time} · {booking.session?.duration} min
-                        </p>
-                        <p className="text-xs text-muted-foreground font-sans flex items-center gap-1 mt-0.5">
-                          <MapPin className="w-3 h-3" />
-                          {booking.session?.location}
+                          {startsAt?.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false }) ?? ""}
+                          {ci?.class_templates?.default_duration_minutes ? ` · ${ci.class_templates.default_duration_minutes} min` : ""}
                         </p>
                       </div>
                       <button
@@ -155,7 +163,8 @@ const Dashboard = () => {
                         <X className="w-4 h-4" />
                       </button>
                     </div>
-                  ))}
+                  );
+                  })}
                 </div>
               )}
 

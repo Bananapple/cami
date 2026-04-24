@@ -8,6 +8,17 @@ This is a **multi-tenant SaaS platform** for Norwegian yoga studios. A single Su
 
 **Architectural state**: YogaBrie (`xskqpxfjhhxontirezjd`, eu-north-1) has completed the v2 cutover as of 2026-04-24. The multi-tenant schema is live. The legacy `sessions` table and `session_id`/`session_date` columns on `bookings` are still present but inert — drop them once rollback confidence is established. The migration SQL is in `supabase/migrations-v2/` and the execution record is in `docs/MIGRATION-MULTITENANT.md`.
 
+**Live features (as of 2026-04-24):**
+- Passwordless email OTP auth
+- Class schedule from `class_instances` (14-day rolling window)
+- Stripe Checkout booking flow (server-side via Edge Functions)
+- Webhook-confirmed bookings + booking confirmation email (Resend)
+- Cancel + refund via `issue-refund` Edge Function (24h window policy)
+
+**Edge Function deploy notes:**
+- `payment-webhook` must be deployed with `--no-verify-jwt` (Stripe sends no JWT)
+- `create-checkout` and `issue-refund` use standard JWT auth (no flag needed)
+
 ## Commands
 
 ```bash
@@ -46,7 +57,7 @@ Key hooks (current):
 
 ### Booking Flow (`src/components/BookingSheet.tsx`)
 
-**Current**: `date → confirm → auth → checkout`. The `auth` step uses a two-phase email OTP form (email → 6-digit code). The `checkout` step calls the `create-checkout` Edge Function, which creates a `payments` row + `bookings` row (`status='pending'`) and returns a hosted provider checkout URL. The browser redirects out; the provider's webhook promotes the booking to `confirmed` on success. On return, `Index.tsx` detects `?status=success` in the URL and shows a Sonner toast.
+**Current**: `date → confirm → auth → checkout`. The `auth` step uses a two-phase email OTP form (email → 6-digit code). The `checkout` step calls the `create-checkout` Edge Function, which creates a `payments` row + `bookings` row (`status='pending'`) and returns a hosted provider checkout URL. The browser redirects out; the provider's webhook promotes the booking to `confirmed` on success and sends a booking confirmation email via Resend. On return, `Index.tsx` detects `?status=success` in the URL and shows a Sonner toast.
 
 **Legacy (decommissioned)**: was `date → confirm → auth → payment → addCard → success` with an insecure client-side `StripeCardForm` that wrote card details directly to the DB.
 
@@ -86,6 +97,7 @@ Key hooks (current):
 | `payment_methods` | Generalized: `provider` + `provider_external_id` |
 | `memberships` | `provider` + `provider_subscription_id` |
 | `waitlists` | Reservation-window state machine (`waiting`→`offered`→`accepted`/`expired`) |
+| `notification_log` | Idempotent outbound notification record (email/SMS, one row per send attempt) |
 
 RLS helper functions: `user_studio_ids()`, `user_has_role(studio_id, roles[])`, `user_is_staff(studio_id)`. All `SECURITY DEFINER` with locked `search_path` to prevent privilege escalation. Conflict detection for instructors and rooms uses `EXCLUDE USING GIST` on `tstzrange` — double-booking is rejected at the DB level.
 
@@ -106,7 +118,13 @@ VITE_SUPABASE_PUBLISHABLE_KEY
 VITE_STUDIO_SLUG              # e.g. "yogabrie" — resolves the current tenant on load
 ```
 
-Payment provider secrets (`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, etc.) live in Supabase Edge Function env via `supabase secrets set`. Never in frontend, never in git.
+Payment provider and notification secrets live in Supabase Edge Function env via `supabase secrets set`. Never in frontend, never in git:
+```
+STRIPE_SECRET_KEY
+STRIPE_WEBHOOK_SECRET
+RESEND_API_KEY
+FROM_EMAIL          # e.g. booking@yogabrie.no — defaults to onboarding@resend.dev if unset
+```
 
 Copy `.env.example` → `.env` per studio deployment. Never commit `.env` (gitignored).
 
@@ -117,15 +135,16 @@ Copy `.env.example` → `.env` per studio deployment. Never commit `.env` (gitig
 - **Live URL:** https://brie-alpha.vercel.app
 - **Platform:** Vercel (connected to GitHub repo `Bananapple/brie`, auto-deploys on push to `main`)
 - **Supabase project ref:** `xskqpxfjhhxontirezjd` (eu-north-1)
-- **Sessions:** Seeded — all 15 class slots live in the `sessions` table
+- **Schedule:** Seeded — 15 class slots migrated to `class_templates` + `schedule_rules`; 90-day `class_instances` window materialized
 
 ### Vercel environment variables
 Set these in Vercel → Project → Settings → Environment Variables (Production scope, no quotes):
 ```
 VITE_SUPABASE_URL
 VITE_SUPABASE_PUBLISHABLE_KEY
-VITE_STRIPE_PUBLISHABLE_KEY
+VITE_STUDIO_SLUG
 ```
+`VITE_STRIPE_PUBLISHABLE_KEY` is no longer needed — payments are fully server-side via Edge Functions.
 After adding or changing env vars, trigger a fresh deploy (don't use "Redeploy from cache").
 
 ### Git config requirement

@@ -1,6 +1,6 @@
 # Multi-Tenant Migration Plan
 
-**Status**: Partially implemented (2026-04-23/24). Edge Functions built; v2 migrations staged but not yet applied to production.
+**Status**: ✅ Complete (2026-04-24). All migrations applied to production (`xskqpxfjhhxontirezjd`). Edge Functions deployed. YogaBrie is live on the v2 schema.
 **Scope**: Pivot from one-Supabase-project-per-studio to a single multi-tenant project. Addresses tenancy, recurrence engine, waitlist reservation windows, and Stripe security.
 
 ---
@@ -24,12 +24,13 @@ The per-project model blocks every feature that needs cross-studio context: CRM 
 | Phase | What | Status |
 |---|---|---|
 | 0 | Kill the insecure card form; replace with hosted Stripe Checkout redirect | ✅ Done |
-| 1 | Create `studios`, `studio_members`, helper functions | Staged in `0001_core_tenancy.sql` |
-| 2 | Add `studio_id` to existing tenanted tables; backfill; rewrite RLS | Staged in `0002_backfill_and_rls.sql` |
-| 3 | Recurrence engine tables; migrate `sessions` → `class_templates` + `schedule_rules` | Staged in `0003_recurrence_engine.sql` |
-| 4 | Waitlist with reservation window + pg_cron expiry job | Staged in `0004_waitlists.sql` |
-| 5 | Provider-agnostic payment layer + Edge Functions | Staged + Edge Functions ✅ built |
-| 6+ | Feature work (CRM, referrals, waivers, etc.) on the new foundation | Pending migration cutover |
+| 1 | Create `studios`, `studio_members`, helper functions | ✅ Applied (`0001_core_tenancy.sql`) |
+| 2 | Add `studio_id` to existing tenanted tables; backfill; rewrite RLS | ✅ Applied (`0002_backfill_and_rls.sql`) |
+| 3 | Recurrence engine tables; migrate `sessions` → `class_templates` + `schedule_rules` | ✅ Applied (`0003_recurrence_engine.sql`) |
+| 4 | Waitlist with reservation window + pg_cron expiry job | ✅ Applied (`0004_waitlists.sql`) |
+| 5 | Provider-agnostic payment layer + Edge Functions deployed | ✅ Applied (`0005_payments_provider_agnostic.sql`) |
+| 6 | Notification log + booking confirmation email | ✅ Applied (`0006_notification_log.sql`) |
+| 7+ | Feature work (class reminders, manager UI, memberships, referrals, waivers) | In progress |
 
 ---
 
@@ -475,15 +476,17 @@ Every `stripe_*` column in the schema is a line of code that has to be rewritten
 - No auth header; adapter verifies signature
 - Parses provider's webhook into `CanonicalWebhookEvent` (shared shape)
 - Dedupes against `payment_webhook_events (provider, provider_event_id)`
-- On `payment.succeeded`: `payments.status='succeeded'`, booking → `confirmed`
+- On `payment.succeeded`: `payments.status='succeeded'`, booking → `confirmed`, sends booking confirmation email via Resend
 - On `payment.failed` / `payment.cancelled`: booking → `payment_failed`
 - On `payment.refunded` / `payment.partially_refunded`: updates `refunded_amount`
 
-**`issue-refund`** — staff-only refund
-- Auth: Supabase JWT, staff role enforced
-- Input: `{ payment_id, amount?, reason? }`
-- Looks up `payments.provider`, calls adapter's `issueRefund()`
-- Updates `payments.refunded_amount` and `provider_refund_id`
+**`issue-refund`** — cancel booking + optional refund
+- Auth: Supabase JWT; accessible by the booking owner OR studio staff
+- Input: `{ booking_id }`
+- Always cancels the booking first
+- Refunds if: payment exists, `payments.status='succeeded'`, and class is more than `cancellation_window_hours` (default 24h) away
+- If Stripe refund fails: booking stays cancelled, error logged for manual follow-up
+- Updates `payments.refunded_amount`, `provider_refund_id`, and `refund_reason`
 
 ### The adapter interface
 
@@ -629,4 +632,4 @@ src/types/database.ts             — TypeScript handshake for new schema
 docs/MIGRATION-MULTITENANT.md     — this document
 ```
 
-These are design artifacts, not applied migrations. Copy to `supabase/migrations/` only when ready to execute and after verifying backfill scripts are prepared.
+All migrations in `migrations-v2/` have been applied to production (`xskqpxfjhhxontirezjd`) as of 2026-04-24. The backfill script is at `supabase/backfill-yogabrie.sql`.

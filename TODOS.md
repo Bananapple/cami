@@ -4,19 +4,13 @@ Deferred work captured during /plan-eng-review on 2026-04-15.
 
 ---
 
-## Refund / cancellation policy
+## ~~Refund / cancellation policy~~ — ✅ DONE (2026-04-24)
 
-**What:** `studios.cancellation_window_hours` is defined in v2 (default 24). Wire `cancelBooking` to call the provider-agnostic `issue-refund` Edge Function when a booking is cancelled inside the window — that function looks up `bookings.payment_id → payments.provider`, dispatches to the correct adapter's `issueRefund()`, and updates `payments.refunded_amount` + `provider_refund_id`.
+**Implemented:** `issue-refund` Edge Function repurposed as a combined cancel+refund endpoint. Takes `{ booking_id }`. Accessible by the booking owner OR studio staff. Always cancels the booking first, then conditionally refunds based on:
+- `payment_id` must exist and payment must have `status='succeeded'`
+- Class must be more than `cancellation_window_hours` (default 24) away
 
-**Why:** Studio owners will ask about this before signing. "Money is gone if you cancel" is not an acceptable policy for yoga studios, which have high last-minute cancellation rates.
-
-**Pros:** Enables real commercial relationships. Studios manage refund policy themselves via `cancellation_window_hours`. Refund logic is provider-neutral — works for Stripe today and Frisbii/Vipps when added.
-
-**Cons:** Cannot refund what was never charged. Requires the `create-checkout` flow to be live so that `bookings.payment_id` is populated.
-
-**Context:** `cancelBooking` mutation in `useBookings.ts:59` currently sets `status='cancelled'` and `cancelled_at`. In v2 it should also call `/functions/v1/issue-refund` when cancelling within the window, and update `bookings.status='cancelled'` only after the refund is initiated (or queued). Schema already ready: `bookings.payment_id` → `payments.provider_payment_id` exists in `0005_payments_provider_agnostic.sql`. Refund contract in `src/types/database.ts` under `EdgeFunctions.IssueRefundRequest`.
-
-**Depends on:** ~~v2 payment layer applied~~ ✅; ~~`issue-refund` Edge Function built~~ ✅. Ready to implement.
+If the Stripe refund fails, the booking is still cancelled and the error is logged for manual follow-up. `cancelBooking` in `useBookings.ts` calls this function. Dashboard shows context-aware toast (refunded / inside window / refund failed / generic).
 
 ---
 

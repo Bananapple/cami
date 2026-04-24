@@ -16,10 +16,19 @@ Architecture assessment conducted 2026-04-23. v2 cutover completed 2026-04-24 �
 **Artifacts**: `supabase/migrations-v2/0005_payments_provider_agnostic.sql`, Edge Function pattern in `docs/MIGRATION-MULTITENANT.md` §4.
 **Implication**: The insecure `StripeCardForm` is decommissioned. The booking flow is `create-checkout` → redirect to hosted URL → webhook confirms → booking promoted from `pending` to `confirmed`.
 
-### ✅ Edge Functions — RESOLVED (2026-04-23) — built and tested locally
+### ✅ Edge Functions — RESOLVED (2026-04-23) — deployed to production
 **Decision**: Three Deno Edge Functions + shared provider adapter layer. Stripe adapter implemented.
 **Artifacts**: `supabase/functions/create-checkout/`, `supabase/functions/payment-webhook/`, `supabase/functions/issue-refund/`, `supabase/functions/_shared/providers/` (types, index, stripe adapter).
-**Implication**: All payment logic runs server-side. Frontend calls `supabase.functions.invoke('create-checkout')` and redirects. Webhook at `/payment-webhook/stripe` handles confirmation. All three functions deployed to production; secrets set.
+**Implication**: All payment logic runs server-side. Frontend calls `supabase.functions.invoke('create-checkout')` and redirects. Webhook at `/payment-webhook/stripe` handles confirmation and sends booking confirmation email via Resend. All three functions deployed to production; secrets set. `payment-webhook` must be deployed with `--no-verify-jwt`.
+
+### ✅ Refund / Cancellation — RESOLVED (2026-04-24)
+**Decision**: `issue-refund` Edge Function handles combined cancel+refund. Owner or staff can cancel any booking. Refund issued automatically if payment succeeded and cancellation is outside the 24h window (`studios.cancellation_window_hours`). If Stripe refund fails, booking is still cancelled and error is logged.
+**Artifacts**: `supabase/functions/issue-refund/index.ts`, `src/hooks/useBookings.ts` (`cancelBooking` mutation), `src/pages/Dashboard.tsx` (context-aware toast).
+
+### ✅ Booking Confirmation Email — RESOLVED (2026-04-24)
+**Decision**: Resend is the email provider. Confirmation email is sent from `payment-webhook` after a booking is confirmed. Idempotency via `notification_log` table.
+**Artifacts**: `supabase/functions/payment-webhook/index.ts` (`sendBookingConfirmation`), `supabase/migrations-v2/0006_notification_log.sql`.
+**Implication**: Secrets needed: `RESEND_API_KEY`, `FROM_EMAIL` (defaults to `onboarding@resend.dev` for sandbox). Domain must be verified in Resend for production sends.
 
 ### ✅ Passwordless Auth (Email OTP) — RESOLVED (2026-04-24)
 **Decision**: Replace email + password with a two-phase OTP flow. Single email field → 6-digit code sent to inbox → verified in-sheet via `supabase.auth.verifyOtp`. `shouldCreateUser: true` handles both new and returning users with one call.
@@ -62,10 +71,9 @@ Architecture assessment conducted 2026-04-23. v2 cutover completed 2026-04-24 �
 - Owner purchases/gifts passes from their dashboard (uses the same `create-checkout` Edge Function with a different product type)
 
 ### CRM & Automated Sequences
-- Requires Edge Functions + email provider (Resend recommended)
-- New table: `notification_log (studio_id, user_id, channel, template, sent_at, booking_id?)` — idempotency key
-- Sequences: booking confirmation, class reminder (~2h before), post-class follow-up with review link, re-engagement (14-day inactivity)
-- pg_cron or Supabase Scheduled Functions drives the timed sends
+- Email provider: Resend (live). `notification_log` table exists (`0006`). Booking confirmation email is live.
+- Remaining sequences: class reminder (~2h before), post-class follow-up with review link, re-engagement (14-day inactivity)
+- Timed sends require pg_cron or Supabase Scheduled Functions (not yet enabled)
 
 ### SMS / WhatsApp Notifications
 - `profiles.phone_number` already added in `0002_backfill_and_rls.sql`, plus opt-in flags
@@ -101,4 +109,4 @@ Architecture assessment conducted 2026-04-23. v2 cutover completed 2026-04-24 �
 | `waivers` (new table) | Digital waivers |
 | `member_activity_summary` (view) | Segmentation |
 
-*Tables already in `migrations-v2/`: `studios`, `studio_members`, `studio_payment_providers`, `locations`, `instructors`, `class_templates`, `schedule_rules`, `schedule_exceptions`, `class_instances`, `waitlists`, `payments`, `payment_webhook_events`.*
+*Tables already in `migrations-v2/`: `studios`, `studio_members`, `studio_payment_providers`, `locations`, `instructors`, `class_templates`, `schedule_rules`, `schedule_exceptions`, `class_instances`, `waitlists`, `payments`, `payment_webhook_events`, `notification_log`.*
