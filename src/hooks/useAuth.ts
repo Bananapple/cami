@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import type { Session, User } from "@supabase/supabase-js";
+import type { Session } from "@supabase/supabase-js";
 
 export function useAuth() {
   const [session, setSession] = useState<Session | null>(null);
@@ -25,21 +25,20 @@ export function useAuth() {
     return () => subscription.unsubscribe();
   }, [queryClient]);
 
-  const signUp = async ({ email, password, fullName }: { email: string; password: string; fullName: string }) => {
-    const { data, error } = await supabase.auth.signUp({
+  const sendOtp = async ({ email }: { email: string }) => {
+    const { error } = await supabase.auth.signInWithOtp({
       email,
-      password,
-      options: {
-        data: { full_name: fullName },
-        emailRedirectTo: window.location.origin,
-      },
+      options: { shouldCreateUser: true },
     });
     if (error) throw error;
-    return data;
   };
 
-  const signIn = async ({ email, password }: { email: string; password: string }) => {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  const verifyOtp = async ({ email, token }: { email: string; token: string }) => {
+    const { data, error } = await supabase.auth.verifyOtp({
+      email,
+      token,
+      type: "email",
+    });
     if (error) throw error;
     return data;
   };
@@ -54,8 +53,8 @@ export function useAuth() {
     user: session?.user ?? null,
     isAuthenticated: !!session,
     loading,
-    signUp,
-    signIn,
+    sendOtp,
+    verifyOtp,
     signOut,
   };
 }

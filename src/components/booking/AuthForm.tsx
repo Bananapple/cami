@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -6,124 +6,175 @@ interface AuthFormProps {
   onSuccess: () => void;
 }
 
-const AuthForm = ({ onSuccess }: AuthFormProps) => {
-  const [mode, setMode] = useState<"login" | "signup">("login");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [fullName, setFullName] = useState("");
-  const [loading, setLoading] = useState(false);
-  const { signIn, signUp } = useAuth();
+const RESEND_COOLDOWN = 30;
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email || !password) {
-      toast("Please fill in all fields.");
-      return;
-    }
+const AuthForm = ({ onSuccess }: AuthFormProps) => {
+  const [phase, setPhase] = useState<"email" | "code">("email");
+  const [email, setEmail] = useState("");
+  const [token, setToken] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [cooldown, setCooldown] = useState(0);
+  const codeRef = useRef<HTMLInputElement>(null);
+  const { sendOtp, verifyOtp } = useAuth();
+
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const t = setTimeout(() => setCooldown((c) => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [cooldown]);
+
+  const handleSendOtp = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (!email) return;
+    setError(null);
     setLoading(true);
     try {
-      if (mode === "login") {
-        await signIn({ email, password });
-      } else {
-        if (!fullName) {
-          toast("Please enter your name.");
-          setLoading(false);
-          return;
-        }
-        await signUp({ email, password, fullName });
-      }
-      toast(mode === "login" ? "Welcome back!" : "Account created!");
-      onSuccess();
+      await sendOtp({ email });
+      setPhase("code");
+      setCooldown(RESEND_COOLDOWN);
+      setTimeout(() => codeRef.current?.focus(), 50);
     } catch (err: any) {
-      toast(err.message || "Something went wrong.");
+      setError(err.message ?? "Failed to send code. Please try again.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleVerify = async (overrideToken?: string) => {
+    const code = overrideToken ?? token;
+    if (code.length !== 6) return;
+    setError(null);
+    setLoading(true);
+    try {
+      await verifyOtp({ email, token: code });
+      onSuccess();
+    } catch (err: any) {
+      setError(err.message ?? "Invalid code. Please try again.");
+      setToken("");
+      codeRef.current?.focus();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value.replace(/\D/g, "").slice(0, 6);
+    setToken(val);
+    if (val.length === 6) handleVerify(val);
+  };
+
+  const handleResend = async () => {
+    if (cooldown > 0) return;
+    setError(null);
+    setToken("");
+    try {
+      await sendOtp({ email });
+      setCooldown(RESEND_COOLDOWN);
+      toast("New code sent.");
+    } catch (err: any) {
+      setError(err.message ?? "Failed to resend. Please try again.");
     }
   };
 
   const inputClass =
     "w-full bg-transparent border-b border-border pb-2 text-foreground font-serif focus:border-primary focus:outline-none transition-colors placeholder:text-muted-foreground/50";
 
-  return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      <h3 className="text-lg font-serif text-foreground">
-        {mode === "login" ? "Welcome back" : "Create your account"}
-      </h3>
+  if (phase === "code") {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h3 className="text-lg font-serif text-foreground">Enter your code</h3>
+          <p className="text-sm text-muted-foreground font-sans mt-1">
+            We emailed a 6-digit code to <span className="text-foreground">{email}</span>
+          </p>
+        </div>
 
-      <div className="space-y-5">
-        {mode === "signup" && (
-          <div className="space-y-2">
-            <label className="text-xs font-sans font-medium uppercase tracking-[0.15em] text-muted-foreground">
-              Full Name
-            </label>
-            <input
-              type="text"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              placeholder="Jane Smith"
-              className={inputClass}
-            />
-          </div>
+        <div className="space-y-2">
+          <label className="text-xs font-sans font-medium uppercase tracking-[0.15em] text-muted-foreground">
+            Code
+          </label>
+          <input
+            ref={codeRef}
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            maxLength={6}
+            autoFocus
+            value={token}
+            onChange={handleCodeChange}
+            placeholder="123456"
+            className={`${inputClass} font-mono text-xl tracking-[0.5em]`}
+          />
+        </div>
+
+        {error && (
+          <p className="text-sm text-destructive font-sans">{error}</p>
         )}
 
-        <div className="space-y-2">
-          <label className="text-xs font-sans font-medium uppercase tracking-[0.15em] text-muted-foreground">
-            Email
-          </label>
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="you@email.com"
-            className={inputClass}
-            required
-          />
-        </div>
+        <button
+          type="button"
+          onClick={() => handleVerify()}
+          disabled={loading || token.length !== 6}
+          className="w-full bg-primary hover:bg-primary/80 text-primary-foreground py-3.5 font-sans font-medium text-sm uppercase tracking-[0.15em] rounded-lg transition-all duration-200 disabled:opacity-50"
+        >
+          {loading ? "Verifying…" : "Verify →"}
+        </button>
 
-        <div className="space-y-2">
-          <label className="text-xs font-sans font-medium uppercase tracking-[0.15em] text-muted-foreground">
-            Password
-          </label>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="••••••••"
-            className={inputClass}
-            required
-          />
-          {mode === "login" && (
-            <p className="text-xs text-primary font-sans cursor-pointer hover:underline text-right mt-1">
-              Forgot password?
-            </p>
-          )}
+        <div className="flex items-center justify-between text-xs font-sans text-muted-foreground">
+          <button
+            type="button"
+            onClick={() => { setPhase("email"); setToken(""); setError(null); }}
+            className="hover:text-foreground transition-colors"
+          >
+            ← Different email
+          </button>
+          <button
+            type="button"
+            onClick={handleResend}
+            disabled={cooldown > 0}
+            className="hover:text-foreground transition-colors disabled:opacity-50"
+          >
+            {cooldown > 0 ? `Resend in ${cooldown}s` : "Resend code"}
+          </button>
         </div>
       </div>
+    );
+  }
+
+  return (
+    <form onSubmit={handleSendOtp} className="space-y-6">
+      <h3 className="text-lg font-serif text-foreground">Welcome</h3>
+
+      <div className="space-y-2">
+        <label className="text-xs font-sans font-medium uppercase tracking-[0.15em] text-muted-foreground">
+          Email
+        </label>
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="you@email.com"
+          className={inputClass}
+          required
+          autoFocus
+        />
+      </div>
+
+      {error && (
+        <p className="text-sm text-destructive font-sans">{error}</p>
+      )}
 
       <button
         type="submit"
-        disabled={loading}
+        disabled={loading || !email}
         className="w-full bg-primary hover:bg-primary/80 text-primary-foreground py-3.5 font-sans font-medium text-sm uppercase tracking-[0.15em] rounded-lg transition-all duration-200 disabled:opacity-50"
       >
-        {loading ? "Please wait..." : mode === "login" ? "Sign In →" : "Create Account →"}
+        {loading ? "Sending…" : "Continue →"}
       </button>
 
       <p className="text-xs text-center text-muted-foreground font-serif">
-        {mode === "login" ? (
-          <>
-            New here?{" "}
-            <button type="button" onClick={() => setMode("signup")} className="text-primary hover:underline">
-              Create an account
-            </button>
-          </>
-        ) : (
-          <>
-            Already a member?{" "}
-            <button type="button" onClick={() => setMode("login")} className="text-primary hover:underline">
-              Log in
-            </button>
-          </>
-        )}
+        We'll send a one-time code to your inbox.
       </p>
     </form>
   );

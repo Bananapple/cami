@@ -4,7 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Business Context
 
-This is a **multi-studio SaaS platform** — not a single yoga studio site. Each yoga studio client gets their own isolated Supabase project and branded deployment. The owner sells websites + booking engines to Norwegian yoga studios as a flat monthly SaaS fee. Student payments go directly to each studio (no marketplace layer). Vipps support is important for Norwegian users.
+This is a **multi-tenant SaaS platform** for Norwegian yoga studios. A single Supabase project serves all studios, with every tenanted table scoped by `studio_id` and RLS enforcing isolation. The owner sells websites + booking engines as a flat monthly SaaS fee. Student payments flow directly to each studio (no marketplace layer) via a **provider-agnostic adapter pattern** — Stripe Checkout in MVP, Frisbii next (Brie already uses it), Vipps later for Norwegian market fit. Adding a provider is an adapter file + one enum value; no schema changes.
+
+**Architectural state**: The current live YogaBrie deployment still runs on the legacy "one Supabase project per studio" model. The v2 multi-tenant schema is staged in `supabase/migrations-v2/` and documented in `docs/MIGRATION-MULTITENANT.md`. Cutover is pending — see that document for the execution order.
 
 ## Commands
 
@@ -19,15 +21,13 @@ npm run test -- src/test/some.test.ts  # Run a single test file
 
 ## Provisioning a New Studio
 
-```bash
-./scripts/new-studio.sh
-```
+**Legacy (current, being retired)**: `./scripts/new-studio.sh` creates a new Supabase project per studio. This model is deprecated but remains in place until the v2 cutover.
 
-Automates: Supabase project creation (eu-north-1), migration push, `studio_config` seed, and generates `.env.<studio-slug>`. Requires `supabase` CLI and `jq` installed, and `supabase login` already run.
+**Target (v2, documented in `docs/MIGRATION-MULTITENANT.md`)**: adding a studio is a row INSERT into `studios` + Stripe Connect (or Frisbii / Vipps) onboarding. Schedule is built via `class_templates` + `schedule_rules` instead of the flat `sessions` table.
 
-### Seeding Sessions
+### Seeding Sessions (legacy)
 
-After provisioning, insert sessions via the Supabase dashboard or SQL. The `day_of_week` column controls which days a class appears in the booking UI. Values follow JS `Date.getDay()`: 0=Sunday, 1=Monday, ..., 6=Saturday.
+For studios still on the legacy schema, insert sessions via the Supabase dashboard or SQL. The `day_of_week` column controls which days a class appears in the booking UI. Values follow JS `Date.getDay()`: 0=Sunday, 1=Monday, ..., 6=Saturday.
 
 ```sql
 -- YogaBrie full session seed (adapt times/days per studio)
@@ -57,56 +57,71 @@ Sessions with an empty `day_of_week` (`'{}'`) appear on every day — use this o
 ### Stack
 - React 18 + TypeScript + Vite (SWC), React Router v6
 - Tailwind CSS + shadcn/ui (Radix UI primitives)
-- Supabase (auth + Postgres) — **one project per studio deployment**
+- Supabase — single multi-tenant project in the v2 target (currently still per-studio on legacy YogaBrie)
 - TanStack Query for server state
 - react-hook-form + zod for forms
-- Stripe for payments (frontend key only; secret key lives in Supabase Edge Functions)
+- **Provider-agnostic payment layer**: canonical `payments` table + `PaymentProviderAdapter` interface. MVP adapter = Stripe Checkout; adapters planned for Frisbii and Vipps. Secrets (API keys, webhook secrets) live in Supabase Edge Function env, never in frontend or DB.
 
 ### Data Flow
-All Supabase access goes through the client in `src/integrations/supabase/client.ts`, which reads `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`. Custom hooks in `src/hooks/` wrap every table. Components never call Supabase directly.
+All Supabase access goes through the client in `src/integrations/supabase/client.ts`. Custom hooks in `src/hooks/` wrap every table; components never call Supabase directly. In the v2 architecture, a `StudioContext` resolves the current studio from the URL slug/subdomain on load and supplies `studio_id` to every hook.
 
-Key hooks:
-- `useAuth()` — sign up/in/out, current user
-- `useSessions()` — available yoga classes
-- `useBookings()` — user's bookings, `createBooking` mutation
-- `usePaymentMethods()` — saved cards
-- `useStudioConfig()` — studio name/location/branding from DB (cached permanently, one read on load)
+Key hooks (current):
+- `useAuth()` — passwordless OTP (`sendOtp`, `verifyOtp`), `signOut`, current user/session
+- `useSessions()` — available yoga classes (legacy; v2 uses `useClassInstances()`)
+- `useBookings()` — user's bookings + `cancelBooking` mutation (booking creation is now handled server-side by the `create-checkout` Edge Function)
+- `usePaymentMethods()` — saved payment methods
+- `useStudioConfig()` — studio branding (legacy; v2 replaces this with `StudioContext`)
 - `useProfile()`, `useMembership()`
 
 ### Booking Flow (`src/components/BookingSheet.tsx`)
 
-The core feature. A slide-in Sheet with a 6-step wizard:
+**Current**: `date → confirm → auth → checkout`. The `auth` step uses a two-phase email OTP form (email → 6-digit code). The `checkout` step calls the `create-checkout` Edge Function, which creates a `payments` row + `bookings` row (`status='pending'`) and returns a hosted provider checkout URL. The browser redirects out; the provider's webhook promotes the booking to `confirmed` on success. On return, `Index.tsx` detects `?status=success` in the URL and shows a Sonner toast.
 
-```
-date → confirm → auth → payment → addCard → success
-```
-
-State machine lives entirely in `BookingSheet.tsx`. Each step renders a sub-component from `src/components/booking/`. Steps `auth`, `payment`, and `addCard` use a split layout (order summary left, form right).
-
-`handlePaymentComplete(last4)` is the convergence point — called by both `PaymentSelector` (existing card) and `StripeCardForm` (new card). It calls `createBooking.mutateAsync()` and advances to `success` only on success. On failure it sets `bookingError` state and stays on the payment step.
+**Legacy (decommissioned)**: was `date → confirm → auth → payment → addCard → success` with an insecure client-side `StripeCardForm` that wrote card details directly to the DB.
 
 ### Database Schema
 
-Migrations in `supabase/migrations/`:
+**Legacy (in `supabase/migrations/`)**:
 - `20260329021240_*` — initial schema
 - `20260416000000_*` — adds `day_of_week` to sessions
 - `20260416000001_*` — replaces `increment_user_sessions` RPC with DB trigger
 - `20260416000002_*` — adds UNIQUE constraint on bookings `(user_id, session_id, session_date)`
 
-| Table | Purpose | RLS |
-|---|---|---|
-| `profiles` | Extends auth.users (name, initials, level, total_sessions) | Own row only |
-| `sessions` | Yoga classes (name, instructor, time, duration, level, price, day_of_week) | Public read |
-| `bookings` | User reservations (session_id, session_date, status, amount_paid) | Own rows only |
-| `payment_methods` | Saved Stripe cards (brand, last4, expiry) | Own rows only |
-| `memberships` | Subscription plans | Own rows only |
-| `studio_config` | Per-deployment branding (studio_name, location, logo_url, primary_color) | Public read |
+| Legacy Table | Purpose |
+|---|---|
+| `profiles` | Extends auth.users (name, initials, level, total_sessions) |
+| `sessions` | Yoga classes (name, instructor, time, duration, price, day_of_week) |
+| `bookings` | User reservations (session_id, session_date, status) |
+| `payment_methods` | Saved cards |
+| `memberships` | Subscription plans |
+| `studio_config` | Per-deployment branding (one row) |
 
-Auto-trigger `handle_new_user()` creates a `profiles` row on signup. DB trigger `trg_increment_sessions` bumps `profiles.total_sessions` after a confirmed booking INSERT (replaced the old `increment_user_sessions` RPC which had a privilege escalation vulnerability).
+**v2 (staged in `supabase/migrations-v2/`, not yet applied)** — full design in `docs/MIGRATION-MULTITENANT.md`:
+
+| v2 Table | Purpose |
+|---|---|
+| `studios` | Tenant root (slug, branding, timezone, currency) |
+| `studio_members` | user↔studio with role + per-studio state (total_sessions, level, referral_code) |
+| `studio_payment_providers` | Per-studio provider enrolment (Stripe/Frisbii/Vipps account IDs) |
+| `profiles` | Global PII only (name, phone, marketing opt-ins) |
+| `locations`, `instructors` | Rooms/branches and staff per studio |
+| `class_templates` | What a class IS |
+| `schedule_rules` | One row per weekday slot, with effective date range |
+| `schedule_exceptions` | Per-date deviations (cancel / reschedule / sub / relocate) |
+| `class_instances` | Materialized concrete occurrences — bookings point here |
+| `bookings` | `class_instance_id` FK; `payment_id` FK; status lifecycle incl. `pending`/`payment_failed` |
+| `payments` | Canonical payment record (`provider`, `provider_session_id`, `provider_payment_id`, status) |
+| `payment_webhook_events` | Idempotent audit log for provider webhooks |
+| `payment_methods` | Generalized: `provider` + `provider_external_id` |
+| `memberships` | `provider` + `provider_subscription_id` |
+| `waitlists` | Reservation-window state machine (`waiting`→`offered`→`accepted`/`expired`) |
+
+RLS helper functions: `user_studio_ids()`, `user_has_role(studio_id, roles[])`, `user_is_staff(studio_id)`. All `SECURITY DEFINER` with locked `search_path` to prevent privilege escalation. Conflict detection for instructors and rooms uses `EXCLUDE USING GIST` on `tstzrange` — double-booking is rejected at the DB level.
 
 ### Per-Studio Branding
 
-`studio_config` has one row per deployment. `useStudioConfig()` reads it and exposes `studioName` and `location`. Colors come from Tailwind CSS variables (HSL). Fonts are DM Serif Display (headings) + Inter (body).
+**Legacy**: `studio_config` is a single row per deployment, read via `useStudioConfig()`.
+**v2**: Branding lives on the `studios` row. `StudioContext` resolves the current studio by slug (from subdomain or URL prefix) on app load and provides branding + `studio_id` throughout the tree. Tailwind CSS variables (HSL) still drive colors. Fonts: DM Serif Display (headings) + Inter (body).
 
 ### Supabase Config
 
@@ -117,8 +132,10 @@ Auto-trigger `handle_new_user()` creates a `profiles` row on signup. DB trigger 
 ```
 VITE_SUPABASE_URL
 VITE_SUPABASE_PUBLISHABLE_KEY
-VITE_STRIPE_PUBLISHABLE_KEY   # frontend only; secret key goes in Edge Function env
+VITE_STUDIO_SLUG              # e.g. "yogabrie" — resolves the current tenant on load
 ```
+
+Payment provider secrets (`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, etc.) live in Supabase Edge Function env via `supabase secrets set`. Never in frontend, never in git.
 
 Copy `.env.example` → `.env` per studio deployment. Never commit `.env` (gitignored).
 

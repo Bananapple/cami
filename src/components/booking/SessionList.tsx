@@ -1,12 +1,10 @@
 import { ChevronRight, MapPin } from "lucide-react";
-import type { Tables } from "@/integrations/supabase/types";
-
-type Session = Tables<"sessions">;
+import type { ClassInstance } from "@/hooks/useClassInstances";
 
 interface SessionListProps {
-  sessions: Session[];
+  sessions: ClassInstance[];
   selectedDate: Date;
-  onSelectSession: (session: Session) => void;
+  onSelectSession: (session: ClassInstance) => void;
 }
 
 const avatarColors = [
@@ -18,10 +16,8 @@ const avatarColors = [
 ];
 
 const SessionList = ({ sessions, selectedDate, onSelectSession }: SessionListProps) => {
-  const dayOfWeek = selectedDate.getDay();
-  // Sessions with an empty or null day_of_week show on every day (legacy/unset rows)
   const filtered = sessions.filter(
-    (s) => !s.day_of_week || s.day_of_week.length === 0 || s.day_of_week.includes(dayOfWeek)
+    (s) => new Date(s.starts_at).toDateString() === selectedDate.toDateString()
   );
 
   const dateLabel = selectedDate.toLocaleDateString("nb-NO", {
@@ -57,7 +53,7 @@ const SessionList = ({ sessions, selectedDate, onSelectSession }: SessionListPro
                   avatarColors[i % avatarColors.length]
                 }`}
               >
-                {session.practitioner_initials}
+                {session.practitioner_initials || "?"}
               </div>
 
               <div className="flex-1 min-w-0">

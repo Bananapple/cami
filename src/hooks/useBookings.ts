@@ -22,38 +22,6 @@ export function useBookings() {
     enabled: !!user,
   });
 
-  const createBooking = useMutation({
-    mutationFn: async ({
-      sessionId,
-      sessionDate,
-      paymentMethodLast4,
-      amountPaid,
-    }: {
-      sessionId: string;
-      sessionDate: string;
-      paymentMethodLast4: string;
-      amountPaid: number;
-    }) => {
-      const { data, error } = await supabase
-        .from("bookings")
-        .insert({
-          user_id: user!.id,
-          session_id: sessionId,
-          session_date: sessionDate,
-          payment_method_last4: paymentMethodLast4,
-          amount_paid: amountPaid,
-        })
-        .select()
-        .single();
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["bookings"] });
-      queryClient.invalidateQueries({ queryKey: ["profile"] });
-    },
-  });
-
   const cancelBooking = useMutation({
     mutationFn: async (bookingId: string) => {
       if (!user) throw new Error("Not authenticated");
@@ -66,5 +34,5 @@ export function useBookings() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["bookings"] }),
   });
 
-  return { bookings, isLoading, createBooking, cancelBooking };
+  return { bookings, isLoading, cancelBooking };
 }

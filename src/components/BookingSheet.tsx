@@ -2,20 +2,16 @@ import { useState } from "react";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { ArrowLeft } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { useSessions } from "@/hooks/useSessions";
-import { useBookings } from "@/hooks/useBookings";
+import { useClassInstances } from "@/hooks/useClassInstances";
+import type { ClassInstance } from "@/hooks/useClassInstances";
 import DateStrip from "@/components/booking/DateStrip";
 import SessionList from "@/components/booking/SessionList";
 import OrderSummary from "@/components/booking/OrderSummary";
 import AuthForm from "@/components/booking/AuthForm";
-import PaymentSelector from "@/components/booking/PaymentSelector";
-import StripeCardForm from "@/components/booking/StripeCardForm";
-import ConfirmationView from "@/components/booking/ConfirmationView";
-import type { Tables } from "@/integrations/supabase/types";
+import { supabase } from "@/integrations/supabase/client";
 import { useStudioConfig } from "@/hooks/useStudioConfig";
 
-type Session = Tables<"sessions">;
-type Step = "date" | "confirm" | "auth" | "payment" | "addCard" | "success";
+type Step = "date" | "confirm" | "auth" | "checkout";
 
 interface BookingSheetProps {
   isOpen: boolean;
@@ -25,12 +21,12 @@ interface BookingSheetProps {
 const BookingSheet = ({ isOpen, onClose }: BookingSheetProps) => {
   const [step, setStep] = useState<Step>("date");
   const [selectedDate, setSelectedDate] = useState(new Date());
-  const [selectedSession, setSelectedSession] = useState<Session | null>(null);
-  const [bookingError, setBookingError] = useState<string | null>(null);
+  const [selectedSession, setSelectedSession] = useState<ClassInstance | null>(null);
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
 
-  const { sessions } = useSessions();
-  const { isAuthenticated, user } = useAuth();
-  const { createBooking } = useBookings();
+  const { instances: sessions } = useClassInstances();
+  const { isAuthenticated } = useAuth();
   const { studioName, location } = useStudioConfig();
 
   const handleClose = () => {
@@ -38,76 +34,75 @@ const BookingSheet = ({ isOpen, onClose }: BookingSheetProps) => {
     setTimeout(() => {
       setStep("date");
       setSelectedSession(null);
-      setBookingError(null);
+      setCheckoutError(null);
     }, 300);
   };
 
-  const handleSelectSession = (session: Session) => {
+  const handleSelectSession = (session: ClassInstance) => {
     setSelectedSession(session);
     setStep("confirm");
   };
 
   const handleContinueFromConfirm = () => {
     if (isAuthenticated) {
-      setStep("payment");
+      setStep("checkout");
     } else {
       setStep("auth");
     }
   };
 
   const handleAuthSuccess = () => {
-    setStep("payment");
+    setStep("checkout");
   };
 
-  const handlePaymentComplete = async (last4: string) => {
+  const handleCheckout = async () => {
     if (!selectedSession) return;
-    setBookingError(null);
+    setCheckoutError(null);
+    setCheckoutLoading(true);
 
     try {
-      await createBooking.mutateAsync({
-        sessionId: selectedSession.id,
-        sessionDate: selectedDate.toISOString().split("T")[0],
-        paymentMethodLast4: last4,
-        amountPaid: selectedSession.price ?? 250,
+      const returnUrl = window.location.origin;
+      const { data, error } = await supabase.functions.invoke("create-checkout", {
+        body: {
+          class_instance_id: selectedSession.id,
+          return_url: returnUrl,
+        },
       });
-    } catch (err: any) {
-      setBookingError(err.message || "Booking failed. Please try again.");
-      return;
-    }
 
-    setStep("success");
+      if (error || !data?.checkout_url) {
+        const message = error?.message ?? data?.error ?? "Unable to start checkout. Please try again.";
+        setCheckoutError(message);
+        return;
+      }
+
+      // Hand off to the provider's hosted checkout page
+      window.location.href = data.checkout_url;
+    } catch (err: any) {
+      setCheckoutError(err.message ?? "Something went wrong. Please try again.");
+    } finally {
+      setCheckoutLoading(false);
+    }
   };
 
   const goBack = () => {
     switch (step) {
-      case "confirm":
-        setStep("date");
-        break;
-      case "auth":
-        setStep("confirm");
-        break;
-      case "payment":
-        setStep("confirm");
-        break;
-      case "addCard":
-        setStep("payment");
-        break;
+      case "confirm": setStep("date"); break;
+      case "auth": setStep("confirm"); break;
+      case "checkout": setStep("confirm"); break;
     }
   };
 
   const stepLabel = () => {
     switch (step) {
-      case "date": return "Select a Date";
-      case "confirm": return "Session Details";
-      case "auth": return "Sign In";
-      case "payment": return "Payment";
-      case "addCard": return "Add Card";
-      case "success": return "Confirmed";
+      case "date":     return "Select a Date";
+      case "confirm":  return "Session Details";
+      case "auth":     return "Sign In";
+      case "checkout": return "Payment";
     }
   };
 
-  const showBack = step !== "date" && step !== "success";
-  const showSplitLayout = ["auth", "payment", "addCard"].includes(step);
+  const showBack = step !== "date";
+  const showSplitLayout = step === "auth" || step === "checkout";
 
   return (
     <Sheet open={isOpen} onOpenChange={(open) => !open && handleClose()}>
@@ -199,7 +194,7 @@ const BookingSheet = ({ isOpen, onClose }: BookingSheetProps) => {
           </div>
         )}
 
-        {/* Split layout steps */}
+        {/* Split layout: Auth + Checkout steps */}
         {showSplitLayout && selectedSession && (
           <div className="flex flex-col sm:flex-row min-h-[calc(100vh-60px)]">
             {/* Left: Order Summary */}
@@ -207,45 +202,46 @@ const BookingSheet = ({ isOpen, onClose }: BookingSheetProps) => {
               <OrderSummary session={selectedSession} selectedDate={selectedDate} />
             </div>
 
-            {/* Right: Form */}
+            {/* Right: Auth form or Checkout CTA */}
             <div className="flex-1 p-6 bg-background border-t sm:border-t-0 sm:border-l border-border">
               {step === "auth" && <AuthForm onSuccess={handleAuthSuccess} />}
-              {step === "payment" && (
-                <>
-                  <PaymentSelector
-                    onSelectPayment={handlePaymentComplete}
-                    onAddNew={() => setStep("addCard")}
-                    loading={createBooking.isPending}
-                  />
-                  {bookingError && (
-                    <p className="text-sm text-destructive mt-4 text-center font-sans">
-                      {bookingError}
+
+              {step === "checkout" && (
+                <div className="space-y-6">
+                  <div>
+                    <h3 className="text-lg font-serif text-foreground">Ready to book?</h3>
+                    <p className="text-sm text-muted-foreground font-sans mt-1">
+                      You'll be taken to our secure payment page to complete your booking.
+                    </p>
+                  </div>
+
+                  <div className="bg-muted/40 rounded-lg px-4 py-3 text-xs text-muted-foreground font-sans space-y-1">
+                    <p>· {selectedSession.class_name}</p>
+                    <p>· {selectedDate.toLocaleDateString("nb-NO", { weekday: "long", day: "numeric", month: "long" })}</p>
+                    <p>· kr {(selectedSession.price ?? 250).toLocaleString("nb-NO")}</p>
+                  </div>
+
+                  <button
+                    onClick={handleCheckout}
+                    disabled={checkoutLoading}
+                    className="w-full bg-primary hover:bg-primary/80 disabled:opacity-60 text-primary-foreground py-3.5 font-sans font-medium text-sm uppercase tracking-[0.15em] rounded-lg transition-all duration-200"
+                  >
+                    {checkoutLoading ? "Preparing checkout…" : "Pay now →"}
+                  </button>
+
+                  {checkoutError && (
+                    <p className="text-sm text-destructive text-center font-sans">
+                      {checkoutError}
                     </p>
                   )}
-                </>
-              )}
-              {step === "addCard" && (
-                <>
-                  <StripeCardForm onSuccess={handlePaymentComplete} />
-                  {bookingError && (
-                    <p className="text-sm text-destructive mt-4 text-center font-sans">
-                      {bookingError}
-                    </p>
-                  )}
-                </>
+
+                  <p className="text-xs text-center text-muted-foreground font-sans">
+                    Secure payment · 24-hour free cancellation
+                  </p>
+                </div>
               )}
             </div>
           </div>
-        )}
-
-        {/* Success */}
-        {step === "success" && selectedSession && (
-          <ConfirmationView
-            session={selectedSession}
-            selectedDate={selectedDate}
-            email={user?.email ?? ""}
-            onClose={handleClose}
-          />
         )}
       </SheetContent>
     </Sheet>

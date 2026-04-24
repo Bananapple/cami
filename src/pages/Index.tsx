@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
+import { toast } from "sonner";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import BookingSheet from "@/components/BookingSheet";
@@ -87,6 +88,25 @@ const shopProducts = [
 
 const Index = () => {
   const [bookingOpen, setBookingOpen] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const status = params.get("status");
+    if (status === "success") {
+      toast.success("Booking confirmed!", {
+        description: "You're all set. See you on the mat.",
+        duration: 6000,
+      });
+    } else if (status === "cancelled") {
+      toast.info("Booking not completed", {
+        description: "Your payment was cancelled. No charge was made.",
+        duration: 5000,
+      });
+    }
+    if (status) {
+      window.history.replaceState({}, "", "/");
+    }
+  }, []);
 
   return (
     <div className="min-h-screen bg-background">

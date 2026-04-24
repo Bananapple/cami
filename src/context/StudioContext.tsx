@@ -1,0 +1,104 @@
+// Requires v2 migration (supabase/migrations-v2/) to be applied before the
+// studios and studio_members tables exist. Pre-migration, context is null and
+// legacy useStudioConfig() continues to serve existing components unchanged.
+
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import type { Studio, StudioMember, StudioContextValue, StudioRole } from "@/types/database";
+
+const StudioContext = createContext<StudioContextValue | null>(null);
+
+function resolveSlug(): string {
+  const envSlug = import.meta.env.VITE_STUDIO_SLUG as string | undefined;
+  if (envSlug) return envSlug;
+  // Derive from subdomain: yogabrie.brie.app → "yogabrie"
+  const host = window.location.hostname;
+  const parts = host.split(".");
+  if (parts.length >= 3) return parts[0];
+  return "default";
+}
+
+export function StudioProvider({ children }: { children: ReactNode }) {
+  const slug = resolveSlug();
+  const queryClient = useQueryClient();
+  const [userId, setUserId] = useState<string | null>(null);
+
+  // Track auth state to drive the membership query
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id ?? null));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      const uid = session?.user?.id ?? null;
+      setUserId(uid);
+      // Invalidate the membership cache on login/logout
+      queryClient.invalidateQueries({ queryKey: ["studio_member"] });
+    });
+    return () => subscription.unsubscribe();
+  }, [queryClient]);
+
+  // Fetch studio by slug — public, no auth required.
+  // Uses `as any` because 'studios' is a v2 table not yet in the auto-generated types.
+  const { data: studio } = useQuery<Studio | null>({
+    queryKey: ["studio", slug],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("studios")
+        .select("*")
+        .eq("slug", slug)
+        .eq("is_active", true)
+        .single();
+      if (error) return null; // gracefully handle pre-migration (table doesn't exist yet)
+      return data as Studio;
+    },
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+  });
+
+  // Fetch the current user's studio membership — only when authenticated and studio is loaded.
+  const { data: membership } = useQuery<StudioMember | null>({
+    queryKey: ["studio_member", studio?.id, userId],
+    queryFn: async () => {
+      if (!studio || !userId) return null;
+      const { data } = await (supabase as any)
+        .from("studio_members")
+        .select("*")
+        .eq("studio_id", studio.id)
+        .eq("user_id", userId)
+        .eq("is_active", true)
+        .maybeSingle();
+      return (data as StudioMember) ?? null;
+    },
+    enabled: !!studio && !!userId,
+    staleTime: 2 * 60 * 1000,
+  });
+
+  const role: StudioRole | null = membership?.role ?? null;
+  const value: StudioContextValue | null = studio
+    ? { studio, membership: membership ?? null, role }
+    : null;
+
+  return (
+    <StudioContext.Provider value={value}>
+      {children}
+    </StudioContext.Provider>
+  );
+}
+
+// useStudio() — throws if studio is not loaded (requires v2 migration).
+// Use only in components written for the v2 architecture.
+export function useStudio(): StudioContextValue {
+  const ctx = useContext(StudioContext);
+  if (!ctx) {
+    throw new Error(
+      "useStudio: studio context not available. " +
+      "Either the v2 migration has not been applied, or this component is outside <StudioProvider>."
+    );
+  }
+  return ctx;
+}
+
+// useStudioContext() — safe version that returns null pre-migration.
+// Use for components that need to be compatible with both legacy and v2.
+export function useStudioContext(): StudioContextValue | null {
+  return useContext(StudioContext);
+}

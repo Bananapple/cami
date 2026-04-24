@@ -6,17 +6,17 @@ Deferred work captured during /plan-eng-review on 2026-04-15.
 
 ## Refund / cancellation policy
 
-**What:** Add a `cancellation_window_hours` field to `studio_config` (e.g., 24 = free cancel up to 24h before). Wire Stripe refund API to `cancelBooking` mutation — call `stripe.refunds.create({ payment_intent: ... })` from the Edge Function when a booking is cancelled within the window.
+**What:** `studios.cancellation_window_hours` is defined in v2 (default 24). Wire `cancelBooking` to call the provider-agnostic `issue-refund` Edge Function when a booking is cancelled inside the window — that function looks up `bookings.payment_id → payments.provider`, dispatches to the correct adapter's `issueRefund()`, and updates `payments.refunded_amount` + `provider_refund_id`.
 
 **Why:** Studio owners will ask about this before signing. "Money is gone if you cancel" is not an acceptable policy for yoga studios, which have high last-minute cancellation rates.
 
-**Pros:** Enables real commercial relationships. Studios manage refund policy themselves via config.
+**Pros:** Enables real commercial relationships. Studios manage refund policy themselves via `cancellation_window_hours`. Refund logic is provider-neutral — works for Stripe today and Frisbii/Vipps when added.
 
-**Cons:** Requires Stripe integration to be complete first (Phase 1 Stripe Elements). Cannot refund what was never charged.
+**Cons:** Cannot refund what was never charged. Requires the `create-checkout` flow to be live so that `bookings.payment_id` is populated.
 
-**Context:** `cancelBooking` mutation exists in `useBookings.ts:59`. It sets `status = 'cancelled'` and `cancelled_at`. No Stripe refund is called. The payment_method_last4 is stored but the PaymentIntent ID is not, so a refund schema change will also be needed (add `stripe_payment_intent_id` to bookings).
+**Context:** `cancelBooking` mutation in `useBookings.ts:59` currently sets `status='cancelled'` and `cancelled_at`. In v2 it should also call `/functions/v1/issue-refund` when cancelling within the window, and update `bookings.status='cancelled'` only after the refund is initiated (or queued). Schema already ready: `bookings.payment_id` → `payments.provider_payment_id` exists in `0005_payments_provider_agnostic.sql`. Refund contract in `src/types/database.ts` under `EdgeFunctions.IssueRefundRequest`.
 
-**Depends on:** Stripe Elements integration (Phase 1) must be complete. Bookings table must store `stripe_payment_intent_id`.
+**Depends on:** v2 payment layer applied; `issue-refund` Edge Function built.
 
 ---
 
@@ -54,14 +54,35 @@ Deferred work captured during /plan-eng-review on 2026-04-15.
 
 ## Shop / Membership purchasing
 
-**What:** The `/joinnow` page currently shows all 7 products with prices but has no purchase flow. Students can browse but must contact the studio to actually buy.
+**What:** The `/joinnow` page currently shows all 7 products with prices but has no purchase flow. Students can browse but must contact the studio to actually buy. Wire the `create-checkout` Edge Function redirect flow to each product's CTA — same pattern as class bookings, different line items.
 
-**Why:** Conversion drops when there's no buy button. For memberships and clip cards, an online purchase flow (Vipps or Stripe) removes friction.
+**Why:** Conversion drops when there's no buy button. The provider-agnostic `create-checkout` flow (decided 2026-04-23) handles single-class bookings *and* memberships/clip cards through the same Edge Function — the hosted checkout page (Stripe Checkout for MVP, Frisbii/Vipps via the same adapter interface) accepts a line items payload and redirects back on success.
 
-**Pros:** Self-serve purchasing, less admin for the studio owner.
+**Flow:**
+1. User clicks "Buy 10-class card" on `/joinnow`
+2. Frontend calls `POST /functions/v1/create-checkout` with `{ product_id }` (or `class_instance_id` for single classes)
+3. Edge Function resolves the studio's primary provider via `studio_primary_provider()`, creates `payments` row, calls the adapter's `createCheckoutSession()`
+4. Returns `checkout_url` — browser redirects
+5. Webhook promotes the associated `memberships` row (or `bookings` row) from `pending` to `active`/`confirmed`
 
-**Cons:** Requires Vipps integration (Phase 2) or Stripe checkout session from an Edge Function. Not a simple frontend change.
+**Pros:** Self-serve purchasing. Same Edge Function handles class bookings, memberships, guest passes — no duplicate code per flow.
 
-**Context:** Products and prices are hardcoded in `src/pages/JoinNow.tsx`. For now, the CTA is `contact@yogabrie.com`. Phase 2 will add a `products` table in Supabase and a checkout flow.
+**Cons:** Needs a `products` (or `membership_plans`) table in Supabase; needs the membership-activation webhook handler to be distinct from the booking-confirmation handler. Frontend `/joinnow` needs to read from the DB instead of hardcoded values.
 
-**Depends on:** Vipps integration (Phase 2) or Stripe Checkout (simpler interim option).
+**Context:** Products and prices are hardcoded in `src/pages/JoinNow.tsx`. For now, the CTA is `contact@yogabrie.com`. The Edge Function contract is defined in `docs/MIGRATION-MULTITENANT.md` §4 and typed in `src/types/database.ts` under `EdgeFunctions.CreateCheckoutRequest`.
+
+**Depends on:** `create-checkout` Edge Function built + provider-agnostic payment schema applied (`supabase/migrations-v2/0005_payments_provider_agnostic.sql`). No more Stripe-specific code required — adding Frisbii or Vipps later is a pure adapter swap.
+
+---
+
+## Auth — SMS OTP via Twilio (Phase 2)
+
+**What:** Replace (or supplement) email OTP with phone number OTP. User enters their phone number, receives a 6-digit SMS code, verifies it in-sheet. Uses `supabase.auth.signInWithOtp({ phone })` + `supabase.auth.verifyOtp({ phone, token, type: 'sms' })`.
+
+**Why:** Phone OTP has higher delivery reliability than email (no spam filters, no inbox searching), and is familiar from banking/e-commerce flows. Better conversion for mobile-first yoga studio students.
+
+**Cons:** Requires a Twilio account, Supabase Phone Auth enabled, and per-SMS cost (~$0.0075/SMS). Not worth setting up until the student base grows beyond 100 active users.
+
+**Context:** Email OTP is live as of 2026-04-23 (`useAuth.sendOtp` / `useAuth.verifyOtp`). The `profiles` table already has a `phone_number TEXT` column (added in `migrations-v2/0002`). Adding SMS OTP is a UI-only change — add a phone input phase to `AuthForm.tsx`, call `signInWithOtp({ phone })`, verify with `type: 'sms'`. No schema changes needed.
+
+**Depends on:** Twilio account + Supabase Phone Auth config. Do not implement until external accounts are provisioned.

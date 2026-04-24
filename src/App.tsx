@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useEffect } from "react";
 import { useLocation } from "react-router-dom";
+import { StudioProvider } from "@/context/StudioContext";
 import Index from "./pages/Index";
 import Programs from "./pages/Programs";
 import Coaches from "./pages/Coaches";
@@ -26,10 +27,11 @@ const ScrollToTop = () => {
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
+    <StudioProvider>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
         <ScrollToTop />
         <Routes>
           <Route path="/" element={<Index />} />
@@ -41,8 +43,9 @@ const App = () => (
           <Route path="/insights/:slug" element={<ArticleDetail />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
+        </BrowserRouter>
+      </TooltipProvider>
+    </StudioProvider>
   </QueryClientProvider>
 );
 

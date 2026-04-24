@@ -1,10 +1,8 @@
 import { Clock, MapPin } from "lucide-react";
-import type { Tables } from "@/integrations/supabase/types";
-
-type Session = Tables<"sessions">;
+import type { ClassInstance } from "@/hooks/useClassInstances";
 
 interface OrderSummaryProps {
-  session: Session;
+  session: ClassInstance;
   selectedDate: Date;
 }
 

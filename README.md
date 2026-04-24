@@ -11,20 +11,14 @@ Built with React 18 + TypeScript + Vite, Tailwind CSS, shadcn/ui, and Supabase.
 ## Quick start
 
 ```bash
-cp .env.example .env       # fill in Supabase + Stripe keys
+cp .env.example .env       # fill in Supabase URL + anon key; set VITE_STUDIO_SLUG
 npm install
 npm run dev                # localhost:8080 (or next available port)
 ```
 
 ## Provisioning a new studio
 
-```bash
-./scripts/new-studio.sh
-```
-
-Creates a new Supabase project (eu-north-1), runs migrations, seeds `studio_config`, and generates `.env.<studio-slug>`. Requires `supabase` CLI, `jq`, and `supabase login`.
-
-After provisioning, seed the sessions table — see **CLAUDE.md → Seeding Sessions** for the full SQL.
+In the v2 multi-tenant architecture (see `docs/MIGRATION-MULTITENANT.md`), adding a studio is an INSERT into the `studios` table — not a new Supabase project. The legacy `./scripts/new-studio.sh` is deprecated and will be retired after the v2 migration cutover.
 
 ## Key commands
 
@@ -40,10 +34,11 @@ npm run test:watch   # Vitest (watch mode)
 ```
 VITE_SUPABASE_URL
 VITE_SUPABASE_PUBLISHABLE_KEY
-VITE_STRIPE_PUBLISHABLE_KEY
+VITE_STUDIO_SLUG          # e.g. "yogabrie" — resolves the current tenant
 ```
 
 Never commit `.env` — it is gitignored. Use `.env.example` as the template.
+Stripe and other payment provider secrets live in Supabase Edge Function env, not here.
 
 ## Architecture notes
 
@@ -51,4 +46,4 @@ See **CLAUDE.md** for full architecture, booking flow, database schema, and per-
 
 ## Deferred work
 
-See **TODOS.md** for known gaps: Stripe/Vipps purchasing, cancellation/refund policy, timezone handling, multi-studio migration tooling.
+See **TODOS.md** for known gaps: shop/membership purchasing, cancellation/refund policy, timezone handling, SMS OTP, multi-studio migration tooling.
