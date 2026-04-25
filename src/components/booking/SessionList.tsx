@@ -1,5 +1,7 @@
 import { ChevronRight, MapPin } from "lucide-react";
 import type { ClassInstance } from "@/hooks/useClassInstances";
+import { useStudioContext } from "@/context/StudioContext";
+import { formatTime, toDateString } from "@/lib/timezone";
 
 interface SessionListProps {
   sessions: ClassInstance[];
@@ -16,8 +18,14 @@ const avatarColors = [
 ];
 
 const SessionList = ({ sessions, selectedDate, onSelectSession }: SessionListProps) => {
+  const studioCtx = useStudioContext();
+  const studioTz = studioCtx?.studio?.timezone ?? "Europe/Oslo";
+
+  // Compare dates in studio timezone so a class at 07:30 Oslo
+  // appears on April 25 even when the viewer is in a different timezone.
+  const selectedDateStr = toDateString(selectedDate, studioTz);
   const filtered = sessions.filter(
-    (s) => new Date(s.starts_at).toDateString() === selectedDate.toDateString()
+    (s) => toDateString(s.starts_at, studioTz) === selectedDateStr
   );
 
   const dateLabel = selectedDate.toLocaleDateString("nb-NO", {
@@ -38,37 +46,61 @@ const SessionList = ({ sessions, selectedDate, onSelectSession }: SessionListPro
         </p>
       ) : (
         <div className="space-y-2">
-          {filtered.map((session, i) => (
-            <button
-              key={session.id}
-              onClick={() => onSelectSession(session)}
-              className="w-full flex items-center gap-4 p-4 rounded-lg border border-border bg-card hover:border-primary/50 transition-all group text-left"
-            >
-              <span className="text-sm font-sans font-medium text-foreground min-w-[70px]">
-                {session.time}
-              </span>
+          {filtered.map((session, i) => {
+            const tz = session.location_timezone ?? studioTz;
+            const spotsLeft = session.max_capacity > 0
+              ? session.max_capacity - session.booked_count
+              : null;
+            const isFull = spotsLeft !== null && spotsLeft <= 0;
+            const nearlyFull = spotsLeft !== null && spotsLeft > 0 && spotsLeft <= 3;
 
-              <div
-                className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-sans font-bold flex-shrink-0 ${
-                  avatarColors[i % avatarColors.length]
+            return (
+              <button
+                key={session.id}
+                onClick={() => !isFull && onSelectSession(session)}
+                disabled={isFull}
+                className={`w-full flex items-center gap-4 p-4 rounded-lg border bg-card transition-all group text-left ${
+                  isFull
+                    ? "border-border opacity-60 cursor-not-allowed"
+                    : "border-border hover:border-primary/50"
                 }`}
               >
-                {session.practitioner_initials || "?"}
-              </div>
+                <span className="text-sm font-sans font-medium text-foreground min-w-[70px]">
+                  {formatTime(session.starts_at, tz)}
+                </span>
 
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-serif text-foreground truncate">
-                  {session.class_name}
-                </p>
-                <p className="text-xs text-muted-foreground font-sans flex items-center gap-1 mt-0.5">
-                  <MapPin className="w-3 h-3" />
-                  {session.location}
-                </p>
-              </div>
+                <div
+                  className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-sans font-bold flex-shrink-0 ${
+                    avatarColors[i % avatarColors.length]
+                  }`}
+                >
+                  {session.practitioner_initials || "?"}
+                </div>
 
-              <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors flex-shrink-0" />
-            </button>
-          ))}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-serif text-foreground truncate">
+                    {session.class_name}
+                  </p>
+                  <p className="text-xs text-muted-foreground font-sans flex items-center gap-1 mt-0.5">
+                    <MapPin className="w-3 h-3" />
+                    {session.location}
+                  </p>
+                </div>
+
+                {isFull && (
+                  <span className="text-xs font-sans text-muted-foreground shrink-0">Full</span>
+                )}
+                {nearlyFull && (
+                  <span className="text-xs font-sans text-amber-600 shrink-0">
+                    {spotsLeft} spot{spotsLeft === 1 ? "" : "s"} left
+                  </span>
+                )}
+                {!isFull && (
+                  <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors flex-shrink-0" />
+                )}
+              </button>
+            );
+          })}
         </div>
       )}
     </div>

@@ -9,12 +9,16 @@ import Footer from "@/components/Footer";
 import BookingSheet from "@/components/BookingSheet";
 import { LogOut, CreditCard, User, X } from "lucide-react";
 import { toast } from "sonner";
+import { useStudioContext } from "@/context/StudioContext";
+import { formatTime, formatDate } from "@/lib/timezone";
 
 const Dashboard = () => {
   const { user, isAuthenticated, loading, signOut } = useAuth();
   const { profile } = useProfile();
   const { bookings, cancelBooking } = useBookings();
   const { membership } = useMembership();
+  const studioCtx = useStudioContext();
+  const studioTz = studioCtx?.studio?.timezone ?? "Europe/Oslo";
   const [bookingOpen, setBookingOpen] = useState(false);
 
   if (loading) {
@@ -132,7 +136,8 @@ const Dashboard = () => {
                 <div className="space-y-3">
                   {bookings.map((booking: any) => {
                     const ci = booking.class_instances;
-                    const startsAt = ci?.starts_at ? new Date(ci.starts_at) : null;
+                    const locationTz = ci?.locations?.timezone ?? null;
+                    const tz = locationTz ?? studioTz;
                     return (
                     <div
                       key={booking.id}
@@ -140,10 +145,10 @@ const Dashboard = () => {
                     >
                       <div className="text-center min-w-[50px]">
                         <p className="text-xs font-sans font-medium uppercase text-muted-foreground">
-                          {startsAt?.toLocaleDateString("en-US", { weekday: "short" }) ?? "—"}
+                          {ci?.starts_at ? formatDate(ci.starts_at, tz, { weekday: "short" }) : "—"}
                         </p>
                         <p className="text-lg font-serif text-foreground">
-                          {startsAt?.getDate() ?? "—"}
+                          {ci?.starts_at ? new Date(ci.starts_at).toLocaleDateString("en-CA", { timeZone: tz }).split("-")[2] : "—"}
                         </p>
                       </div>
                       <div className="flex-1">
@@ -151,7 +156,7 @@ const Dashboard = () => {
                           {ci?.class_templates?.name ?? "Class"}
                         </p>
                         <p className="text-xs text-muted-foreground font-sans">
-                          {startsAt?.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false }) ?? ""}
+                          {ci?.starts_at ? formatTime(ci.starts_at, tz) : ""}
                           {ci?.class_templates?.default_duration_minutes ? ` · ${ci.class_templates.default_duration_minutes} min` : ""}
                         </p>
                       </div>

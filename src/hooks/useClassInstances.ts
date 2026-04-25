@@ -15,8 +15,7 @@ export type ClassInstance = {
   practitioner_name: string;
   practitioner_initials: string;
   location: string;
-  time: string;
-  duration: number;
+  location_timezone: string | null;
 };
 
 export function useClassInstances() {
@@ -34,7 +33,7 @@ export function useClassInstances() {
           id, studio_id, starts_at, ends_at, price, max_capacity, booked_count, status,
           class_templates ( name, level ),
           instructors ( display_name, initials ),
-          locations ( name )
+          locations ( name, timezone )
         `)
         .eq("status", "scheduled")
         .gte("starts_at", from.toISOString())
@@ -43,27 +42,22 @@ export function useClassInstances() {
 
       if (error) throw error;
 
-      return (data ?? []).map((row: any) => {
-        const startsAt = new Date(row.starts_at);
-        const endsAt = new Date(row.ends_at);
-        return {
-          id: row.id,
-          studio_id: row.studio_id,
-          starts_at: row.starts_at,
-          ends_at: row.ends_at,
-          price: Number(row.price),
-          max_capacity: row.max_capacity,
-          booked_count: row.booked_count,
-          status: row.status,
-          class_name: row.class_templates?.name ?? "",
-          level: row.class_templates?.level ?? "",
-          practitioner_name: row.instructors?.display_name ?? "",
-          practitioner_initials: row.instructors?.initials ?? "",
-          location: row.locations?.name ?? "",
-          time: startsAt.toLocaleTimeString("nb-NO", { hour: "2-digit", minute: "2-digit", hour12: false }),
-          duration: Math.round((endsAt.getTime() - startsAt.getTime()) / 60000),
-        } as ClassInstance;
-      });
+      return (data ?? []).map((row: any) => ({
+        id: row.id,
+        studio_id: row.studio_id,
+        starts_at: row.starts_at,
+        ends_at: row.ends_at,
+        price: Number(row.price),
+        max_capacity: row.max_capacity,
+        booked_count: row.booked_count,
+        status: row.status,
+        class_name: row.class_templates?.name ?? "",
+        level: row.class_templates?.level ?? "",
+        practitioner_name: row.instructors?.display_name ?? "",
+        practitioner_initials: row.instructors?.initials ?? "",
+        location: row.locations?.name ?? "",
+        location_timezone: row.locations?.timezone ?? null,
+      })) as ClassInstance[];
     },
   });
 
