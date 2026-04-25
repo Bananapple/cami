@@ -15,12 +15,48 @@ export class StripeProvider implements PaymentProviderAdapter {
   readonly name = "stripe" as const;
   private stripe = new Stripe(SECRET_KEY, { apiVersion: "2024-04-10" });
 
+  private async resolveCustomer(
+    email: string | undefined,
+    name: string | undefined,
+    stripeAccount: string | undefined,
+  ): Promise<string | undefined> {
+    if (!email) return undefined;
+    const opts = stripeAccount ? { stripeAccount } : undefined;
+    try {
+      const existing = await this.stripe.customers.list({ email, limit: 1 }, opts);
+      if (existing.data.length > 0) {
+        const cus = existing.data[0];
+        if (name && !cus.name) {
+          await this.stripe.customers.update(cus.id, { name }, opts);
+        }
+        return cus.id;
+      }
+      const created = await this.stripe.customers.create({ email, name }, opts);
+      return created.id;
+    } catch (err) {
+      console.error("resolveCustomer failed:", err);
+      return undefined;
+    }
+  }
+
   async createCheckoutSession(params: CreateCheckoutParams): Promise<CheckoutResult> {
+    const stripeAccount = params.studio_provider_account_id ?? undefined;
+    const customerId = await this.resolveCustomer(
+      params.customer_email,
+      params.customer_name,
+      stripeAccount,
+    );
+
     const session = await this.stripe.checkout.sessions.create(
       {
         payment_method_types: ["card"],
         mode: "payment",
-        ...(params.customer_email ? { customer_email: params.customer_email } : {}),
+        billing_address_collection: "required",
+        ...(customerId
+          ? { customer: customerId }
+          : params.customer_email
+            ? { customer_email: params.customer_email }
+            : {}),
         line_items: [
           {
             price_data: {
@@ -33,12 +69,17 @@ export class StripeProvider implements PaymentProviderAdapter {
         ],
         success_url: params.success_url,
         cancel_url: params.cancel_url,
-        metadata: params.metadata,
+        metadata: {
+          ...params.metadata,
+          ...(params.customer_name ? { customer_name: params.customer_name } : {}),
+        },
+        payment_intent_data: {
+          description: params.customer_name
+            ? `${params.description} — ${params.customer_name}`
+            : params.description,
+        },
       },
-      // Destination charge to the studio's Connect account
-      params.studio_provider_account_id
-        ? { stripeAccount: params.studio_provider_account_id }
-        : undefined,
+      stripeAccount ? { stripeAccount } : undefined,
     );
 
     return {

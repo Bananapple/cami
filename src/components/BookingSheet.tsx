@@ -8,10 +8,13 @@ import DateStrip from "@/components/booking/DateStrip";
 import SessionList from "@/components/booking/SessionList";
 import OrderSummary from "@/components/booking/OrderSummary";
 import AuthForm from "@/components/booking/AuthForm";
+import ProfileForm from "@/components/booking/ProfileForm";
 import { supabase } from "@/integrations/supabase/client";
 import { useStudioConfig } from "@/hooks/useStudioConfig";
+import { useStudioContext } from "@/context/StudioContext";
+import { formatTime, formatDate } from "@/lib/timezone";
 
-type Step = "date" | "confirm" | "auth" | "checkout";
+type Step = "date" | "confirm" | "auth" | "profile" | "checkout";
 
 interface BookingSheetProps {
   isOpen: boolean;
@@ -28,6 +31,8 @@ const BookingSheet = ({ isOpen, onClose }: BookingSheetProps) => {
   const { instances: sessions } = useClassInstances();
   const { isAuthenticated } = useAuth();
   const { studioName, location } = useStudioConfig();
+  const studioCtx = useStudioContext();
+  const studioTz = studioCtx?.studio?.timezone ?? "Europe/Oslo";
 
   const handleClose = () => {
     onClose();
@@ -43,16 +48,30 @@ const BookingSheet = ({ isOpen, onClose }: BookingSheetProps) => {
     setStep("confirm");
   };
 
-  const handleContinueFromConfirm = () => {
-    if (isAuthenticated) {
-      setStep("checkout");
-    } else {
+  const handleContinueFromConfirm = async () => {
+    if (!isAuthenticated) {
       setStep("auth");
+      return;
     }
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { setStep("checkout"); return; }
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("full_name")
+      .eq("id", user.id)
+      .maybeSingle();
+    setStep(profile?.full_name ? "checkout" : "profile");
   };
 
-  const handleAuthSuccess = () => {
-    setStep("checkout");
+  const handleAuthSuccess = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { setStep("checkout"); return; }
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("full_name")
+      .eq("id", user.id)
+      .maybeSingle();
+    setStep(profile?.full_name ? "checkout" : "profile");
   };
 
   const handleCheckout = async () => {
@@ -95,6 +114,7 @@ const BookingSheet = ({ isOpen, onClose }: BookingSheetProps) => {
     switch (step) {
       case "confirm": setStep("date"); break;
       case "auth": setStep("confirm"); break;
+      case "profile": setStep("auth"); break;
       case "checkout": setStep("confirm"); break;
     }
   };
@@ -104,12 +124,13 @@ const BookingSheet = ({ isOpen, onClose }: BookingSheetProps) => {
       case "date":     return "Select a Date";
       case "confirm":  return "Session Details";
       case "auth":     return "Sign In";
+      case "profile":  return "Your Details";
       case "checkout": return "Payment";
     }
   };
 
   const showBack = step !== "date";
-  const showSplitLayout = step === "auth" || step === "checkout";
+  const showSplitLayout = step === "auth" || step === "profile" || step === "checkout";
 
   return (
     <Sheet open={isOpen} onOpenChange={(open) => !open && handleClose()}>
@@ -166,15 +187,20 @@ const BookingSheet = ({ isOpen, onClose }: BookingSheetProps) => {
               </p>
               <div className="border-t border-border pt-4 space-y-2 text-sm text-muted-foreground font-sans">
                 <p>
-                  {selectedDate.toLocaleDateString("nb-NO", {
+                  {formatDate(selectedSession.starts_at, selectedSession.location_timezone ?? studioTz, {
                     weekday: "short",
                     month: "short",
                     day: "numeric",
-                  })}{" "}
-                  · {selectedSession.time}
+                  })}
+                  {" · "}
+                  {formatTime(selectedSession.starts_at, selectedSession.location_timezone ?? studioTz)}
                 </p>
                 <p>📍 {selectedSession.location}</p>
-                <p>{selectedSession.duration} min · {selectedSession.level}</p>
+                <p>
+                  {Math.round(
+                    (new Date(selectedSession.ends_at).getTime() - new Date(selectedSession.starts_at).getTime()) / 60000
+                  )} min · {selectedSession.level}
+                </p>
               </div>
             </div>
 
@@ -212,6 +238,8 @@ const BookingSheet = ({ isOpen, onClose }: BookingSheetProps) => {
             {/* Right: Auth form or Checkout CTA */}
             <div className="flex-1 p-6 bg-background border-t sm:border-t-0 sm:border-l border-border">
               {step === "auth" && <AuthForm onSuccess={handleAuthSuccess} />}
+
+              {step === "profile" && <ProfileForm onSuccess={() => setStep("checkout")} />}
 
               {step === "checkout" && (
                 <div className="space-y-6">

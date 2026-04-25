@@ -42,11 +42,17 @@ Deno.serve(async (req) => {
     // --- Fetch class instance: price and studio_id (server-side — never trust client) ---
     const { data: instance, error: instanceErr } = await adminClient
       .from("class_instances")
-      .select("id, studio_id, price, status, starts_at, template_id")
+      .select("id, studio_id, price, status, starts_at, template_id, max_capacity, booked_count, class_templates ( name )")
       .eq("id", class_instance_id)
       .eq("status", "scheduled")
       .single();
     if (instanceErr || !instance) return json({ error: "Class not found or not schedulable" }, 404);
+    const className = (instance as any).class_templates?.name ?? "Class";
+
+    // --- Capacity check ---
+    if (instance.max_capacity > 0 && instance.booked_count >= instance.max_capacity) {
+      return json({ error: "This class is fully booked" }, 409);
+    }
 
     // --- Verify user is a member of this studio ---
     const { data: member } = await adminClient
@@ -57,6 +63,15 @@ Deno.serve(async (req) => {
       .eq("is_active", true)
       .maybeSingle();
     if (!member) return json({ error: "You are not a member of this studio" }, 403);
+
+    // --- Fetch customer name for Stripe pre-fill (best-effort) ---
+    const { data: profile } = await adminClient
+      .from("profiles")
+      .select("full_name")
+      .eq("id", user.id)
+      .maybeSingle();
+    const customerName = profile?.full_name || undefined;
+    console.log("checkout: customerName=", customerName, "userId=", user.id);
 
     // --- Resolve studio's primary payment provider ---
     const { data: providerRow, error: providerErr } = await adminClient
@@ -115,9 +130,10 @@ Deno.serve(async (req) => {
       checkoutResult = await adapter.createCheckoutSession({
         studio_provider_account_id: providerRow.provider_account_id,
         customer_email: user.email,
+        customer_name: customerName,
         amount: Math.round(instance.price * 100),  // convert NOK → øre
         currency: "NOK",
-        description: `Class booking`,
+        description: className,
         success_url: successUrl,
         cancel_url: cancelUrl,
         metadata: {

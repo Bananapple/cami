@@ -14,6 +14,7 @@ import JoinNow from "./pages/JoinNow";
 import Dashboard from "./pages/Dashboard";
 import ArticleDetail from "./pages/ArticleDetail";
 import NotFound from "./pages/NotFound";
+import { ManageApp } from "./manage/ManageApp";
 
 const queryClient = new QueryClient();
 
@@ -40,6 +41,7 @@ const App = () => (
           <Route path="/journal" element={<Insights />} />
           <Route path="/joinnow" element={<JoinNow />} />
           <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/manage/*" element={<ManageApp />} />
           <Route path="/insights/:slug" element={<ArticleDetail />} />
           <Route path="*" element={<NotFound />} />
         </Routes>

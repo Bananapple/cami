@@ -16,6 +16,7 @@ export type PaymentStatus =
 export interface CreateCheckoutParams {
   studio_provider_account_id: string | null;  // Stripe Connect acct_xxx / Frisbii merchant id (null = platform account)
   customer_email?: string;
+  customer_name?: string;
   amount: number;                      // in smallest currency unit (øre for NOK)
   currency: string;                    // ISO 4217, e.g. "NOK"
   description: string;
