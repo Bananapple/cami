@@ -51,7 +51,7 @@ export class StripeProvider implements PaymentProviderAdapter {
       {
         payment_method_types: ["card"],
         mode: "payment",
-        billing_address_collection: "required",
+        billing_address_collection: "auto",
         ...(customerId
           ? { customer: customerId }
           : params.customer_email

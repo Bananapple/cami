@@ -71,7 +71,6 @@ Deno.serve(async (req) => {
       .eq("id", user.id)
       .maybeSingle();
     const customerName = profile?.full_name || undefined;
-    console.log("checkout: customerName=", customerName, "userId=", user.id);
 
     // --- Resolve studio's primary payment provider ---
     const { data: providerRow, error: providerErr } = await adminClient
