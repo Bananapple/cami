@@ -66,17 +66,15 @@ Architecture assessment conducted 2026-04-23. v2 cutover completed 2026-04-24 �
 - Instructor conflict detection via same exclusion-constraint pattern as locations
 - UI work remaining: schedule builder for owners/managers; exception handler ("cancel this Tuesday")
 
-### Cross-sell upsell in BookingSheet (next small win)
-When `bookingMode === "dropin"`, show a subtle hint below the price line:
-> *"Save kr 50/class with a 10-class card →"* (link to /joinnow)
-One line, visually subordinate to the main CTA — drives membership conversion at the highest-intent moment. Small change in `BookingSheet.tsx` confirm step.
+### ✅ Frisbii Payment Adapter — IMPLEMENTED (2026-05-01, untested live)
+`supabase/functions/_shared/providers/frisbii.ts` — full `PaymentProviderAdapter`:
+- Auth: HTTP Basic with `FRISBII_API_KEY` (format `priv_xxx`) as username, empty password
+- Checkout: `POST https://checkout-api.frisbii.com/v1/session/charge`; `order.handle = payment_id` → invoice handle = payment_id → webhook lookup works without Stripe-style session ID
+- Webhook: signature is inside the JSON payload (`event.signature = hex(hmac_sha256(secret, timestamp+id))`), not a header — adapter reads it from parsed payload
+- Refund: `POST https://api.frisbii.com/v1/refund` with invoice handle
+- Subscription support (monthly memberships) deferred — needs `/session/recurring` + plan setup in Frisbii dashboard
 
-### Push to production + subscription cancel test
-- `git push` → Vercel auto-deploys Phase 1A + 1B
-- Real-world test: complete subscription checkout → cancel from Stripe Dashboard → verify `memberships.status = 'cancelled'`
-
-### Confirmation email for membership purchases
-Currently only class bookings get a Resend email. Add a membership receipt from `payment-webhook` when `activate_membership()` succeeds.
+To activate for a studio: set `FRISBII_API_KEY` + `FRISBII_WEBHOOK_SECRET` secrets; insert `studio_payment_providers` row with `provider='frisbii'`; set webhook URL to `.../payment-webhook/frisbii`.
 
 ### Staff product management UI
 Add/edit/deactivate products from manager panel without touching the DB directly.
