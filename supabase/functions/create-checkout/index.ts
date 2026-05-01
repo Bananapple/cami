@@ -104,6 +104,37 @@ Deno.serve(async (req) => {
       amountMinor = Math.round(instance.price * 100);
       description = className;
       resolvedClassInstance = { id: instance.id, studio_id: instance.studio_id, max_capacity: instance.max_capacity, price: instance.price };
+
+      // --- Check for active membership: subscription (unlimited) or clip card with credits ---
+      // Fetch all active memberships for this user+studio, validate in application code
+      // to avoid brittle PostgREST OR filter chaining.
+      const today = new Date().toISOString().split("T")[0];
+      const { data: memberships } = await adminClient
+        .from("memberships")
+        .select("id, credits_remaining, valid_until")
+        .eq("user_id", user.id)
+        .eq("studio_id", studioId)
+        .eq("status", "active");
+
+      const activeMembership = (memberships ?? []).find((m) => {
+        const notExpired = !m.valid_until || m.valid_until >= today;
+        const hasAccess = m.credits_remaining === null || m.credits_remaining > 0;
+        return notExpired && hasAccess;
+      }) ?? null;
+
+      if (activeMembership) {
+        await adminClient.from("studio_members").upsert(
+          { studio_id: studioId, user_id: user.id, role: "member", is_active: true },
+          { onConflict: "studio_id,user_id", ignoreDuplicates: true }
+        );
+        const { data: bookingId, error: creditErr } = await adminClient.rpc("book_with_credit", {
+          p_user_id: user.id,
+          p_class_instance_id: class_instance_id,
+          p_membership_id: activeMembership.id,
+        });
+        if (creditErr) return json({ error: creditErr.message ?? "Booking failed" }, 409);
+        return json({ booking_id: bookingId, free: true });
+      }
     } else {
       // --- Product purchase path ---
       const { data: product, error: productErr } = await adminClient

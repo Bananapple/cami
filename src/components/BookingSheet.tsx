@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { ArrowLeft } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
@@ -12,6 +12,7 @@ import ProfileForm from "@/components/booking/ProfileForm";
 import { supabase } from "@/integrations/supabase/client";
 import { useStudioConfig } from "@/hooks/useStudioConfig";
 import { useStudioContext } from "@/context/StudioContext";
+import { useMembership } from "@/hooks/useMembership";
 import { formatTime, formatDate } from "@/lib/timezone";
 
 type Step = "date" | "confirm" | "auth" | "profile" | "checkout";
@@ -33,6 +34,16 @@ const BookingSheet = ({ isOpen, onClose }: BookingSheetProps) => {
   const { studioName, location } = useStudioConfig();
   const studioCtx = useStudioContext();
   const studioTz = studioCtx?.studio?.timezone ?? "Europe/Oslo";
+  const { membership } = useMembership();
+
+  const bookingMode = useMemo<"subscription" | "credit" | "dropin">(() => {
+    if (!membership) return "dropin";
+    const today = new Date().toISOString().split("T")[0];
+    if (membership.valid_until && membership.valid_until < today) return "dropin";
+    if (membership.credits_remaining === null) return "subscription";
+    if (membership.credits_remaining > 0) return "credit";
+    return "dropin";
+  }, [membership]);
 
   const handleClose = () => {
     onClose();
@@ -88,6 +99,12 @@ const BookingSheet = ({ isOpen, onClose }: BookingSheetProps) => {
         headers: session ? { Authorization: `Bearer ${session.access_token}` } : {},
       });
 
+      // Free booking (active membership covered the class)
+      if (data?.booking_id && !data?.checkout_url) {
+        window.location.href = `${returnUrl}?booking_id=${data.booking_id}&status=success`;
+        return;
+      }
+
       if (error || !data?.checkout_url) {
         let message = data?.error ?? "Unable to start checkout. Please try again.";
         if (error?.context) {
@@ -123,7 +140,7 @@ const BookingSheet = ({ isOpen, onClose }: BookingSheetProps) => {
       case "confirm":  return "Session Details";
       case "auth":     return "Sign In";
       case "profile":  return "Your Details";
-      case "checkout": return "Payment";
+      case "checkout": return bookingMode === "dropin" ? "Payment" : "Confirm Booking";
     }
   };
 
@@ -203,17 +220,35 @@ const BookingSheet = ({ isOpen, onClose }: BookingSheetProps) => {
             </div>
 
             <div className="flex items-center justify-between py-3 border-y border-border">
-              <span className="text-sm text-muted-foreground font-sans">Drop-in</span>
-              <span className="text-lg font-serif text-foreground">
-                kr {(selectedSession.price ?? 250).toLocaleString("nb-NO")}
-              </span>
+              {bookingMode === "subscription" && (
+                <>
+                  <span className="text-sm text-muted-foreground font-sans">{membership?.plan_name}</span>
+                  <span className="text-lg font-serif text-foreground">Included</span>
+                </>
+              )}
+              {bookingMode === "credit" && (
+                <>
+                  <span className="text-sm text-muted-foreground font-sans">
+                    Clip card · {membership?.credits_remaining} credit{membership?.credits_remaining !== 1 ? "s" : ""} remaining
+                  </span>
+                  <span className="text-lg font-serif text-foreground">1 credit</span>
+                </>
+              )}
+              {bookingMode === "dropin" && (
+                <>
+                  <span className="text-sm text-muted-foreground font-sans">Drop-in</span>
+                  <span className="text-lg font-serif text-foreground">
+                    kr {(selectedSession.price ?? 250).toLocaleString("nb-NO")}
+                  </span>
+                </>
+              )}
             </div>
 
             <button
               onClick={handleContinueFromConfirm}
               className="w-full bg-primary hover:bg-primary/80 text-primary-foreground py-3.5 font-sans font-medium text-sm uppercase tracking-[0.15em] rounded-lg transition-all duration-200"
             >
-              Continue to Checkout →
+              {bookingMode === "dropin" ? "Continue to Checkout →" : "Book Class →"}
             </button>
 
             <p className="text-xs text-center text-muted-foreground font-serif">
@@ -230,7 +265,13 @@ const BookingSheet = ({ isOpen, onClose }: BookingSheetProps) => {
           <div className="flex flex-col sm:flex-row min-h-[calc(100vh-60px)]">
             {/* Left: Order Summary */}
             <div className="sm:w-[45%] p-6 flex-shrink-0">
-              <OrderSummary session={selectedSession} selectedDate={selectedDate} />
+              <OrderSummary
+                session={selectedSession}
+                selectedDate={selectedDate}
+                bookingMode={bookingMode}
+                planName={membership?.plan_name}
+                creditsRemaining={membership?.credits_remaining}
+              />
             </div>
 
             {/* Right: Auth form or Checkout CTA */}
@@ -244,14 +285,20 @@ const BookingSheet = ({ isOpen, onClose }: BookingSheetProps) => {
                   <div>
                     <h3 className="text-lg font-serif text-foreground">Ready to book?</h3>
                     <p className="text-sm text-muted-foreground font-sans mt-1">
-                      You'll be taken to our secure payment page to complete your booking.
+                      {bookingMode === "dropin"
+                        ? "You'll be taken to our secure payment page to complete your booking."
+                        : "Your membership covers this class. Click below to confirm your spot."}
                     </p>
                   </div>
 
                   <div className="bg-muted/40 rounded-lg px-4 py-3 text-xs text-muted-foreground font-sans space-y-1">
                     <p>· {selectedSession.class_name}</p>
                     <p>· {selectedDate.toLocaleDateString("nb-NO", { weekday: "long", day: "numeric", month: "long" })}</p>
-                    <p>· kr {(selectedSession.price ?? 250).toLocaleString("nb-NO")}</p>
+                    <p>· {bookingMode === "dropin"
+                      ? `kr ${(selectedSession.price ?? 250).toLocaleString("nb-NO")}`
+                      : bookingMode === "subscription"
+                        ? `Included with ${membership?.plan_name ?? "membership"}`
+                        : "1 credit"}</p>
                   </div>
 
                   <button
@@ -259,7 +306,9 @@ const BookingSheet = ({ isOpen, onClose }: BookingSheetProps) => {
                     disabled={checkoutLoading}
                     className="w-full bg-primary hover:bg-primary/80 disabled:opacity-60 text-primary-foreground py-3.5 font-sans font-medium text-sm uppercase tracking-[0.15em] rounded-lg transition-all duration-200"
                   >
-                    {checkoutLoading ? "Preparing checkout…" : "Pay now →"}
+                    {checkoutLoading
+                      ? (bookingMode === "dropin" ? "Preparing checkout…" : "Booking…")
+                      : (bookingMode === "dropin" ? "Pay now →" : "Confirm Booking →")}
                   </button>
 
                   {checkoutError && (
@@ -269,7 +318,7 @@ const BookingSheet = ({ isOpen, onClose }: BookingSheetProps) => {
                   )}
 
                   <p className="text-xs text-center text-muted-foreground font-sans">
-                    Secure payment · 24-hour free cancellation
+                    {bookingMode === "dropin" ? "Secure payment · 24-hour free cancellation" : "24-hour free cancellation"}
                   </p>
                 </div>
               )}

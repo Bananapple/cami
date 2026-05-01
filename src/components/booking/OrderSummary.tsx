@@ -4,9 +4,12 @@ import type { ClassInstance } from "@/hooks/useClassInstances";
 interface OrderSummaryProps {
   session: ClassInstance;
   selectedDate: Date;
+  bookingMode: "subscription" | "credit" | "dropin";
+  planName?: string | null;
+  creditsRemaining?: number | null;
 }
 
-const OrderSummary = ({ session, selectedDate }: OrderSummaryProps) => {
+const OrderSummary = ({ session, selectedDate, bookingMode, planName, creditsRemaining }: OrderSummaryProps) => {
   const dateStr = selectedDate.toLocaleDateString("nb-NO", {
     weekday: "short",
     month: "short",
@@ -32,14 +35,28 @@ const OrderSummary = ({ session, selectedDate }: OrderSummaryProps) => {
       </div>
 
       <div className="bg-background/50 rounded-lg p-4 space-y-3">
-        <p className="text-xs font-sans font-medium uppercase tracking-wider text-foreground/60">
-          (1) Drop In — 1 Class
-        </p>
+        {bookingMode === "subscription" && (
+          <p className="text-xs font-sans font-medium uppercase tracking-wider text-foreground/60">
+            {planName ?? "Membership"} — Included
+          </p>
+        )}
+        {bookingMode === "credit" && (
+          <p className="text-xs font-sans font-medium uppercase tracking-wider text-foreground/60">
+            Clip Card — 1 Credit ({creditsRemaining} remaining)
+          </p>
+        )}
+        {bookingMode === "dropin" && (
+          <p className="text-xs font-sans font-medium uppercase tracking-wider text-foreground/60">
+            (1) Drop In — 1 Class
+          </p>
+        )}
         <p className="text-xs font-sans text-foreground/60">{session.location}</p>
-        <div className="flex items-center gap-1.5 text-xs text-foreground/60">
-          <Clock className="w-3 h-3" />
-          Valid for 1 month
-        </div>
+        {bookingMode === "dropin" && (
+          <div className="flex items-center gap-1.5 text-xs text-foreground/60">
+            <Clock className="w-3 h-3" />
+            Valid for 1 month
+          </div>
+        )}
       </div>
 
       <div className="border-t border-border/50 pt-4 space-y-2">
@@ -66,7 +83,11 @@ const OrderSummary = ({ session, selectedDate }: OrderSummaryProps) => {
           Total
         </span>
         <span className="text-2xl font-serif text-foreground">
-          kr {(session.price ?? 250).toLocaleString("nb-NO")}
+          {bookingMode === "dropin"
+            ? `kr ${(session.price ?? 250).toLocaleString("nb-NO")}`
+            : bookingMode === "credit"
+              ? "1 credit"
+              : "Included"}
         </span>
       </div>
     </div>

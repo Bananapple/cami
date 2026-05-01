@@ -38,7 +38,7 @@ Deno.serve(async (req) => {
     const { data: booking, error: bookingErr } = await admin
       .from("bookings")
       .select(`
-        id, studio_id, user_id, payment_id, status,
+        id, studio_id, user_id, payment_id, membership_id, status,
         class_instances ( starts_at ),
         studios ( cancellation_window_hours )
       `)
@@ -70,12 +70,22 @@ Deno.serve(async (req) => {
     const windowHours = (booking.studios as any)?.cancellation_window_hours ?? 24;
     const outsideWindow = (startsAt.getTime() - Date.now()) > windowHours * 60 * 60 * 1000;
     const hasPayment = !!booking.payment_id;
+    const hasMembership = !!booking.membership_id;
 
     // --- Always cancel the booking first ---
     await admin
       .from("bookings")
       .update({ status: "cancelled", cancelled_at: new Date().toISOString() })
       .eq("id", booking_id);
+
+    // --- Credit-paid booking: return credit if within refund window ---
+    if (hasMembership) {
+      if (outsideWindow) {
+        await admin.rpc("return_credit", { p_membership_id: booking.membership_id });
+        return json({ cancelled: true, credit_returned: true });
+      }
+      return json({ cancelled: true, credit_returned: false, reason: "inside_cancellation_window" });
+    }
 
     if (!hasPayment || !outsideWindow) {
       return json({
