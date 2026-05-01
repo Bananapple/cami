@@ -1,6 +1,6 @@
 # Brie — Yoga Studio SaaS
 
-A website and booking engine for Norwegian yoga studios. Each studio gets their own isolated Supabase project and branded deployment. Studio owners pay a flat monthly SaaS fee; student payments go directly to each studio.
+A website and booking engine for yoga studios in Scandinavia, Europe and the US. Each studio gets their own isolated Supabase project and branded deployment. Studio owners pay a flat monthly SaaS fee; student payments go directly to each studio.
 
 Built with React 18 + TypeScript + Vite, Tailwind CSS, shadcn/ui, and Supabase.
 

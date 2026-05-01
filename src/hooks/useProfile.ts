@@ -6,7 +6,7 @@ export function useProfile() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
-  const { data: profile, isLoading } = useQuery({
+  const { data: profile, isLoading, error } = useQuery({
     queryKey: ["profile", user?.id],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -34,5 +34,5 @@ export function useProfile() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["profile"] }),
   });
 
-  return { profile, isLoading, updateProfile };
+  return { profile, isLoading, error, updateProfile };
 }

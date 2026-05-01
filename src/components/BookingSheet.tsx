@@ -49,12 +49,10 @@ const BookingSheet = ({ isOpen, onClose }: BookingSheetProps) => {
   };
 
   const handleContinueFromConfirm = async () => {
-    if (!isAuthenticated) {
-      setStep("auth");
-      return;
-    }
+    // Single getUser() call as the authoritative auth check — avoids TOCTOU race
+    // where a stale isAuthenticated flag could diverge from the actual session state.
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { setStep("checkout"); return; }
+    if (!user) { setStep("auth"); return; }
     const { data: profile } = await supabase
       .from("profiles")
       .select("full_name")
@@ -93,7 +91,7 @@ const BookingSheet = ({ isOpen, onClose }: BookingSheetProps) => {
       if (error || !data?.checkout_url) {
         let message = data?.error ?? "Unable to start checkout. Please try again.";
         if (error?.context) {
-          try { const body = await error.context.json(); message = body.error ?? message; } catch {}
+          try { const body = await error.context.json(); message = body.error ?? message; } catch { /* ignore JSON parse error */ }
         } else if (error?.message) {
           message = error.message;
         }

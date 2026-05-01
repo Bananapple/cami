@@ -13,6 +13,15 @@ const OrderSummary = ({ session, selectedDate }: OrderSummaryProps) => {
     day: "numeric",
   });
 
+  const timeStr = new Date(session.starts_at).toLocaleTimeString("nb-NO", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+  const durationMin = Math.round(
+    (new Date(session.ends_at).getTime() - new Date(session.starts_at).getTime()) / 60000
+  );
+
   return (
     <div className="bg-header rounded-xl p-6 space-y-5">
       <div>
@@ -41,14 +50,14 @@ const OrderSummary = ({ session, selectedDate }: OrderSummaryProps) => {
           with {session.practitioner_name}
         </p>
         <p className="text-xs text-foreground/70 font-sans">
-          {dateStr} · {session.time}
+          {dateStr} · {timeStr}
         </p>
         <p className="text-xs text-foreground/70 font-sans flex items-center gap-1">
           <MapPin className="w-3 h-3" />
           {session.location}
         </p>
         <p className="text-xs text-foreground/70 font-sans">
-          {session.duration} min · {session.level}
+          {durationMin} min · {session.level}
         </p>
       </div>
 

@@ -23,6 +23,12 @@ export interface CreateCheckoutParams {
   success_url: string;
   cancel_url: string;
   metadata: Record<string, string>;   // must include payment_id for webhook reconciliation
+
+  // Subscription mode (one-time payment when omitted)
+  recurring?: {
+    interval: "day" | "week" | "month" | "year";
+    interval_count?: number;
+  };
 }
 
 export interface CheckoutResult {
@@ -36,6 +42,8 @@ export type CanonicalEventType =
   | "payment.cancelled"
   | "payment.refunded"
   | "payment.partially_refunded"
+  | "subscription.renewed"
+  | "subscription.cancelled"
   | "unknown";
 
 export interface CanonicalWebhookEvent {
@@ -43,6 +51,7 @@ export interface CanonicalWebhookEvent {
   provider_event_id: string;
   provider_session_id?: string;
   provider_payment_id?: string;        // set on succeeded
+  provider_subscription_id?: string;   // set when the session/event is for a subscription
   amount?: number;
   refunded_amount?: number;
   failure_code?: string;

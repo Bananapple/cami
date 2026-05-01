@@ -21,6 +21,14 @@ export default tseslint.config(
       ...reactHooks.configs.recommended.rules,
       "react-refresh/only-export-components": ["warn", { allowConstantExport: true }],
       "@typescript-eslint/no-unused-vars": "off",
+      // TypeScript config is intentionally permissive (noImplicitAny: false)
+      "@typescript-eslint/no-explicit-any": "off",
+      // shadcn/ui generated components use empty interfaces as extension points
+      "@typescript-eslint/no-empty-object-type": "off",
+      // supabase gen types uses namespaces; generated file, not hand-edited
+      "@typescript-eslint/no-namespace": "off",
+      // tailwind.config.ts uses require() for the animate plugin
+      "@typescript-eslint/no-require-imports": "off",
     },
   },
 );

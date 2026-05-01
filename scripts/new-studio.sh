@@ -1,4 +1,10 @@
 #!/usr/bin/env bash
+# DEPRECATED: This script is no longer maintained.
+# The v2 multi-tenant architecture provisions studios via INSERT into the
+# `studios` table. See CLAUDE.md > "Provisioning a New Studio" for the current flow.
+echo "ERROR: new-studio.sh is deprecated. See CLAUDE.md for the v2 provisioning flow." >&2
+exit 1
+
 # new-studio.sh — Provisions a new yoga studio deployment
 #
 # What it does:

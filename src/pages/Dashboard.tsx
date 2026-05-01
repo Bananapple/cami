@@ -2,6 +2,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useBookings } from "@/hooks/useBookings";
 import { useMembership } from "@/hooks/useMembership";
+import { useStudioMember } from "@/hooks/useStudioMember";
 import { useState } from "react";
 import { Link, Navigate } from "react-router-dom";
 import Header from "@/components/Header";
@@ -15,8 +16,9 @@ import { formatTime, formatDate } from "@/lib/timezone";
 const Dashboard = () => {
   const { user, isAuthenticated, loading, signOut } = useAuth();
   const { profile } = useProfile();
-  const { bookings, cancelBooking } = useBookings();
+  const { bookings, cancelBooking, error: bookingsError } = useBookings();
   const { membership } = useMembership();
+  const { studioMember } = useStudioMember();
   const studioCtx = useStudioContext();
   const studioTz = studioCtx?.studio?.timezone ?? "Europe/Oslo";
   const [bookingOpen, setBookingOpen] = useState(false);
@@ -97,15 +99,11 @@ const Dashboard = () => {
             <div className="border-t border-border/50 pt-6 space-y-4">
               <div>
                 <p className="text-xs font-sans font-medium uppercase tracking-wider text-foreground/50">Level</p>
-                <p className="text-lg font-serif text-foreground">{profile?.level || "STARTER"}</p>
+                <p className="text-lg font-serif text-foreground">{studioMember?.level || "STARTER"}</p>
               </div>
               <div>
                 <p className="text-xs font-sans font-medium uppercase tracking-wider text-foreground/50">Sessions</p>
-                <p className="text-lg font-serif text-foreground">{profile?.total_sessions ?? 0}</p>
-              </div>
-              <div>
-                <p className="text-xs font-sans font-medium uppercase tracking-wider text-foreground/50">Referrals</p>
-                <p className="text-lg font-serif text-foreground">{profile?.referrals ?? 0}</p>
+                <p className="text-lg font-serif text-foreground">{studioMember?.total_sessions ?? 0}</p>
               </div>
             </div>
 
@@ -128,7 +126,11 @@ const Dashboard = () => {
             <div className="bg-card rounded-xl p-6 space-y-4">
               <h2 className="text-lg font-serif text-foreground">Upcoming Sessions</h2>
 
-              {bookings.length === 0 ? (
+              {bookingsError ? (
+                <p className="text-sm text-destructive font-sans py-4">
+                  Failed to load bookings. Please refresh.
+                </p>
+              ) : bookings.length === 0 ? (
                 <p className="text-sm text-muted-foreground font-serif py-4">
                   No upcoming sessions. Book your first class!
                 </p>

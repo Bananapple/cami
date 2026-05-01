@@ -1,5 +1,6 @@
 // Public endpoint — no JWT auth. Signature verification is done by each provider adapter.
 // URL pattern: /functions/v1/payment-webhook/stripe  (provider name as last path segment)
+//
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { getProvider } from "../_shared/providers/index.ts";
@@ -72,7 +73,11 @@ Deno.serve(async (req) => {
     paymentId = payment?.id ?? null;
   }
 
-  if (!paymentId && event.type !== "unknown") {
+  // Subscription renewal / cancellation events identify the membership by subscription ID,
+  // not the original session — no payment row lookup needed.
+  const isSubscriptionEvent =
+    event.type === "subscription.renewed" || event.type === "subscription.cancelled";
+  if (!paymentId && !isSubscriptionEvent && event.type !== "unknown") {
     console.warn(`No payment row found for session ${event.provider_session_id}`);
   }
 
@@ -81,13 +86,52 @@ Deno.serve(async (req) => {
     switch (event.type) {
       case "payment.succeeded":
         if (paymentId) {
+          // Branch on product_id: NULL = class booking, set = membership/clip card purchase
+          const { data: pRow } = await admin
+            .from("payments")
+            .select("product_id")
+            .eq("id", paymentId)
+            .single();
+
+          if (pRow?.product_id) {
+            // Membership / clip card purchase — atomic creation via DB function.
+            // For subscriptions, provider_subscription_id is captured for future renewal events.
+            await admin.rpc("activate_membership", {
+              p_payment_id: paymentId,
+              p_provider_subscription_id: event.provider_subscription_id ?? null,
+            });
+          } else {
+            // Class booking — atomic confirm via existing DB function
+            await admin.rpc("confirm_booking", { p_payment_id: paymentId });
+          }
+
+          // Capture the provider payment id in both cases
           await admin.from("payments").update({
-            status: "succeeded",
             provider_payment_id: event.provider_payment_id ?? null,
           }).eq("id", paymentId);
-          await admin.from("bookings").update({ status: "confirmed" })
-            .eq("payment_id", paymentId);
-          await sendBookingConfirmation(admin, paymentId);
+
+          // Confirmation email — only for class bookings (membership receipt comes from Stripe)
+          if (!pRow?.product_id) {
+            await sendBookingConfirmation(admin, paymentId);
+          }
+        }
+        break;
+
+      case "subscription.renewed":
+        // Recurring monthly invoice paid — extend the membership's valid_until.
+        if (event.provider_subscription_id) {
+          await admin.rpc("renew_membership_by_subscription", {
+            p_subscription_id: event.provider_subscription_id,
+          });
+        }
+        break;
+
+      case "subscription.cancelled":
+        // Subscription deleted in Stripe (user cancelled or final retry failed).
+        if (event.provider_subscription_id) {
+          await admin.rpc("cancel_membership_by_subscription", {
+            p_subscription_id: event.provider_subscription_id,
+          });
         }
         break;
 
@@ -112,12 +156,22 @@ Deno.serve(async (req) => {
         break;
 
       case "payment.refunded":
+        if (paymentId) {
+          // Atomic: mark payment refunded AND cancel the booking together.
+          await admin.rpc("refund_booking", { p_payment_id: paymentId });
+          await admin.from("payments").update({
+            refunded_amount: event.refunded_amount ?? 0,
+          }).eq("id", paymentId);
+        }
+        break;
+
       case "payment.partially_refunded":
         if (paymentId) {
           await admin.from("payments").update({
-            status: event.type === "payment.refunded" ? "refunded" : "partially_refunded",
+            status: "partially_refunded",
             refunded_amount: event.refunded_amount ?? 0,
           }).eq("id", paymentId);
+          // Booking remains confirmed on partial refund — staff handle edge cases manually.
         }
         break;
 
@@ -162,18 +216,37 @@ async function sendBookingConfirmation(admin: ReturnType<typeof createClient>, p
       .single();
     if (!booking) return;
 
-    // Idempotency check — don't send twice for the same booking
     const idempotencyKey = `booking_confirmation_${booking.id}`;
-    const { data: existing } = await admin
-      .from("notification_log")
-      .select("id")
-      .eq("idempotency_key", idempotencyKey)
-      .maybeSingle();
-    if (existing) return;
 
-    // Get user email
-    const { data: { user } } = await admin.auth.admin.getUserById(booking.user_id);
+    // Fetch these first — needed for the idempotency log INSERT (recipient is NOT NULL).
+    const [{ data: { user } }, { data: studio }] = await Promise.all([
+      admin.auth.admin.getUserById(booking.user_id),
+      admin.from("studios").select("name").eq("id", booking.studio_id).single(),
+    ]);
     if (!user?.email) return;
+    const studioName = (studio as any)?.name ?? "Yoga Studio";
+
+    // Idempotency: INSERT the log row BEFORE sending.
+    // The UNIQUE constraint on idempotency_key is the atomic lock — the first
+    // function invocation wins; a webhook replay gets 23505 and skips.
+    const { error: logInsertErr } = await admin
+      .from("notification_log")
+      .insert({
+        studio_id: booking.studio_id,
+        user_id: booking.user_id,
+        booking_id: booking.id,
+        channel: "email",
+        template: "booking_confirmation",
+        recipient: user.email,
+        idempotency_key: idempotencyKey,
+      });
+
+    // 23505 = unique_violation — already sent (or in flight), skip
+    if (logInsertErr?.code === "23505") return;
+    if (logInsertErr) {
+      console.error("notification_log insert error:", logInsertErr);
+      return;
+    }
 
     const ci = booking.class_instances as any;
     const startsAt = new Date(ci.starts_at);
@@ -190,7 +263,7 @@ async function sendBookingConfirmation(admin: ReturnType<typeof createClient>, p
       hour: "2-digit", minute: "2-digit", timeZone: "Europe/Oslo",
     });
 
-    const html = buildConfirmationEmail({ className, dateStr, timeStr, instructor, location, duration });
+    const html = buildConfirmationEmail({ studioName, className, dateStr, timeStr, instructor, location, duration });
 
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
@@ -206,28 +279,23 @@ async function sendBookingConfirmation(admin: ReturnType<typeof createClient>, p
       }),
     });
 
-    const logEntry: Record<string, unknown> = {
-      studio_id: booking.studio_id,
-      user_id: booking.user_id,
-      booking_id: booking.id,
-      channel: "email",
-      template: "booking_confirmation",
-      recipient: user.email,
-      idempotency_key: idempotencyKey,
-    };
     if (!res.ok) {
       const errText = await res.text();
-      logEntry.error = errText;
       console.error("Resend error:", errText);
+      // Record the failure on the log row so it's visible to staff.
+      // The row stays so webhook replays don't re-attempt; a manual retry
+      // would need to delete this row first.
+      await admin.from("notification_log")
+        .update({ error: errText })
+        .eq("idempotency_key", idempotencyKey);
     }
-
-    await admin.from("notification_log").insert(logEntry);
   } catch (err) {
     console.error("sendBookingConfirmation error:", err);
   }
 }
 
 function buildConfirmationEmail(p: {
+  studioName: string;
   className: string;
   dateStr: string;
   timeStr: string;
@@ -251,7 +319,7 @@ function buildConfirmationEmail(p: {
           <!-- Header -->
           <tr>
             <td style="padding:40px 48px 32px;border-bottom:1px solid #2e2e2e;">
-              <p style="margin:0;font-size:13px;letter-spacing:0.15em;text-transform:uppercase;color:#8a7e6e;">Yoga Brie</p>
+              <p style="margin:0;font-size:13px;letter-spacing:0.15em;text-transform:uppercase;color:#8a7e6e;">${p.studioName}</p>
               <h1 style="margin:12px 0 0;font-size:28px;font-weight:400;color:#f5f0eb;line-height:1.2;">
                 Your booking is confirmed
               </h1>

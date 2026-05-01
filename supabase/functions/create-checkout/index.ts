@@ -6,12 +6,15 @@ const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const APP_URL = Deno.env.get("APP_URL") ?? "https://brie-alpha.vercel.app";
 
+// Allowed origins for return_url to prevent open redirect attacks.
+const ALLOWED_ORIGINS = [APP_URL].map((u) => new URL(u).origin);
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, {
       headers: {
         "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+        "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-studio-slug",
         "Access-Control-Allow-Methods": "POST",
       },
     });
@@ -36,35 +39,107 @@ Deno.serve(async (req) => {
     const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     // --- Parse request body ---
-    const { class_instance_id, return_url } = await req.json();
-    if (!class_instance_id) return json({ error: "class_instance_id is required" }, 400);
-
-    // --- Fetch class instance: price and studio_id (server-side — never trust client) ---
-    const { data: instance, error: instanceErr } = await adminClient
-      .from("class_instances")
-      .select("id, studio_id, price, status, starts_at, template_id, max_capacity, booked_count, class_templates ( name )")
-      .eq("id", class_instance_id)
-      .eq("status", "scheduled")
-      .single();
-    if (instanceErr || !instance) return json({ error: "Class not found or not schedulable" }, 404);
-    const className = (instance as any).class_templates?.name ?? "Class";
-
-    // --- Capacity check ---
-    if (instance.max_capacity > 0 && instance.booked_count >= instance.max_capacity) {
-      return json({ error: "This class is fully booked" }, 409);
+    // Accepts either { class_instance_id } (book a class) or { product_id } (buy a membership/clip card)
+    const { class_instance_id, product_id, return_url, discount_code } = await req.json();
+    if (!class_instance_id && !product_id) {
+      return json({ error: "Either class_instance_id or product_id is required" }, 400);
+    }
+    if (class_instance_id && product_id) {
+      return json({ error: "Cannot specify both class_instance_id and product_id" }, 400);
     }
 
-    // --- Verify user is a member of this studio ---
-    const { data: member } = await adminClient
-      .from("studio_members")
-      .select("id, is_active")
-      .eq("studio_id", instance.studio_id)
-      .eq("user_id", user.id)
-      .eq("is_active", true)
-      .maybeSingle();
-    if (!member) return json({ error: "You are not a member of this studio" }, 403);
+    // --- Validate return_url to prevent open redirect ---
+    if (return_url) {
+      let parsed: URL;
+      try {
+        parsed = new URL(return_url);
+      } catch {
+        return json({ error: "Invalid return_url" }, 400);
+      }
+      const isLocalhost = parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1";
+      if (!ALLOWED_ORIGINS.includes(parsed.origin) && !isLocalhost) {
+        return json({ error: "Invalid return_url" }, 400);
+      }
+    }
 
-    // --- Fetch customer name for Stripe pre-fill (best-effort) ---
+    // --- Resolve target: class booking OR product purchase ---
+    let studioId: string;
+    let amountMinor: number;     // smallest currency unit (øre, cents)
+    let currency: string;
+    let description: string;
+    let extraMetadata: Record<string, string> = {};
+    let resolvedClassInstance: { id: string; studio_id: string; max_capacity: number; price: number } | null = null;
+    let resolvedProductId: string | null = null;
+    let recurring: { interval: "month"; interval_count: number } | undefined;
+
+    if (class_instance_id) {
+      // --- Class booking path ---
+      const { data: instance, error: instanceErr } = await adminClient
+        .from("class_instances")
+        .select("id, studio_id, price, status, max_capacity, class_templates ( name )")
+        .eq("id", class_instance_id)
+        .eq("status", "scheduled")
+        .single();
+      if (instanceErr || !instance) return json({ error: "Class not found or not schedulable" }, 404);
+      const className = (instance as any).class_templates?.name ?? "Class";
+
+      // Capacity check: count pending + confirmed bookings (UNIQUE constraint is the hard stop)
+      const { count: bookingCount } = await adminClient
+        .from("bookings")
+        .select("*", { count: "exact", head: true })
+        .eq("class_instance_id", class_instance_id)
+        .in("status", ["pending", "confirmed"]);
+      if (instance.max_capacity > 0 && (bookingCount ?? 0) >= instance.max_capacity) {
+        return json({ error: "This class is fully booked" }, 409);
+      }
+
+      const { data: studio } = await adminClient
+        .from("studios")
+        .select("currency")
+        .eq("id", instance.studio_id)
+        .single();
+
+      studioId = instance.studio_id;
+      currency = (studio as any)?.currency ?? "NOK";
+      amountMinor = Math.round(instance.price * 100);
+      description = className;
+      resolvedClassInstance = { id: instance.id, studio_id: instance.studio_id, max_capacity: instance.max_capacity, price: instance.price };
+    } else {
+      // --- Product purchase path ---
+      const { data: product, error: productErr } = await adminClient
+        .from("products")
+        .select("id, studio_id, name, type, price_minor, currency, requires_contact, is_active, billing_interval")
+        .eq("id", product_id)
+        .single();
+      if (productErr || !product) return json({ error: "Product not found" }, 404);
+      if (!product.is_active) return json({ error: "Product is not available" }, 400);
+      if (product.requires_contact) {
+        return json({ error: "This product requires a personal consultation — please contact the studio" }, 400);
+      }
+      if (product.type === "drop_in") {
+        return json({ error: "Drop-in classes must be booked from the schedule" }, 400);
+      }
+
+      studioId = product.studio_id;
+      currency = product.currency;
+      amountMinor = product.price_minor;
+      description = product.name;
+      resolvedProductId = product.id;
+      extraMetadata = { product_id: product.id, product_type: product.type };
+
+      // Recurring subscription: pass interval so the adapter switches to subscription mode
+      if (product.billing_interval === "month") {
+        recurring = { interval: "month", interval_count: 1 };
+      }
+    }
+
+    // --- Auto-enroll user as a member of this studio ---
+    await adminClient.from("studio_members").upsert(
+      { studio_id: studioId, user_id: user.id, role: "member", is_active: true },
+      { onConflict: "studio_id,user_id", ignoreDuplicates: true }
+    );
+
+    // --- Fetch customer name for provider pre-fill (best-effort) ---
     const { data: profile } = await adminClient
       .from("profiles")
       .select("full_name")
@@ -76,7 +151,7 @@ Deno.serve(async (req) => {
     const { data: providerRow, error: providerErr } = await adminClient
       .from("studio_payment_providers")
       .select("provider, provider_account_id")
-      .eq("studio_id", instance.studio_id)
+      .eq("studio_id", studioId)
       .eq("is_primary", true)
       .eq("is_active", true)
       .not("onboarded_at", "is", null)
@@ -87,42 +162,51 @@ Deno.serve(async (req) => {
 
     const adapter = getProvider(providerRow.provider as any);
 
-    // --- Insert payments row (status: requires_action) ---
+    // --- Insert payments row ---
     const { data: payment, error: paymentErr } = await adminClient
       .from("payments")
       .insert({
-        studio_id: instance.studio_id,
+        studio_id: studioId,
         user_id: user.id,
         provider: providerRow.provider,
         status: "requires_action",
-        amount: instance.price,
-        currency: "NOK",
+        amount: amountMinor / 100,
+        currency,
+        product_id: resolvedProductId,
+        discount_code: discount_code ?? null,
       })
       .select("id")
       .single();
     if (paymentErr || !payment) return json({ error: "Failed to create payment record" }, 500);
 
-    // --- Insert booking row (status: pending) ---
-    const { data: booking, error: bookingErr } = await adminClient
-      .from("bookings")
-      .insert({
-        studio_id: instance.studio_id,
-        class_instance_id: instance.id,
-        user_id: user.id,
-        payment_id: payment.id,
-        status: "pending",
-      })
-      .select("id")
-      .single();
-    if (bookingErr || !booking) {
-      // Clean up the payment row before returning
-      await adminClient.from("payments").update({ status: "failed" }).eq("id", payment.id);
-      return json({ error: "Failed to create booking record" }, 500);
+    // --- Class booking only: insert pending booking row ---
+    let bookingId: string | null = null;
+    if (resolvedClassInstance) {
+      const { data: booking, error: bookingErr } = await adminClient
+        .from("bookings")
+        .insert({
+          studio_id: resolvedClassInstance.studio_id,
+          class_instance_id: resolvedClassInstance.id,
+          user_id: user.id,
+          payment_id: payment.id,
+          status: "pending",
+        })
+        .select("id")
+        .single();
+      if (bookingErr || !booking) {
+        await adminClient.from("payments").update({ status: "failed" }).eq("id", payment.id);
+        return json({ error: "Failed to create booking record" }, 500);
+      }
+      bookingId = booking.id;
     }
 
     // --- Call provider adapter to create hosted checkout session ---
-    const successUrl = `${return_url ?? APP_URL}?payment_id=${payment.id}&booking_id=${booking.id}&status=success`;
-    const cancelUrl = `${return_url ?? APP_URL}?payment_id=${payment.id}&status=cancelled`;
+    const base = return_url ?? APP_URL;
+    const successQs = bookingId
+      ? `payment_id=${payment.id}&booking_id=${bookingId}&status=success`
+      : `payment_id=${payment.id}&status=success`;
+    const successUrl = `${base}?${successQs}`;
+    const cancelUrl = `${base}?payment_id=${payment.id}&status=cancelled`;
 
     let checkoutResult;
     try {
@@ -130,22 +214,25 @@ Deno.serve(async (req) => {
         studio_provider_account_id: providerRow.provider_account_id,
         customer_email: user.email,
         customer_name: customerName,
-        amount: Math.round(instance.price * 100),  // convert NOK → øre
-        currency: "NOK",
-        description: className,
+        amount: amountMinor,
+        currency,
+        description,
         success_url: successUrl,
         cancel_url: cancelUrl,
+        recurring,
         metadata: {
           payment_id: payment.id,
-          booking_id: booking.id,
-          studio_id: instance.studio_id,
+          studio_id: studioId,
           user_id: user.id,
+          ...(bookingId ? { booking_id: bookingId } : {}),
+          ...extraMetadata,
         },
       });
     } catch (err) {
-      // Provider call failed — mark both rows as failed
       await adminClient.from("payments").update({ status: "failed" }).eq("id", payment.id);
-      await adminClient.from("bookings").update({ status: "payment_failed" }).eq("id", booking.id);
+      if (bookingId) {
+        await adminClient.from("bookings").update({ status: "payment_failed" }).eq("id", bookingId);
+      }
       return json({ error: `Payment provider error: ${err}` }, 502);
     }
 
@@ -155,14 +242,14 @@ Deno.serve(async (req) => {
       .update({
         provider_session_id: checkoutResult.provider_session_id,
         checkout_url: checkoutResult.checkout_url,
-        return_url: return_url ?? APP_URL,
+        return_url: base,
       })
       .eq("id", payment.id);
 
     return json({
       checkout_url: checkoutResult.checkout_url,
       payment_id: payment.id,
-      booking_id: booking.id,
+      booking_id: bookingId,
     });
   } catch (err) {
     console.error("create-checkout error:", err);

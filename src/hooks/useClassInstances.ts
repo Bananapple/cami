@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useStudioContext } from "@/context/StudioContext";
 
 export type ClassInstance = {
   id: string;
@@ -19,14 +20,28 @@ export type ClassInstance = {
 };
 
 export function useClassInstances() {
-  const { data: instances = [], isLoading } = useQuery({
-    queryKey: ["class_instances"],
-    queryFn: async () => {
-      const from = new Date();
-      from.setHours(0, 0, 0, 0);
-      const to = new Date(from);
-      to.setDate(to.getDate() + 14);
+  const studioCtx = useStudioContext();
+  const studioId = studioCtx?.studio?.id;
+  const studioTimezone = studioCtx?.studio?.timezone ?? "Europe/Oslo";
 
+  // Anchor the 14-day window to the studio's timezone, not the user's browser.
+  // Using sv-SE locale gives ISO 8601-style dates without library dependencies.
+  const nowInStudio = new Date(
+    new Date().toLocaleString("sv-SE", { timeZone: studioTimezone })
+  );
+  const fromDate = new Date(nowInStudio);
+  fromDate.setHours(0, 0, 0, 0);
+  const toDate = new Date(fromDate);
+  toDate.setDate(toDate.getDate() + 14);
+
+  const fromISO = fromDate.toISOString();
+  const toISO = toDate.toISOString();
+
+  const { data: instances = [], isLoading, error } = useQuery({
+    // Include studioId + date range in the key so the cache invalidates at midnight
+    // and when the studio context changes.
+    queryKey: ["class_instances", studioId, fromISO, toISO],
+    queryFn: async () => {
       const { data, error } = await supabase
         .from("class_instances")
         .select(`
@@ -36,8 +51,8 @@ export function useClassInstances() {
           locations ( name, timezone )
         `)
         .eq("status", "scheduled")
-        .gte("starts_at", from.toISOString())
-        .lt("starts_at", to.toISOString())
+        .gte("starts_at", fromISO)
+        .lt("starts_at", toISO)
         .order("starts_at");
 
       if (error) throw error;
@@ -61,5 +76,5 @@ export function useClassInstances() {
     },
   });
 
-  return { instances, isLoading };
+  return { instances, isLoading, error };
 }

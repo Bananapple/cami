@@ -63,7 +63,7 @@ export function useManagerCancelBooking(userId: string | undefined) {
             const body = await error.context.json();
             message = body.error ?? message;
           }
-        } catch {}
+        } catch { /* ignore JSON parse error */ }
         throw new Error(message);
       }
       return data as { cancelled: boolean; refunded: boolean; refund_amount?: number; reason?: string };

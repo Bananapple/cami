@@ -1,59 +1,21 @@
+import { useState } from "react";
+import { Link } from "react-router-dom";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
-
-const products = [
-  {
-    img: "/images/shop/dropin.jpeg",
-    name: "Drop-in",
-    price: "kr 250",
-    desc: "Single class. No commitment, no card needed. Show up and practice.",
-    tag: "Flexible",
-  },
-  {
-    img: "/images/shop/clipcard10.jpeg",
-    name: "10× Clip Card",
-    price: "kr 2,300",
-    desc: "Ten classes at a reduced rate. Use across any class type at any time.",
-    tag: "Best value",
-  },
-  {
-    img: "/images/shop/allincl.jpeg",
-    name: "All-Inclusive",
-    price: "kr 1,600 / month",
-    desc: "Unlimited access to all classes for one month. Roll month-to-month, cancel anytime.",
-    tag: "Most popular",
-  },
-  {
-    img: "/images/shop/membership1.jpeg",
-    name: "1-Year Membership",
-    price: "kr 1,250 / month",
-    desc: "Unlimited access with a 12-month commitment. Best monthly rate we offer.",
-    tag: "Committed",
-  },
-  {
-    img: "/images/shop/mathotel.jpeg",
-    name: "Mat Hotel",
-    price: "kr 50 / month",
-    desc: "We store your mat at the studio so you never have to carry it. Monthly add-on.",
-    tag: "Add-on",
-  },
-  {
-    img: "/images/shop/private60mn.jpeg",
-    name: "Private Session — 60 min",
-    price: "kr 1,500",
-    desc: "One-on-one instruction tailored entirely to your needs and current practice.",
-    tag: "Private",
-  },
-  {
-    img: "/images/shop/private90mn.jpeg",
-    name: "Private Session — 90 min",
-    price: "kr 1,900",
-    desc: "Extended private session. Ideal for deeper work, injury recovery, or focused technique.",
-    tag: "Private",
-  },
-];
+import ProductPurchaseSheet from "@/components/ProductPurchaseSheet";
+import { useProducts, type Product } from "@/hooks/useProducts";
 
 const JoinNow = () => {
+  const { products, isLoading, error } = useProducts();
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+
+  const formatPrice = (p: Product) => {
+    const symbol = p.currency === "NOK" ? "kr" : p.currency;
+    const amount = (p.price_minor / 100).toLocaleString("nb-NO");
+    const interval = p.billing_interval === "month" ? " / month" : "";
+    return `${symbol} ${amount}${interval}`;
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <Header />
@@ -64,37 +26,51 @@ const JoinNow = () => {
           Memberships &amp; classes
         </h1>
         <p className="text-lg text-muted-foreground font-serif max-w-2xl mx-auto">
-          Purchase in studio or contact us at{" "}
-          <a href="mailto:contact@yogabrie.com" className="underline hover:text-foreground transition-colors">
-            contact@yogabrie.com
-          </a>
-          . Prices include VAT.
+          Pick the option that suits your practice. Prices include VAT.
         </p>
       </section>
 
       <section className="max-w-7xl mx-auto px-6 lg:px-8 pb-24 lg:pb-36">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
-          {products.map((product) => (
-            <div key={product.name} className="bg-card rounded-xl overflow-hidden flex flex-col">
-              <div className="relative">
-                <img
-                  src={product.img}
-                  alt={product.name}
-                  className="w-full aspect-square object-cover"
-                  loading="lazy"
-                />
-                <span className="absolute top-3 left-3 text-xs font-sans font-medium uppercase tracking-wider bg-background/90 text-foreground px-3 py-1.5 rounded-full">
-                  {product.tag}
-                </span>
+        {error ? (
+          <p className="text-center text-destructive font-sans py-8">
+            Failed to load products. Please refresh.
+          </p>
+        ) : isLoading ? (
+          <p className="text-center text-muted-foreground font-serif py-8">Loading…</p>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
+            {products.map((product) => (
+              <div key={product.id} className="bg-card rounded-xl overflow-hidden flex flex-col">
+                {product.image_url && (
+                  <div className="relative">
+                    <img
+                      src={product.image_url}
+                      alt={product.name}
+                      className="w-full aspect-square object-cover"
+                      loading="lazy"
+                    />
+                    {product.tag && (
+                      <span className="absolute top-3 left-3 text-xs font-sans font-medium uppercase tracking-wider bg-background/90 text-foreground px-3 py-1.5 rounded-full">
+                        {product.tag}
+                      </span>
+                    )}
+                  </div>
+                )}
+                <div className="p-6 flex flex-col flex-1">
+                  <h3 className="font-serif text-xl text-card-foreground mb-2">{product.name}</h3>
+                  {product.description && (
+                    <p className="text-sm text-muted-foreground font-sans leading-relaxed flex-1 mb-4">
+                      {product.description}
+                    </p>
+                  )}
+                  <p className="font-sans font-semibold text-foreground text-lg mb-4">{formatPrice(product)}</p>
+
+                  <ProductCTA product={product} onBuy={setSelectedProduct} />
+                </div>
               </div>
-              <div className="p-6 flex flex-col flex-1">
-                <h3 className="font-serif text-xl text-card-foreground mb-2">{product.name}</h3>
-                <p className="text-sm text-muted-foreground font-sans leading-relaxed flex-1 mb-4">{product.desc}</p>
-                <p className="font-sans font-semibold text-foreground text-lg">{product.price}</p>
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
 
         <div className="mt-16 text-center bg-secondary/40 rounded-2xl p-10 lg:p-16">
           <h2 className="text-2xl lg:text-3xl font-serif text-foreground mb-4">Questions or corporate bookings?</h2>
@@ -111,7 +87,49 @@ const JoinNow = () => {
       </section>
 
       <Footer />
+
+      <ProductPurchaseSheet
+        product={selectedProduct}
+        onClose={() => setSelectedProduct(null)}
+      />
     </div>
+  );
+};
+
+const ProductCTA = ({ product, onBuy }: { product: Product; onBuy: (p: Product) => void }) => {
+  const ctaClass =
+    "w-full text-center bg-primary hover:bg-primary/80 text-primary-foreground py-3 font-sans font-medium text-sm uppercase tracking-[0.15em] rounded-lg transition-all";
+  const ctaSecondaryClass =
+    "w-full text-center border border-border hover:bg-muted/30 text-foreground py-3 font-sans font-medium text-sm uppercase tracking-[0.15em] rounded-lg transition-all";
+
+  if (product.requires_contact) {
+    return (
+      <a href="mailto:contact@yogabrie.com" className={ctaSecondaryClass}>
+        Contact us
+      </a>
+    );
+  }
+
+  if (product.type === "drop_in") {
+    return (
+      <Link to="/" className={ctaSecondaryClass}>
+        Browse classes
+      </Link>
+    );
+  }
+
+  if (product.type === "subscription") {
+    return (
+      <button type="button" onClick={() => onBuy(product)} className={ctaClass}>
+        Subscribe
+      </button>
+    );
+  }
+
+  return (
+    <button type="button" onClick={() => onBuy(product)} className={ctaClass}>
+      Buy now
+    </button>
   );
 };
 

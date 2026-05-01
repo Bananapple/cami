@@ -1,4 +1,5 @@
 import Stripe from "npm:stripe@14";
+// redeploy subscription webhook handlers
 import type {
   PaymentProviderAdapter,
   CreateCheckoutParams,
@@ -47,38 +48,57 @@ export class StripeProvider implements PaymentProviderAdapter {
       stripeAccount,
     );
 
-    const session = await this.stripe.checkout.sessions.create(
-      {
-        payment_method_types: ["card"],
-        mode: "payment",
-        billing_address_collection: "auto",
-        ...(customerId
-          ? { customer: customerId }
-          : params.customer_email
-            ? { customer_email: params.customer_email }
-            : {}),
-        line_items: [
-          {
-            price_data: {
-              currency: params.currency.toLowerCase(),
-              product_data: { name: params.description },
-              unit_amount: params.amount,              // already in øre/cents
-            },
-            quantity: 1,
+    const isSubscription = !!params.recurring;
+    const baseMetadata = {
+      ...params.metadata,
+      ...(params.customer_name ? { customer_name: params.customer_name } : {}),
+    };
+
+    const sessionParams: Stripe.Checkout.SessionCreateParams = {
+      payment_method_types: ["card"],
+      mode: isSubscription ? "subscription" : "payment",
+      billing_address_collection: "auto",
+      ...(customerId
+        ? { customer: customerId }
+        : params.customer_email
+          ? { customer_email: params.customer_email }
+          : {}),
+      line_items: [
+        {
+          price_data: {
+            currency: params.currency.toLowerCase(),
+            product_data: { name: params.description },
+            unit_amount: params.amount,              // already in øre/cents
+            ...(isSubscription
+              ? {
+                  recurring: {
+                    interval: params.recurring!.interval,
+                    interval_count: params.recurring!.interval_count ?? 1,
+                  },
+                }
+              : {}),
           },
-        ],
-        success_url: params.success_url,
-        cancel_url: params.cancel_url,
-        metadata: {
-          ...params.metadata,
-          ...(params.customer_name ? { customer_name: params.customer_name } : {}),
+          quantity: 1,
         },
-        payment_intent_data: {
-          description: params.customer_name
-            ? `${params.description} — ${params.customer_name}`
-            : params.description,
-        },
-      },
+      ],
+      success_url: params.success_url,
+      cancel_url: params.cancel_url,
+      metadata: baseMetadata,
+    };
+
+    if (isSubscription) {
+      // Mirror metadata onto the subscription so renewal webhooks can find our payment row
+      sessionParams.subscription_data = { metadata: baseMetadata };
+    } else {
+      sessionParams.payment_intent_data = {
+        description: params.customer_name
+          ? `${params.description} — ${params.customer_name}`
+          : params.description,
+      };
+    }
+
+    const session = await this.stripe.checkout.sessions.create(
+      sessionParams,
       stripeAccount ? { stripeAccount } : undefined,
     );
 
@@ -106,6 +126,7 @@ export class StripeProvider implements PaymentProviderAdapter {
           provider_event_id: event.id,
           provider_session_id: session.id,
           provider_payment_id: session.payment_intent as string | undefined,
+          provider_subscription_id: session.subscription as string | undefined,
           amount: session.amount_total ?? undefined,
           raw,
         };
@@ -140,6 +161,31 @@ export class StripeProvider implements PaymentProviderAdapter {
           provider_event_id: event.id,
           provider_payment_id: charge.payment_intent as string | undefined,
           refunded_amount: refunded,
+          raw,
+        };
+      }
+      case "invoice.paid": {
+        // Recurring subscription billing succeeded — extend the membership.
+        // Skip the very first invoice (billing_reason: 'subscription_create') —
+        // checkout.session.completed already creates the membership.
+        const invoice = event.data.object as Stripe.Invoice;
+        if (invoice.billing_reason === "subscription_create") {
+          return { type: "unknown", provider_event_id: event.id, raw };
+        }
+        return {
+          type: "subscription.renewed",
+          provider_event_id: event.id,
+          provider_subscription_id: invoice.subscription as string | undefined,
+          amount: invoice.amount_paid ?? undefined,
+          raw,
+        };
+      }
+      case "customer.subscription.deleted": {
+        const sub = event.data.object as Stripe.Subscription;
+        return {
+          type: "subscription.cancelled",
+          provider_event_id: event.id,
+          provider_subscription_id: sub.id,
           raw,
         };
       }

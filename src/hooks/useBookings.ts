@@ -1,13 +1,16 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
+import { useStudioContext } from "@/context/StudioContext";
 
 export function useBookings() {
   const { user } = useAuth();
+  const studioCtx = useStudioContext();
+  const studioId = studioCtx?.studio?.id;
   const queryClient = useQueryClient();
 
-  const { data: bookings = [], isLoading } = useQuery({
-    queryKey: ["bookings", user?.id],
+  const { data: bookings = [], isLoading, error } = useQuery({
+    queryKey: ["bookings", user?.id, studioId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("bookings")
@@ -18,6 +21,7 @@ export function useBookings() {
           )
         `)
         .eq("user_id", user!.id)
+        .eq("studio_id", studioId!)
         .eq("status", "confirmed");
       if (error) throw error;
       return (data ?? []).filter((b: any) => {
@@ -25,7 +29,7 @@ export function useBookings() {
         return startsAt && new Date(startsAt) > new Date();
       });
     },
-    enabled: !!user,
+    enabled: !!user && !!studioId,
   });
 
   const cancelBooking = useMutation({
@@ -43,7 +47,7 @@ export function useBookings() {
             const body = await error.context.json();
             message = body.error ?? message;
           }
-        } catch {}
+        } catch { /* ignore JSON parse error */ }
         throw new Error(message);
       }
       return data as { cancelled: boolean; refunded: boolean; refund_amount?: number; reason?: string };
@@ -51,5 +55,5 @@ export function useBookings() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["bookings"] }),
   });
 
-  return { bookings, isLoading, cancelBooking };
+  return { bookings, isLoading, error, cancelBooking };
 }

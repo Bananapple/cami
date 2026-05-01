@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Business Context
 
-This is a **multi-tenant SaaS platform** for Norwegian yoga studios. A single Supabase project serves all studios, with every tenanted table scoped by `studio_id` and RLS enforcing isolation. The owner sells websites + booking engines as a flat monthly SaaS fee. Student payments flow directly to each studio (no marketplace layer) via a **provider-agnostic adapter pattern** — Stripe Checkout in MVP, Frisbii next (Brie already uses it), Vipps later for Norwegian market fit. Adding a provider is an adapter file + one enum value; no schema changes.
+This is a **multi-tenant SaaS platform** for yoga studios in Scandinavia, Europe and the US. A single Supabase project serves all studios, with every tenanted table scoped by `studio_id` and RLS enforcing isolation. The owner sells websites + booking engines as a flat monthly SaaS fee. Student payments flow directly to each studio (no marketplace layer) via a **provider-agnostic adapter pattern** — Stripe Checkout in MVP, Frisbii next (Brie already uses it), Vipps later for Norwegian market fit. Adding a provider is an adapter file + one enum value; no schema changes.
 
 **Architectural state**: YogaBrie (`xskqpxfjhhxontirezjd`, eu-north-1) has completed the v2 cutover as of 2026-04-24. The multi-tenant schema is live. The legacy `sessions` table and `session_id`/`session_date` columns on `bookings` are still present but inert — drop them once rollback confidence is established. The migration SQL is in `supabase/migrations-v2/` and the execution record is in `docs/MIGRATION-MULTITENANT.md`.
 
@@ -14,6 +14,8 @@ This is a **multi-tenant SaaS platform** for Norwegian yoga studios. A single Su
 - Stripe Checkout booking flow (server-side via Edge Functions)
 - Webhook-confirmed bookings + booking confirmation email (Resend)
 - Cancel + refund via `issue-refund` Edge Function (24h window policy)
+
+**Security hardening (2026-04-30):** 28-finding audit implemented — see `docs/SECURITY-HARDENING.md`.
 
 **Edge Function deploy notes:**
 - `payment-webhook` must be deployed with `--no-verify-jwt` (Stripe sends no JWT)
@@ -43,6 +45,8 @@ npm run test -- src/test/some.test.ts  # Run a single test file
 - TanStack Query for server state
 - react-hook-form + zod for forms
 - **Provider-agnostic payment layer**: canonical `payments` table + `PaymentProviderAdapter` interface. MVP adapter = Stripe Checkout; adapters planned for Frisbii and Vipps. Secrets (API keys, webhook secrets) live in Supabase Edge Function env, never in frontend or DB.
+- `ErrorBoundary` (`src/components/ErrorBoundary.tsx`) wraps the full React tree in `App.tsx` — catches render panics and shows a reload fallback.
+- Supabase client (`src/integrations/supabase/client.ts`) passes `x-studio-slug: VITE_STUDIO_SLUG` as a global header on every request. This is required for anon RLS policies to scope reads to the correct tenant.
 
 ### Data Flow
 All Supabase access goes through the client in `src/integrations/supabase/client.ts`. Custom hooks in `src/hooks/` wrap every table; components never call Supabase directly. In the v2 architecture, a `StudioContext` resolves the current studio from the URL slug/subdomain on load and supplies `studio_id` to every hook.
@@ -54,10 +58,19 @@ Key hooks (current):
 - `usePaymentMethods()` — saved payment methods
 - `useStudioConfig()` — studio branding (legacy; v2 replaces this with `StudioContext`)
 - `useProfile()`, `useMembership()`
+- `useStudioMember()` — fetches the current user's `studio_members` row (`level`, `total_sessions`, `referral_code`). Use this for per-studio user stats — these columns no longer live on `profiles`.
+
+All user-facing hooks (`useBookings`, `useMembership`, `usePaymentMethods`, `useClassInstances`, `useStudioMember`) require `studioId` from `useStudioContext()` and scope their queries by it. All hooks expose an `error` field in their return value.
 
 ### Booking Flow (`src/components/BookingSheet.tsx`)
 
 **Current**: `date → confirm → auth → checkout`. The `auth` step uses a two-phase email OTP form (email → 6-digit code). The `checkout` step calls the `create-checkout` Edge Function, which creates a `payments` row + `bookings` row (`status='pending'`) and returns a hosted provider checkout URL. The browser redirects out; the provider's webhook promotes the booking to `confirmed` on success and sends a booking confirmation email via Resend. On return, `Index.tsx` detects `?status=success` in the URL and shows a Sonner toast.
+
+**`create-checkout` details:**
+- Auto-upserts a `studio_members` row (`role='member'`) on first booking — new users can book without a staff invite.
+- Capacity check counts `pending + confirmed` bookings, not just `booked_count` (prevents overselling during concurrent checkouts).
+- `return_url` is validated against `ALLOWED_ORIGINS` (derived from `APP_URL` Edge Function env var) to prevent open redirects.
+- Currency and studio name are read from `studios.currency` / `studios.name` — nothing hardcoded.
 
 **Legacy (decommissioned)**: was `date → confirm → auth → payment → addCard → success` with an insecure client-side `StripeCardForm` that wrote card details directly to the DB.
 
@@ -77,6 +90,12 @@ Key hooks (current):
 | `payment_methods` | Saved cards |
 | `memberships` | Subscription plans |
 | `studio_config` | Per-deployment branding (one row) |
+
+**v2 migrations (in `supabase/migrations-v2/`):**
+- `0001–0007` — initial v2 schema, multi-tenant tables, RLS, functions (see `docs/MIGRATION-MULTITENANT.md`)
+- `0008_security_hardening.sql` — RLS scoping, atomic payment functions, duplicate-booking constraint (see `docs/SECURITY-HARDENING.md`)
+
+**Applying migrations:** The Supabase CLI only looks in `supabase/migrations/` — `supabase db push` will NOT pick up files in `migrations-v2/`. Apply these by copy-pasting the SQL file into the Supabase SQL Editor (Dashboard → SQL Editor → New query).
 
 **v2 (live as of 2026-04-24)** — full design in `docs/MIGRATION-MULTITENANT.md`:
 
@@ -101,6 +120,17 @@ Key hooks (current):
 
 RLS helper functions: `user_studio_ids()`, `user_has_role(studio_id, roles[])`, `user_is_staff(studio_id)`. All `SECURITY DEFINER` with locked `search_path` to prevent privilege escalation. Conflict detection for instructors and rooms uses `EXCLUDE USING GIST` on `tstzrange` — double-booking is rejected at the DB level.
 
+**RLS policy model (post-0008):** All public read policies on `locations`, `instructors`, `class_templates`, and `class_instances` are studio-scoped:
+- Anon reads: require matching `x-studio-slug` header (set automatically by the Supabase client from `VITE_STUDIO_SLUG`).
+- Authenticated reads: require an active `studio_members` row for the user.
+- `schedule_rules` and `schedule_exceptions` are staff-only (not queried by the frontend directly).
+
+**`bookings`** has `UNIQUE(user_id, class_instance_id)` — double-booking rejected at DB level (23505 from PostgREST).
+
+**Atomic payment state transitions:** Use `confirm_booking(p_payment_id)` and `refund_booking(p_payment_id)` RPCs instead of raw UPDATEs. Each RPC updates both `payments` and `bookings` inside a single implicit PostgREST transaction — partial failure is impossible.
+
+**Email idempotency:** `sendBookingConfirmation` in `payment-webhook` INSERTs a `notification_log` row (with a unique `idempotency_key`) *before* calling Resend. A 23505 unique-violation means the email was already sent — skip silently. This prevents duplicate emails on webhook replays.
+
 ### Per-Studio Branding
 
 **Legacy**: `studio_config` is a single row per deployment, read via `useStudioConfig()`.
@@ -124,6 +154,7 @@ STRIPE_SECRET_KEY
 STRIPE_WEBHOOK_SECRET
 RESEND_API_KEY
 FROM_EMAIL          # e.g. booking@yogabrie.no — defaults to onboarding@resend.dev if unset
+APP_URL             # e.g. https://brie-alpha.vercel.app — used to validate return_url in create-checkout
 ```
 
 Copy `.env.example` → `.env` per studio deployment. Never commit `.env` (gitignored).
@@ -153,6 +184,10 @@ Vercel blocks deploys from commits authored with a non-GitHub email. Make sure g
 git config --global user.email "your@github-email.com"
 git config --global user.name "Your Name"
 ```
+
+## CI
+
+GitHub Actions runs on every push and PR to `main` (`.github/workflows/ci.yml`): `bun install → lint → build → test`. PRs should not be merged if CI is red.
 
 ## TypeScript Notes
 

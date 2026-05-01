@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate, Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useIsStaff } from "../hooks/useIsStaff";
 
@@ -28,12 +28,12 @@ export function StaffGate({ children }: { children: ReactNode }) {
             This area is for studio staff. If you believe this is a mistake, contact your studio
             owner.
           </p>
-          <a
-            href="/dashboard"
+          <Link
+            to="/dashboard"
             className="inline-block mt-4 text-sm px-4 py-2 border border-border rounded-md hover:bg-muted transition-colors"
           >
             Back to dashboard
-          </a>
+          </Link>
         </div>
       </div>
     );
