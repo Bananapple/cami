@@ -13,6 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useStudioConfig } from "@/hooks/useStudioConfig";
 import { useStudioContext } from "@/context/StudioContext";
 import { useMembership } from "@/hooks/useMembership";
+import { useProducts } from "@/hooks/useProducts";
 import { formatTime, formatDate } from "@/lib/timezone";
 
 type Step = "date" | "confirm" | "auth" | "profile" | "checkout";
@@ -36,6 +37,8 @@ const BookingSheet = ({ isOpen, onClose }: BookingSheetProps) => {
   const studioTz = studioCtx?.studio?.timezone ?? "Europe/Oslo";
   const { membership } = useMembership();
 
+  const { products } = useProducts();
+
   const bookingMode = useMemo<"subscription" | "credit" | "dropin">(() => {
     if (!membership) return "dropin";
     const today = new Date().toISOString().split("T")[0];
@@ -44,6 +47,21 @@ const BookingSheet = ({ isOpen, onClose }: BookingSheetProps) => {
     if (membership.credits_remaining > 0) return "credit";
     return "dropin";
   }, [membership]);
+
+  // Auto-derive upsell: find the best-value clip card and compute saving vs drop-in price
+  const upsell = useMemo(() => {
+    if (bookingMode !== "dropin" || !selectedSession) return null;
+    const clipCards = products.filter(p => p.type === "clip_card" && p.credits && p.credits > 0);
+    if (!clipCards.length) return null;
+    const best = clipCards.reduce((a, b) =>
+      a.price_minor / a.credits <= b.price_minor / b.credits ? a : b
+    );
+    const dropInOre = (selectedSession.price ?? 250) * 100;
+    const perCreditOre = best.price_minor / best.credits;
+    const savingNOK = Math.round((dropInOre - perCreditOre) / 100);
+    if (savingNOK <= 0) return null;
+    return { credits: best.credits, savingNOK };
+  }, [bookingMode, selectedSession, products]);
 
   const handleClose = () => {
     onClose();
@@ -257,6 +275,15 @@ const BookingSheet = ({ isOpen, onClose }: BookingSheetProps) => {
                 Log in
               </button>
             </p>
+
+            {upsell && (
+              <p className="text-xs text-center text-muted-foreground font-sans">
+                Save kr {upsell.savingNOK}/class with a{" "}
+                <a href="/joinnow" className="text-primary hover:underline">
+                  {upsell.credits}× clip card →
+                </a>
+              </p>
+            )}
           </div>
         )}
 
