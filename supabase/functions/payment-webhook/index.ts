@@ -96,10 +96,13 @@ Deno.serve(async (req) => {
           if (pRow?.product_id) {
             // Membership / clip card purchase — atomic creation via DB function.
             // For subscriptions, provider_subscription_id is captured for future renewal events.
-            await admin.rpc("activate_membership", {
+            const { data: membershipId } = await admin.rpc("activate_membership", {
               p_payment_id: paymentId,
               p_provider_subscription_id: event.provider_subscription_id ?? null,
             });
+            if (membershipId) {
+              await sendMembershipConfirmation(admin, membershipId as string);
+            }
           } else {
             // Class booking — atomic confirm via existing DB function
             await admin.rpc("confirm_booking", { p_payment_id: paymentId });
@@ -110,7 +113,7 @@ Deno.serve(async (req) => {
             provider_payment_id: event.provider_payment_id ?? null,
           }).eq("id", paymentId);
 
-          // Confirmation email — only for class bookings (membership receipt comes from Stripe)
+          // Confirmation email — class bookings only (membership email sent above)
           if (!pRow?.product_id) {
             await sendBookingConfirmation(admin, paymentId);
           }
@@ -292,6 +295,169 @@ async function sendBookingConfirmation(admin: ReturnType<typeof createClient>, p
   } catch (err) {
     console.error("sendBookingConfirmation error:", err);
   }
+}
+
+async function sendMembershipConfirmation(admin: ReturnType<typeof createClient>, membershipId: string) {
+  if (!RESEND_API_KEY) return;
+
+  try {
+    const { data: membership } = await admin
+      .from("memberships")
+      .select(`
+        id, user_id, studio_id, plan_name, credits_remaining, valid_until,
+        products ( type, billing_interval, commitment_months, price_minor, currency ),
+        studios ( name )
+      `)
+      .eq("id", membershipId)
+      .single();
+    if (!membership) return;
+
+    const idempotencyKey = `membership_confirmation_${membership.id}`;
+
+    const { data: { user } } = await admin.auth.admin.getUserById(membership.user_id);
+    if (!user?.email) return;
+
+    const { error: logInsertErr } = await admin.from("notification_log").insert({
+      studio_id: membership.studio_id,
+      user_id: membership.user_id,
+      channel: "email",
+      template: "membership_confirmation",
+      recipient: user.email,
+      idempotency_key: idempotencyKey,
+    });
+    if (logInsertErr?.code === "23505") return;
+    if (logInsertErr) { console.error("notification_log insert error:", logInsertErr); return; }
+
+    const product = membership.products as any;
+    const studioName = (membership.studios as any)?.name ?? "Yoga Studio";
+    const isSubscription = product?.billing_interval === "month";
+    const isClipCard = product?.type === "clip_card";
+    const priceNOK = product?.price_minor ? (product.price_minor / 100).toLocaleString("nb-NO") : null;
+    const currency = product?.currency ?? "NOK";
+
+    const html = buildMembershipEmail({
+      studioName,
+      planName: membership.plan_name,
+      isSubscription,
+      isClipCard,
+      credits: membership.credits_remaining,
+      validUntil: membership.valid_until,
+      commitmentMonths: product?.commitment_months ?? null,
+      priceNOK,
+      currency,
+    });
+
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${RESEND_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: FROM_EMAIL,
+        to: [user.email],
+        subject: `Welcome — ${membership.plan_name} is now active`,
+        html,
+      }),
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error("Resend error (membership):", errText);
+      await admin.from("notification_log")
+        .update({ error: errText })
+        .eq("idempotency_key", idempotencyKey);
+    }
+  } catch (err) {
+    console.error("sendMembershipConfirmation error:", err);
+  }
+}
+
+function buildMembershipEmail(p: {
+  studioName: string;
+  planName: string;
+  isSubscription: boolean;
+  isClipCard: boolean;
+  credits: number | null;
+  validUntil: string | null;
+  commitmentMonths: number | null;
+  priceNOK: string | null;
+  currency: string;
+}): string {
+  const renewalLine = p.commitmentMonths
+    ? `12-month commitment · Renews monthly`
+    : p.isSubscription
+      ? `Renews monthly · Cancel anytime`
+      : null;
+
+  const validLine = p.validUntil
+    ? new Date(p.validUntil).toLocaleDateString("nb-NO", { year: "numeric", month: "long", day: "numeric" })
+    : null;
+
+  const rows = [
+    p.isClipCard && p.credits !== null
+      ? { label: "Credits", value: `${p.credits} classes` }
+      : null,
+    validLine
+      ? { label: p.isSubscription ? "First renewal" : "Valid until", value: validLine }
+      : null,
+    renewalLine ? { label: "Billing", value: renewalLine } : null,
+    p.priceNOK ? { label: "Amount paid", value: `${p.currency} ${p.priceNOK}` } : null,
+  ].filter(Boolean) as { label: string; value: string }[];
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Membership active</title>
+</head>
+<body style="margin:0;padding:0;background:#f5f0eb;font-family:'Georgia',serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f0eb;padding:40px 0;">
+    <tr>
+      <td align="center">
+        <table width="560" cellpadding="0" cellspacing="0" style="background:#1a1a1a;border-radius:8px;overflow:hidden;max-width:100%;">
+
+          <tr>
+            <td style="padding:40px 48px 32px;border-bottom:1px solid #2e2e2e;">
+              <p style="margin:0;font-size:13px;letter-spacing:0.15em;text-transform:uppercase;color:#8a7e6e;">${p.studioName}</p>
+              <h1 style="margin:12px 0 0;font-size:28px;font-weight:400;color:#f5f0eb;line-height:1.2;">
+                Your membership is active
+              </h1>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding:32px 48px;">
+              <h2 style="margin:0 0 24px;font-size:20px;font-weight:400;color:#f5f0eb;">${p.planName}</h2>
+              <table cellpadding="0" cellspacing="0" width="100%">
+                ${rows.map(row => `
+                <tr>
+                  <td style="padding:10px 0;border-bottom:1px solid #2e2e2e;">
+                    <span style="font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:#8a7e6e;font-family:sans-serif;">${row.label}</span>
+                    <p style="margin:4px 0 0;font-size:15px;color:#f5f0eb;">${row.value}</p>
+                  </td>
+                </tr>`).join("")}
+              </table>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding:24px 48px 40px;border-top:1px solid #2e2e2e;">
+              <p style="margin:0;font-size:13px;color:#8a7e6e;line-height:1.6;font-family:sans-serif;">
+                ${p.isSubscription
+                  ? "You can cancel your membership at any time from your account dashboard."
+                  : "Your credits never expire within the validity period. Book classes from your dashboard."}
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
 }
 
 function buildConfirmationEmail(p: {
