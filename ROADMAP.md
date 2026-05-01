@@ -21,6 +21,11 @@ Architecture assessment conducted 2026-04-23. v2 cutover completed 2026-04-24 �
 **Artifacts**: `supabase/functions/create-checkout/`, `supabase/functions/payment-webhook/`, `supabase/functions/issue-refund/`, `supabase/functions/_shared/providers/` (types, index, stripe adapter).
 **Implication**: All payment logic runs server-side. Frontend calls `supabase.functions.invoke('create-checkout')` and redirects. Webhook at `/payment-webhook/stripe` handles confirmation and sends booking confirmation email via Resend. All three functions deployed to production; secrets set. `payment-webhook` must be deployed with `--no-verify-jwt`.
 
+### ✅ Membership Purchase + Credit Booking — RESOLVED (2026-04-30)
+**Decision**: DB-driven `products` catalog replaces hardcoded `/joinnow` array. Stripe Checkout for purchases. `activate_membership()` RPC on webhook success. `create-checkout` detects active membership before creating Stripe session — calls `book_with_credit()` for holders, returns `{ booking_id, free: true }` with no Stripe redirect. Credits atomically decremented/returned via `FOR UPDATE` locked RPCs.
+**Artifacts**: `migrations-v2/0010_products_and_membership_purchase.sql`, `0011_book_with_credit.sql`, `src/components/ProductPurchaseSheet.tsx`, `src/hooks/useProducts.ts`, `src/components/BookingSheet.tsx`, `src/components/booking/OrderSummary.tsx`.
+**Implication**: `useProducts` uses `useEffect`+`useState` (not TanStack Query) — TanStack Query v5 had a subscriber notification bug with anon queries that prevented re-renders. `bookings.membership_id` is set for credit-paid bookings; `payment_id` is NULL. `issue-refund` returns credits on cancellation outside the window.
+
 ### ✅ Refund / Cancellation — RESOLVED (2026-04-24)
 **Decision**: `issue-refund` Edge Function handles combined cancel+refund. Owner or staff can cancel any booking. Refund issued automatically if payment succeeded and cancellation is outside the 24h window (`studios.cancellation_window_hours`). If Stripe refund fails, booking is still cancelled and error is logged.
 **Artifacts**: `supabase/functions/issue-refund/index.ts`, `src/hooks/useBookings.ts` (`cancelBooking` mutation), `src/pages/Dashboard.tsx` (context-aware toast).
@@ -60,6 +65,21 @@ Architecture assessment conducted 2026-04-23. v2 cutover completed 2026-04-24 �
 - Daily pg_cron job materializes a rolling 90-day window
 - Instructor conflict detection via same exclusion-constraint pattern as locations
 - UI work remaining: schedule builder for owners/managers; exception handler ("cancel this Tuesday")
+
+### Cross-sell upsell in BookingSheet (next small win)
+When `bookingMode === "dropin"`, show a subtle hint below the price line:
+> *"Save kr 50/class with a 10-class card →"* (link to /joinnow)
+One line, visually subordinate to the main CTA — drives membership conversion at the highest-intent moment. Small change in `BookingSheet.tsx` confirm step.
+
+### Push to production + subscription cancel test
+- `git push` → Vercel auto-deploys Phase 1A + 1B
+- Real-world test: complete subscription checkout → cancel from Stripe Dashboard → verify `memberships.status = 'cancelled'`
+
+### Confirmation email for membership purchases
+Currently only class bookings get a Resend email. Add a membership receipt from `payment-webhook` when `activate_membership()` succeeds.
+
+### Staff product management UI
+Add/edit/deactivate products from manager panel without touching the DB directly.
 
 ### Referral System
 - `studio_members.referral_code` (unique per studio) and `studio_members.referred_by_user_id` already in `0001`
@@ -109,4 +129,4 @@ Architecture assessment conducted 2026-04-23. v2 cutover completed 2026-04-24 �
 | `waivers` (new table) | Digital waivers |
 | `member_activity_summary` (view) | Segmentation |
 
-*Tables already in `migrations-v2/`: `studios`, `studio_members`, `studio_payment_providers`, `locations`, `instructors`, `class_templates`, `schedule_rules`, `schedule_exceptions`, `class_instances`, `waitlists`, `payments`, `payment_webhook_events`, `notification_log`.*
+*Tables already live: `studios`, `studio_members`, `studio_payment_providers`, `locations`, `instructors`, `class_templates`, `schedule_rules`, `schedule_exceptions`, `class_instances`, `waitlists`, `payments`, `payment_webhook_events`, `notification_log`, `bookings` (with `membership_id`), `memberships` (with `product_id`, `credits_remaining`), `products`.*

@@ -8,12 +8,14 @@ This is a **multi-tenant SaaS platform** for yoga studios in Scandinavia, Europe
 
 **Architectural state**: YogaBrie (`xskqpxfjhhxontirezjd`, eu-north-1) has completed the v2 cutover as of 2026-04-24. The multi-tenant schema is live. The legacy `sessions` table and `session_id`/`session_date` columns on `bookings` are still present but inert — drop them once rollback confidence is established. The migration SQL is in `supabase/migrations-v2/` and the execution record is in `docs/MIGRATION-MULTITENANT.md`.
 
-**Live features (as of 2026-04-24):**
+**Live features (as of 2026-04-30):**
 - Passwordless email OTP auth
 - Class schedule from `class_instances` (14-day rolling window)
 - Stripe Checkout booking flow (server-side via Edge Functions)
 - Webhook-confirmed bookings + booking confirmation email (Resend)
 - Cancel + refund via `issue-refund` Edge Function (24h window policy)
+- **Membership purchase** (Phase 1A, 2026-04-30): DB-driven products catalog; users buy subscriptions/clip cards via Stripe Checkout from `/joinnow`; webhook calls `activate_membership()` RPC on success; subscription renewal/cancellation handled via `invoice.paid` / `customer.subscription.deleted`
+- **Book with membership** (Phase 1B, 2026-04-30): `create-checkout` detects active membership before creating Stripe session; calls `book_with_credit()` for subscription/clip-card holders (no Stripe redirect); `issue-refund` returns credits on cancellation within window; `BookingSheet` adapts UI to show "Included" or "X credits remaining"
 
 **Security hardening (2026-04-30):** 28-finding audit implemented — see `docs/SECURITY-HARDENING.md`.
 
@@ -57,19 +59,26 @@ Key hooks (current):
 - `useBookings()` — user's bookings + `cancelBooking` mutation (booking creation is now handled server-side by the `create-checkout` Edge Function)
 - `usePaymentMethods()` — saved payment methods
 - `useStudioConfig()` — studio branding (legacy; v2 replaces this with `StudioContext`)
-- `useProfile()`, `useMembership()`
+- `useProfile()`, `useMembership()` — `useMembership` returns the user's active membership for the current studio (status='active'); used in `BookingSheet` to determine booking mode
+- `useProducts()` — fetches the studio's active product catalog; uses `useEffect`+`useState` (not TanStack Query) due to a TanStack Query v5 subscriber notification bug with anon queries
 - `useStudioMember()` — fetches the current user's `studio_members` row (`level`, `total_sessions`, `referral_code`). Use this for per-studio user stats — these columns no longer live on `profiles`.
 
 All user-facing hooks (`useBookings`, `useMembership`, `usePaymentMethods`, `useClassInstances`, `useStudioMember`) require `studioId` from `useStudioContext()` and scope their queries by it. All hooks expose an `error` field in their return value.
 
 ### Booking Flow (`src/components/BookingSheet.tsx`)
 
-**Current**: `date → confirm → auth → checkout`. The `auth` step uses a two-phase email OTP form (email → 6-digit code). The `checkout` step calls the `create-checkout` Edge Function, which creates a `payments` row + `bookings` row (`status='pending'`) and returns a hosted provider checkout URL. The browser redirects out; the provider's webhook promotes the booking to `confirmed` on success and sends a booking confirmation email via Resend. On return, `Index.tsx` detects `?status=success` in the URL and shows a Sonner toast.
+**Current**: `date → confirm → auth → [profile if no name] → checkout`. The `auth` step uses a two-phase email OTP form (email → 6-digit code).
+
+**Membership-aware path (Phase 1B):** At the `checkout` step, `create-checkout` checks if the user has an active membership for this studio. If yes, it calls `book_with_credit()` and returns `{ booking_id, free: true }` — no Stripe redirect. `BookingSheet` handles this by redirecting to `/?booking_id=...&status=success`. The confirm step adapts to show "Included" (subscription) or "X credits remaining" (clip card). If no membership → existing Stripe drop-in flow unchanged.
+
+**Drop-in path:** `checkout` step calls `create-checkout` which creates a `payments` row + `bookings` row (`status='pending'`) and returns a hosted Stripe checkout URL. Browser redirects out; webhook promotes booking to `confirmed` on success and sends confirmation email. On return, `Index.tsx` detects `?status=success` and shows a Sonner toast.
 
 **`create-checkout` details:**
+- Class booking path: checks active memberships first (fetch all, filter in app code — avoids brittle PostgREST OR chaining). If match found, calls `book_with_credit()` and returns early.
 - Auto-upserts a `studio_members` row (`role='member'`) on first booking — new users can book without a staff invite.
-- Capacity check counts `pending + confirmed` bookings, not just `booked_count` (prevents overselling during concurrent checkouts).
-- `return_url` is validated against `ALLOWED_ORIGINS` (derived from `APP_URL` Edge Function env var) to prevent open redirects.
+- Capacity check counts `pending + confirmed` bookings (prevents overselling during concurrent checkouts).
+- `return_url` is validated against `ALLOWED_ORIGINS` + localhost (dev) to prevent open redirects.
+- Accepts `{ class_instance_id }` (book a class) OR `{ product_id }` (buy a membership/clip card).
 - Currency and studio name are read from `studios.currency` / `studios.name` — nothing hardcoded.
 
 **Legacy (decommissioned)**: was `date → confirm → auth → payment → addCard → success` with an insecure client-side `StripeCardForm` that wrote card details directly to the DB.
@@ -93,7 +102,10 @@ All user-facing hooks (`useBookings`, `useMembership`, `usePaymentMethods`, `use
 
 **v2 migrations (in `supabase/migrations-v2/`):**
 - `0001–0007` — initial v2 schema, multi-tenant tables, RLS, functions (see `docs/MIGRATION-MULTITENANT.md`)
-- `0008_security_hardening.sql` — RLS scoping, atomic payment functions, duplicate-booking constraint (see `docs/SECURITY-HARDENING.md`)
+- `0008_security_hardening.sql` — RLS scoping, atomic payment functions, duplicate-booking constraint
+- `0009_drop_legacy_sessions.sql` — drops legacy `sessions` table and stale columns
+- `0010_products_and_membership_purchase.sql` — `products` table + RLS + seed data; `payments.product_id`; `memberships.product_id`; `activate_membership()`, `renew_membership_by_subscription()`, `cancel_membership_by_subscription()` RPCs
+- `0011_book_with_credit.sql` — `bookings.membership_id`; `book_with_credit()` RPC (atomic credit booking); `return_credit()` RPC (atomic credit return on cancellation)
 
 **Applying migrations:** The Supabase CLI only looks in `supabase/migrations/` — `supabase db push` will NOT pick up files in `migrations-v2/`. Apply these by copy-pasting the SQL file into the Supabase SQL Editor (Dashboard → SQL Editor → New query).
 
@@ -110,11 +122,12 @@ All user-facing hooks (`useBookings`, `useMembership`, `usePaymentMethods`, `use
 | `schedule_rules` | One row per weekday slot, with effective date range |
 | `schedule_exceptions` | Per-date deviations (cancel / reschedule / sub / relocate) |
 | `class_instances` | Materialized concrete occurrences — bookings point here |
-| `bookings` | `class_instance_id` FK; `payment_id` FK; status lifecycle incl. `pending`/`payment_failed` |
+| `bookings` | `class_instance_id` FK; `payment_id` FK (NULL for credit bookings); `membership_id` FK (NULL for paid bookings); exactly one of payment_id/membership_id is non-null; status lifecycle incl. `pending`/`payment_failed` |
 | `payments` | Canonical payment record (`provider`, `provider_session_id`, `provider_payment_id`, status) |
 | `payment_webhook_events` | Idempotent audit log for provider webhooks |
 | `payment_methods` | Generalized: `provider` + `provider_external_id` |
-| `memberships` | `provider` + `provider_subscription_id` |
+| `memberships` | `product_id` FK → products; `credits_remaining` (NULL=unlimited subscription, integer=clip card); `valid_until` (DATE); `provider_subscription_id` for Stripe subscription renewal/cancel events |
+| `products` | Studio product catalog: type (`drop_in`\|`clip_card`\|`subscription`\|`addon`\|`private`), `price_minor`, `credits`, `validity_days`, `billing_interval`; RLS: anon+authenticated read via x-studio-slug header |
 | `waitlists` | Reservation-window state machine (`waiting`→`offered`→`accepted`/`expired`) |
 | `notification_log` | Idempotent outbound notification record (email/SMS, one row per send attempt) |
 
