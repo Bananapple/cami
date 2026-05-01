@@ -1,5 +1,7 @@
 import { Clock, MapPin } from "lucide-react";
 import type { ClassInstance } from "@/hooks/useClassInstances";
+import { formatTime, formatDate } from "@/lib/timezone";
+import { useStudioContext } from "@/context/StudioContext";
 
 interface OrderSummaryProps {
   session: ClassInstance;
@@ -10,16 +12,16 @@ interface OrderSummaryProps {
 }
 
 const OrderSummary = ({ session, selectedDate, bookingMode, planName, creditsRemaining }: OrderSummaryProps) => {
-  const dateStr = selectedDate.toLocaleDateString("nb-NO", {
+  const studioCtx = useStudioContext();
+  const tz = session.location_timezone ?? studioCtx?.studio?.timezone ?? "Europe/Oslo";
+
+  const dateStr = formatDate(selectedDate.toISOString(), tz, {
     weekday: "short",
     month: "short",
     day: "numeric",
   });
 
-  const timeStr = new Date(session.starts_at).toLocaleTimeString("nb-NO", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  const timeStr = formatTime(session.starts_at, tz);
 
   const durationMin = Math.round(
     (new Date(session.ends_at).getTime() - new Date(session.starts_at).getTime()) / 60000
