@@ -12,6 +12,16 @@ import { LogOut, CreditCard, User, X } from "lucide-react";
 import { toast } from "sonner";
 import { useStudioContext } from "@/context/StudioContext";
 import { formatTime, formatDate } from "@/lib/timezone";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const Dashboard = () => {
   const { user, isAuthenticated, loading, signOut } = useAuth();
@@ -22,6 +32,7 @@ const Dashboard = () => {
   const studioCtx = useStudioContext();
   const studioTz = studioCtx?.studio?.timezone ?? "Europe/Oslo";
   const [bookingOpen, setBookingOpen] = useState(false);
+  const [cancelTarget, setCancelTarget] = useState<{ id: string; startsAt: string; hasMembership: boolean } | null>(null);
 
   if (loading) {
     return (
@@ -40,12 +51,18 @@ const Dashboard = () => {
     toast("Logged out successfully.");
   };
 
-  const handleCancelBooking = async (id: string) => {
-    const result = await cancelBooking.mutateAsync(id);
+  const handleCancelBooking = async () => {
+    if (!cancelTarget) return;
+    const result = await cancelBooking.mutateAsync(cancelTarget.id);
+    setCancelTarget(null);
     if (result?.refunded) {
       toast(`Booking cancelled. A refund of NOK ${result.refund_amount} is on its way.`);
+    } else if (result?.credit_returned) {
+      toast("Booking cancelled. Your credit has been returned.");
     } else if (result?.reason === "inside_cancellation_window") {
-      toast("Booking cancelled. No refund — cancellation is within 24 hours of class.");
+      toast(cancelTarget.hasMembership
+        ? "Booking cancelled. Credit not returned — cancellation is within 24 hours of class."
+        : "Booking cancelled. No refund — cancellation is within 24 hours of class.");
     } else if (result?.reason === "refund_failed") {
       toast("Booking cancelled. Refund could not be processed automatically — we'll follow up.");
     } else {
@@ -163,7 +180,11 @@ const Dashboard = () => {
                         </p>
                       </div>
                       <button
-                        onClick={() => handleCancelBooking(booking.id)}
+                        onClick={() => setCancelTarget({
+                          id: booking.id,
+                          startsAt: ci?.starts_at ?? "",
+                          hasMembership: !!booking.membership_id,
+                        })}
                         className="p-2 text-muted-foreground hover:text-destructive transition-colors"
                         aria-label="Cancel booking"
                       >
@@ -224,6 +245,39 @@ const Dashboard = () => {
 
       <Footer />
       <BookingSheet isOpen={bookingOpen} onClose={() => setBookingOpen(false)} />
+
+      {/* Cancel booking confirmation dialog */}
+      <AlertDialog open={!!cancelTarget} onOpenChange={(open) => !open && setCancelTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel this booking?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {cancelTarget && (() => {
+                const startsAt = new Date(cancelTarget.startsAt);
+                const hoursUntil = (startsAt.getTime() - Date.now()) / (1000 * 60 * 60);
+                const insideWindow = hoursUntil < 24;
+                if (insideWindow) {
+                  return cancelTarget.hasMembership
+                    ? "This class starts in less than 24 hours. Your credit will not be returned."
+                    : "This class starts in less than 24 hours. No refund will be issued.";
+                }
+                return cancelTarget.hasMembership
+                  ? "Your credit will be returned to your membership."
+                  : "A full refund will be issued to your original payment method.";
+              })()}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep Booking</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleCancelBooking}
+              className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+            >
+              Cancel Booking
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

@@ -52,16 +52,18 @@ const SessionList = ({ sessions, selectedDate, onSelectSession }: SessionListPro
               ? session.max_capacity - session.booked_count
               : null;
             const isFull = spotsLeft !== null && spotsLeft <= 0;
-            const nearlyFull = spotsLeft !== null && spotsLeft > 0 && spotsLeft <= 3;
+            const isPast = new Date(session.starts_at) <= new Date();
+            const isDisabled = isFull || isPast;
+            const nearlyFull = !isPast && spotsLeft !== null && spotsLeft > 0 && spotsLeft <= 3;
 
             return (
               <button
                 key={session.id}
-                onClick={() => !isFull && onSelectSession(session)}
-                disabled={isFull}
+                onClick={() => !isDisabled && onSelectSession(session)}
+                disabled={isDisabled}
                 className={`w-full flex items-center gap-4 p-4 rounded-lg border bg-card transition-all group text-left ${
-                  isFull
-                    ? "border-border opacity-60 cursor-not-allowed"
+                  isDisabled
+                    ? "border-border opacity-40 cursor-not-allowed"
                     : "border-border hover:border-primary/50"
                 }`}
               >
@@ -87,7 +89,10 @@ const SessionList = ({ sessions, selectedDate, onSelectSession }: SessionListPro
                   </p>
                 </div>
 
-                {isFull && (
+                {isPast && (
+                  <span className="text-xs font-sans text-muted-foreground shrink-0">Passed</span>
+                )}
+                {!isPast && isFull && (
                   <span className="text-xs font-sans text-muted-foreground shrink-0">Full</span>
                 )}
                 {nearlyFull && (
@@ -95,7 +100,7 @@ const SessionList = ({ sessions, selectedDate, onSelectSession }: SessionListPro
                     {spotsLeft} spot{spotsLeft === 1 ? "" : "s"} left
                   </span>
                 )}
-                {!isFull && (
+                {!isDisabled && (
                   <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors flex-shrink-0" />
                 )}
               </button>

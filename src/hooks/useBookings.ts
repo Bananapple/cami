@@ -15,7 +15,7 @@ export function useBookings() {
       const { data, error } = await supabase
         .from("bookings")
         .select(`
-          id, status, cancelled_at, payment_id, class_instance_id,
+          id, status, cancelled_at, payment_id, membership_id, class_instance_id,
           class_instances ( id, starts_at, template_id,
             class_templates ( name, default_duration_minutes )
           )
