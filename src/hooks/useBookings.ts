@@ -56,7 +56,10 @@ export function useBookings() {
       }
       return data as { cancelled: boolean; refunded: boolean; refund_amount?: number; reason?: string };
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["bookings"] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["bookings"] });
+      queryClient.invalidateQueries({ queryKey: ["membership"] });
+    },
   });
 
   return { bookings, isLoading, error, cancelBooking };
