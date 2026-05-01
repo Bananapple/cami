@@ -24,10 +24,14 @@ export function useBookings() {
         .eq("studio_id", studioId!)
         .eq("status", "confirmed");
       if (error) throw error;
-      return (data ?? []).filter((b: any) => {
-        const startsAt = b.class_instances?.starts_at;
-        return startsAt && new Date(startsAt) > new Date();
-      });
+      return (data ?? [])
+        .filter((b: any) => {
+          const startsAt = b.class_instances?.starts_at;
+          return startsAt && new Date(startsAt) > new Date();
+        })
+        .sort((a: any, b: any) =>
+          new Date(a.class_instances?.starts_at).getTime() - new Date(b.class_instances?.starts_at).getTime()
+        );
     },
     enabled: !!user && !!studioId,
   });

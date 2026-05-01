@@ -132,7 +132,12 @@ Deno.serve(async (req) => {
           p_class_instance_id: class_instance_id,
           p_membership_id: activeMembership.id,
         });
-        if (creditErr) return json({ error: creditErr.message ?? "Booking failed" }, 409);
+        if (creditErr) {
+          const message = creditErr.code === "23505"
+            ? "You already have a booking for this class."
+            : creditErr.message ?? "Booking failed";
+          return json({ error: message }, 409);
+        }
         return json({ booking_id: bookingId, free: true });
       }
     } else {
@@ -226,6 +231,9 @@ Deno.serve(async (req) => {
         .single();
       if (bookingErr || !booking) {
         await adminClient.from("payments").update({ status: "failed" }).eq("id", payment.id);
+        if ((bookingErr as any)?.code === "23505") {
+          return json({ error: "You already have a booking for this class." }, 409);
+        }
         return json({ error: "Failed to create booking record" }, 500);
       }
       bookingId = booking.id;

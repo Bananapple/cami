@@ -212,9 +212,16 @@ const Dashboard = () => {
                 <div className="space-y-3">
                   <p className="text-sm font-serif text-foreground">{membership.plan_name}</p>
                   <div className="space-y-2 text-xs text-muted-foreground font-sans">
-                    <p>↻ Automatic renewal every {membership.renewal_days} days</p>
+                    {membership.credits_remaining !== null && (
+                      <p>◈ {membership.credits_remaining} credit{membership.credits_remaining !== 1 ? "s" : ""} remaining</p>
+                    )}
+                    {membership.valid_until && (
+                      <p>◷ Valid until {new Date(membership.valid_until).toLocaleDateString("nb-NO", { day: "numeric", month: "long", year: "numeric" })}</p>
+                    )}
+                    {membership.renewal_days && (
+                      <p>↻ Renews every {membership.renewal_days} days</p>
+                    )}
                     <p>✕ Cancel anytime easily from your account</p>
-                    <p>$ Get the best deal — book your spot at best price</p>
                   </div>
                 </div>
               ) : (
