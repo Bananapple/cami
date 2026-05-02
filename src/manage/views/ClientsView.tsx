@@ -1,4 +1,3 @@
-import { Search } from "lucide-react";
 import { useClientsView, type MemberSummary, type SegmentKey } from "../hooks/useClientsView";
 import { useDrawerStack } from "../hooks/useDrawerStack";
 
@@ -50,10 +49,9 @@ export function ClientsView() {
   const {
     isLoading,
     filtered,
+    members,
     segments,
     segmentCounts,
-    search,
-    setSearch,
     activeSegment,
     setActiveSegment,
   } = useClientsView();
@@ -62,23 +60,13 @@ export function ClientsView() {
 
   return (
     <div className="max-w-3xl mx-auto px-6 py-8 space-y-6">
-      <header className="flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-serif">Clients</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            {isLoading ? "Loading..." : `${filtered.length} member${filtered.length !== 1 ? "s" : ""}`}
-          </p>
-        </div>
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-          <input
-            type="text"
-            placeholder="Search name or email..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9 pr-4 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/40 w-60"
-          />
-        </div>
+      <header>
+        <h1 className="text-2xl font-serif">Clients</h1>
+        <p className="text-sm text-muted-foreground mt-0.5">
+          {isLoading ? "Loading..." : `${activeSegment === "all" ? members.length : filtered.length} member${filtered.length !== 1 ? "s" : ""}`}
+          {" · "}
+          <span className="text-xs">use ⌘K to search</span>
+        </p>
       </header>
 
       {/* Segment chips */}
@@ -114,7 +102,7 @@ export function ClientsView() {
         </div>
       ) : filtered.length === 0 ? (
         <p className="text-sm text-muted-foreground py-12 text-center">
-          {search ? "No members match your search." : "No members in this segment."}
+          No members in this segment.
         </p>
       ) : (
         <div className="divide-y divide-border border border-border rounded-lg overflow-hidden">

@@ -16,6 +16,7 @@ export type ManagerMember = {
   phone_number: string | null;
   level: string | null;
   total_sessions: number;
+  joined_at: string | null;
   membership: MemberMembership | null;
 };
 
@@ -38,7 +39,7 @@ export function useMember(userId: string | undefined) {
           .maybeSingle(),
         supabase
           .from("studio_members")
-          .select("level, total_sessions")
+          .select("level, total_sessions, joined_at")
           .eq("user_id", userId)
           .maybeSingle(),
         supabase
@@ -70,6 +71,7 @@ export function useMember(userId: string | undefined) {
         phone_number: profile.phone_number ?? null,
         level: studioMember?.level ?? null,
         total_sessions: studioMember?.total_sessions ?? 0,
+        joined_at: (studioMember as any)?.joined_at ?? null,
         membership,
       };
     },

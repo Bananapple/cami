@@ -22,7 +22,7 @@ export type MemberSummary = {
 };
 
 // Thresholds (days) — adjust here to tune segment definitions
-const T = {
+export const T = {
   newMemberDays: 30,
   oneTimerCooldownDays: 14,
   regularActiveDays: 30,
@@ -35,7 +35,7 @@ const T = {
 
 export type SegmentKey = "all" | "new" | "one_timer" | "regular" | "lapsing" | "inactive" | "no_plan";
 
-const SEGMENTS: { key: SegmentKey; label: string }[] = [
+export const SEGMENTS: { key: SegmentKey; label: string }[] = [
   { key: "all",       label: "All" },
   { key: "new",       label: "New" },
   { key: "regular",   label: "Regular" },
@@ -45,11 +45,11 @@ const SEGMENTS: { key: SegmentKey; label: string }[] = [
   { key: "no_plan",   label: "No plan" },
 ];
 
-function daysAgo(n: number) {
+export function daysAgo(n: number) {
   return new Date(Date.now() - n * 86_400_000);
 }
 
-function inSegment(m: MemberSummary, key: SegmentKey): boolean {
+export function inSegment(m: MemberSummary, key: SegmentKey): boolean {
   const lastBooking = m.last_booking_at ? new Date(m.last_booking_at) : null;
   const joined = new Date(m.joined_at);
 
