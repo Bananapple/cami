@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Pencil, ChevronDown, ChevronUp } from "lucide-react";
+import { Plus, Pencil, ChevronDown, ChevronUp, Check, X } from "lucide-react";
 import { toast } from "sonner";
 import { useManageProducts } from "../hooks/useManageProducts";
 import type { Product } from "../hooks/useManageProducts";
@@ -7,6 +7,8 @@ import { ProductDrawer } from "../drawers/ProductDrawer";
 import { useManageDiscountCodes } from "../hooks/useManageDiscountCodes";
 import type { DiscountCode } from "../hooks/useManageDiscountCodes";
 import { useManageStudio } from "../hooks/useManageStudio";
+import { useClassTemplates } from "../hooks/useClassTemplates";
+import type { ClassTemplate } from "../hooks/useClassTemplates";
 
 const TYPE_LABEL: Record<string, string> = {
   clip_card: "Clip card",
@@ -25,9 +27,22 @@ const EMPTY_CODE = {
   max_redemptions: null as number | null,
 };
 
+const EMPTY_TEMPLATE = {
+  name: "",
+  level: "" as string | null,
+  default_duration_minutes: 60,
+  default_price: 250,
+  default_max_capacity: 20,
+};
+
 export function StudioView() {
   const { data: products = [], isLoading, error, toggleActive } = useManageProducts();
   const [drawerProduct, setDrawerProduct] = useState<Product | null | "new">(null);
+
+  const { templates, isLoading: templatesLoading, createTemplate, updateTemplate, toggleActive: toggleTemplate } = useClassTemplates();
+  const [addTemplateOpen, setAddTemplateOpen] = useState(false);
+  const [newTemplate, setNewTemplate] = useState({ ...EMPTY_TEMPLATE });
+  const [editingTemplate, setEditingTemplate] = useState<ClassTemplate | null>(null);
 
   const {
     data: discountCodes = [],
@@ -134,6 +149,164 @@ export function StudioView() {
         open={drawerProduct !== null}
         onOpenChange={(open) => !open && setDrawerProduct(null)}
       />
+
+      {/* Class Types section */}
+      <section className="space-y-4">
+        <div className="flex items-center justify-between border-t border-border pt-4">
+          <div>
+            <h2 className="text-sm font-sans font-medium uppercase tracking-wider text-muted-foreground">
+              Class Types
+            </h2>
+            <p className="text-xs text-muted-foreground mt-1">
+              Templates used when scheduling classes. Changes don't affect existing bookings.
+            </p>
+          </div>
+          <button
+            onClick={() => { setAddTemplateOpen((o) => !o); setNewTemplate({ ...EMPTY_TEMPLATE }); }}
+            className="flex items-center gap-1.5 text-sm px-3 py-1.5 bg-primary text-primary-foreground rounded-md hover:bg-primary/80 transition-colors"
+          >
+            {addTemplateOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
+            {addTemplateOpen ? "Cancel" : "Add class type"}
+          </button>
+        </div>
+
+        {addTemplateOpen && (
+          <div className="rounded-lg border border-border p-4 space-y-3 bg-muted/30">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1 col-span-2">
+                <label className="text-xs font-sans text-muted-foreground">Name *</label>
+                <input
+                  type="text"
+                  value={newTemplate.name}
+                  onChange={(e) => setNewTemplate((t) => ({ ...t, name: e.target.value }))}
+                  placeholder="e.g. Ashtanga Mysore"
+                  className="w-full px-3 py-2 text-sm bg-background border border-border rounded-md"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-sans text-muted-foreground">Level</label>
+                <select
+                  value={newTemplate.level ?? ""}
+                  onChange={(e) => setNewTemplate((t) => ({ ...t, level: e.target.value || null }))}
+                  className="w-full px-3 py-2 text-sm bg-background border border-border rounded-md"
+                >
+                  <option value="">— Any level —</option>
+                  <option value="beginner">Beginner</option>
+                  <option value="all levels">All levels</option>
+                  <option value="intermediate">Intermediate</option>
+                  <option value="advanced">Advanced</option>
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-sans text-muted-foreground">Duration (min)</label>
+                <input
+                  type="number"
+                  min="5"
+                  max="300"
+                  value={newTemplate.default_duration_minutes}
+                  onChange={(e) => setNewTemplate((t) => ({ ...t, default_duration_minutes: Number(e.target.value) }))}
+                  className="w-full px-3 py-2 text-sm bg-background border border-border rounded-md"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-sans text-muted-foreground">Default price (kr)</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={newTemplate.default_price}
+                  onChange={(e) => setNewTemplate((t) => ({ ...t, default_price: Number(e.target.value) }))}
+                  className="w-full px-3 py-2 text-sm bg-background border border-border rounded-md"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-sans text-muted-foreground">Default capacity</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={newTemplate.default_max_capacity}
+                  onChange={(e) => setNewTemplate((t) => ({ ...t, default_max_capacity: Number(e.target.value) }))}
+                  className="w-full px-3 py-2 text-sm bg-background border border-border rounded-md"
+                />
+              </div>
+            </div>
+            <button
+              onClick={async () => {
+                if (!newTemplate.name.trim()) { toast.error("Name is required."); return; }
+                try {
+                  await createTemplate.mutateAsync({
+                    name: newTemplate.name.trim(),
+                    level: newTemplate.level || null,
+                    default_duration_minutes: newTemplate.default_duration_minutes,
+                    default_price: newTemplate.default_price,
+                    default_max_capacity: newTemplate.default_max_capacity,
+                  });
+                  setNewTemplate({ ...EMPTY_TEMPLATE });
+                  setAddTemplateOpen(false);
+                  toast.success("Class type added.");
+                } catch (err: any) {
+                  toast.error(err.message ?? "Failed to add class type.");
+                }
+              }}
+              disabled={createTemplate.isPending}
+              className="w-full py-2 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/80 disabled:opacity-50 transition-colors"
+            >
+              {createTemplate.isPending ? "Adding…" : "Add class type"}
+            </button>
+          </div>
+        )}
+
+        {templatesLoading && (
+          <p className="text-sm text-muted-foreground py-4 text-center">Loading…</p>
+        )}
+
+        {!templatesLoading && templates.length === 0 && (
+          <p className="text-sm text-muted-foreground py-4 text-center">No class types yet.</p>
+        )}
+
+        {!templatesLoading && templates.length > 0 && (
+          <div className="space-y-2">
+            {templates.map((tmpl) => (
+              editingTemplate?.id === tmpl.id ? (
+                <TemplateEditRow
+                  key={tmpl.id}
+                  template={editingTemplate}
+                  onChange={setEditingTemplate}
+                  onSave={async () => {
+                    try {
+                      await updateTemplate.mutateAsync({
+                        id: editingTemplate.id,
+                        name: editingTemplate.name,
+                        level: editingTemplate.level,
+                        default_duration_minutes: editingTemplate.default_duration_minutes,
+                        default_price: editingTemplate.default_price,
+                        default_max_capacity: editingTemplate.default_max_capacity,
+                      });
+                      setEditingTemplate(null);
+                      toast.success("Class type updated.");
+                    } catch (err: any) {
+                      toast.error(err.message ?? "Failed to update.");
+                    }
+                  }}
+                  onCancel={() => setEditingTemplate(null)}
+                  isSaving={updateTemplate.isPending}
+                />
+              ) : (
+                <TemplateRow
+                  key={tmpl.id}
+                  template={tmpl}
+                  onEdit={() => setEditingTemplate({ ...tmpl })}
+                  onToggle={() =>
+                    toggleTemplate.mutate(
+                      { id: tmpl.id, is_active: !tmpl.is_active },
+                      { onError: () => toast.error("Failed to update.") }
+                    )
+                  }
+                />
+              )
+            ))}
+          </div>
+        )}
+      </section>
 
       {/* Referral Program section */}
       <section className="space-y-4">
@@ -355,6 +528,138 @@ export function StudioView() {
           </div>
         )}
       </section>
+    </div>
+  );
+}
+
+function TemplateRow({
+  template,
+  onEdit,
+  onToggle,
+}: {
+  template: ClassTemplate;
+  onEdit: () => void;
+  onToggle: () => void;
+}) {
+  const meta = [
+    template.level ?? "All levels",
+    `${template.default_duration_minutes} min`,
+    `${template.default_max_capacity} spots`,
+    `kr ${template.default_price}`,
+  ].join(" · ");
+
+  return (
+    <div className={`flex items-center gap-4 p-4 rounded-lg border border-border transition-opacity ${template.is_active ? "" : "opacity-50"}`}>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-serif">{template.name}</p>
+        <p className="text-xs text-muted-foreground mt-0.5">{meta}</p>
+      </div>
+      <button
+        onClick={onToggle}
+        className={`text-xs px-2.5 py-1 rounded-full font-sans transition-colors shrink-0 ${
+          template.is_active
+            ? "bg-green-500/10 text-green-600 hover:bg-green-500/20"
+            : "bg-muted text-muted-foreground hover:bg-muted/80"
+        }`}
+      >
+        {template.is_active ? "Active" : "Inactive"}
+      </button>
+      <button
+        onClick={onEdit}
+        className="p-1.5 text-muted-foreground hover:text-foreground transition-colors shrink-0"
+        aria-label="Edit"
+      >
+        <Pencil className="w-3.5 h-3.5" />
+      </button>
+    </div>
+  );
+}
+
+function TemplateEditRow({
+  template,
+  onChange,
+  onSave,
+  onCancel,
+  isSaving,
+}: {
+  template: ClassTemplate;
+  onChange: (t: ClassTemplate) => void;
+  onSave: () => void;
+  onCancel: () => void;
+  isSaving: boolean;
+}) {
+  return (
+    <div className="rounded-lg border border-primary/40 p-4 space-y-3 bg-muted/20">
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1 col-span-2">
+          <label className="text-xs font-sans text-muted-foreground">Name</label>
+          <input
+            type="text"
+            value={template.name}
+            onChange={(e) => onChange({ ...template, name: e.target.value })}
+            className="w-full px-3 py-2 text-sm bg-background border border-border rounded-md"
+          />
+        </div>
+        <div className="space-y-1">
+          <label className="text-xs font-sans text-muted-foreground">Level</label>
+          <select
+            value={template.level ?? ""}
+            onChange={(e) => onChange({ ...template, level: e.target.value || null })}
+            className="w-full px-3 py-2 text-sm bg-background border border-border rounded-md"
+          >
+            <option value="">— Any level —</option>
+            <option value="beginner">Beginner</option>
+            <option value="all levels">All levels</option>
+            <option value="intermediate">Intermediate</option>
+            <option value="advanced">Advanced</option>
+          </select>
+        </div>
+        <div className="space-y-1">
+          <label className="text-xs font-sans text-muted-foreground">Duration (min)</label>
+          <input
+            type="number"
+            min="5"
+            value={template.default_duration_minutes}
+            onChange={(e) => onChange({ ...template, default_duration_minutes: Number(e.target.value) })}
+            className="w-full px-3 py-2 text-sm bg-background border border-border rounded-md"
+          />
+        </div>
+        <div className="space-y-1">
+          <label className="text-xs font-sans text-muted-foreground">Default price (kr)</label>
+          <input
+            type="number"
+            min="0"
+            value={template.default_price}
+            onChange={(e) => onChange({ ...template, default_price: Number(e.target.value) })}
+            className="w-full px-3 py-2 text-sm bg-background border border-border rounded-md"
+          />
+        </div>
+        <div className="space-y-1">
+          <label className="text-xs font-sans text-muted-foreground">Default capacity</label>
+          <input
+            type="number"
+            min="1"
+            value={template.default_max_capacity}
+            onChange={(e) => onChange({ ...template, default_max_capacity: Number(e.target.value) })}
+            className="w-full px-3 py-2 text-sm bg-background border border-border rounded-md"
+          />
+        </div>
+      </div>
+      <div className="flex gap-2 pt-1">
+        <button
+          onClick={onCancel}
+          className="flex items-center gap-1 px-3 py-1.5 text-sm border border-border rounded-md hover:bg-muted transition-colors"
+        >
+          <X className="w-3.5 h-3.5" /> Cancel
+        </button>
+        <button
+          onClick={onSave}
+          disabled={isSaving}
+          className="flex items-center gap-1 px-3 py-1.5 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/80 disabled:opacity-50 transition-colors"
+        >
+          <Check className="w-3.5 h-3.5" /> {isSaving ? "Saving…" : "Save"}
+        </button>
+      </div>
     </div>
   );
 }
