@@ -9,6 +9,10 @@ import type { DiscountCode } from "../hooks/useManageDiscountCodes";
 import { useManageStudio } from "../hooks/useManageStudio";
 import { useClassTemplates } from "../hooks/useClassTemplates";
 import type { ClassTemplate } from "../hooks/useClassTemplates";
+import { useManageInstructors } from "../hooks/useManageInstructors";
+import type { ManagedInstructor } from "../hooks/useManageInstructors";
+import { useManageLocations } from "../hooks/useManageLocations";
+import type { ManagedLocation } from "../hooks/useManageLocations";
 
 const TYPE_LABEL: Record<string, string> = {
   clip_card: "Clip card",
@@ -45,6 +49,16 @@ export function StudioView() {
   const [addTemplateOpen, setAddTemplateOpen] = useState(false);
   const [newTemplate, setNewTemplate] = useState({ ...EMPTY_TEMPLATE });
   const [editingTemplate, setEditingTemplate] = useState<ClassTemplate | null>(null);
+
+  const { instructors, isLoading: instructorsLoading, create: createInstructor, update: updateInstructor, toggleActive: toggleInstructor } = useManageInstructors();
+  const [addInstructorOpen, setAddInstructorOpen] = useState(false);
+  const [newInstructor, setNewInstructor] = useState({ display_name: "", initials: "", bio: "", image_url: "" });
+  const [editingInstructor, setEditingInstructor] = useState<ManagedInstructor | null>(null);
+
+  const { locations, isLoading: locationsLoading, create: createLocation, update: updateLocation, toggleActive: toggleLocation } = useManageLocations();
+  const [addLocationOpen, setAddLocationOpen] = useState(false);
+  const [newLocation, setNewLocation] = useState({ name: "", address: "", timezone: "", default_capacity: 20 });
+  const [editingLocation, setEditingLocation] = useState<ManagedLocation | null>(null);
 
   const {
     data: discountCodes = [],
@@ -330,6 +344,221 @@ export function StudioView() {
                 />
               )
             ))}
+          </div>
+        )}
+      </section>
+
+      {/* Instructors section */}
+      <section className="space-y-4">
+        <div className="flex items-center justify-between border-t border-border pt-4">
+          <div>
+            <h2 className="text-sm font-sans font-medium uppercase tracking-wider text-muted-foreground">
+              Instructors
+            </h2>
+          </div>
+          <button
+            onClick={() => { setAddInstructorOpen((o) => !o); setNewInstructor({ display_name: "", initials: "", bio: "", image_url: "" }); }}
+            className="flex items-center gap-1.5 text-sm px-3 py-1.5 bg-primary text-primary-foreground rounded-md hover:bg-primary/80 transition-colors"
+          >
+            {addInstructorOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
+            {addInstructorOpen ? "Cancel" : "Add instructor"}
+          </button>
+        </div>
+
+        {addInstructorOpen && (
+          <div className="rounded-lg border border-border p-4 space-y-3 bg-muted/30">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-xs font-sans text-muted-foreground">Name *</label>
+                <input type="text" value={newInstructor.display_name}
+                  onChange={(e) => setNewInstructor((i) => ({ ...i, display_name: e.target.value }))}
+                  placeholder="e.g. Brinkela Gjokaj"
+                  className="w-full px-3 py-2 text-sm bg-background border border-border rounded-md" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-sans text-muted-foreground">Initials *</label>
+                <input type="text" value={newInstructor.initials} maxLength={4}
+                  onChange={(e) => setNewInstructor((i) => ({ ...i, initials: e.target.value.toUpperCase() }))}
+                  placeholder="BG"
+                  className="w-full px-3 py-2 text-sm bg-background border border-border rounded-md uppercase" />
+              </div>
+              <div className="space-y-1 col-span-2">
+                <label className="text-xs font-sans text-muted-foreground">Bio</label>
+                <textarea value={newInstructor.bio}
+                  onChange={(e) => setNewInstructor((i) => ({ ...i, bio: e.target.value }))}
+                  rows={2} placeholder="Short bio shown on the Coaches page"
+                  className="w-full px-3 py-2 text-sm bg-background border border-border rounded-md resize-none" />
+              </div>
+              <div className="space-y-1 col-span-2">
+                <label className="text-xs font-sans text-muted-foreground">Photo URL</label>
+                <input type="url" value={newInstructor.image_url}
+                  onChange={(e) => setNewInstructor((i) => ({ ...i, image_url: e.target.value }))}
+                  placeholder="https://…"
+                  className="w-full px-3 py-2 text-sm bg-background border border-border rounded-md" />
+              </div>
+            </div>
+            <button
+              onClick={async () => {
+                if (!newInstructor.display_name.trim() || !newInstructor.initials.trim()) {
+                  toast.error("Name and initials are required."); return;
+                }
+                try {
+                  await createInstructor.mutateAsync({
+                    display_name: newInstructor.display_name.trim(),
+                    initials: newInstructor.initials.trim(),
+                    bio: newInstructor.bio || null,
+                    image_url: newInstructor.image_url || null,
+                  });
+                  setAddInstructorOpen(false);
+                  toast.success("Instructor added.");
+                } catch (err: any) { toast.error(err.message ?? "Failed to add instructor."); }
+              }}
+              disabled={createInstructor.isPending}
+              className="w-full py-2 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/80 disabled:opacity-50 transition-colors"
+            >
+              {createInstructor.isPending ? "Adding…" : "Add instructor"}
+            </button>
+          </div>
+        )}
+
+        {instructorsLoading && <p className="text-sm text-muted-foreground py-4 text-center">Loading…</p>}
+        {!instructorsLoading && instructors.length === 0 && (
+          <p className="text-sm text-muted-foreground py-4 text-center">No instructors yet.</p>
+        )}
+        {!instructorsLoading && instructors.length > 0 && (
+          <div className="space-y-2">
+            {instructors.map((inst) =>
+              editingInstructor?.id === inst.id ? (
+                <InlineEditRow key={inst.id}
+                  fields={[
+                    { label: "Name", value: editingInstructor.display_name, onChange: (v) => setEditingInstructor((i) => i && ({ ...i, display_name: v })) },
+                    { label: "Initials", value: editingInstructor.initials, onChange: (v) => setEditingInstructor((i) => i && ({ ...i, initials: v.toUpperCase() })), maxLength: 4 },
+                    { label: "Bio", value: editingInstructor.bio ?? "", onChange: (v) => setEditingInstructor((i) => i && ({ ...i, bio: v || null })), multiline: true },
+                    { label: "Photo URL", value: editingInstructor.image_url ?? "", onChange: (v) => setEditingInstructor((i) => i && ({ ...i, image_url: v || null })) },
+                  ]}
+                  onSave={async () => {
+                    try {
+                      await updateInstructor.mutateAsync({ id: editingInstructor.id, display_name: editingInstructor.display_name, initials: editingInstructor.initials, bio: editingInstructor.bio, image_url: editingInstructor.image_url });
+                      setEditingInstructor(null);
+                      toast.success("Instructor updated.");
+                    } catch (err: any) { toast.error(err.message ?? "Failed to update."); }
+                  }}
+                  onCancel={() => setEditingInstructor(null)}
+                  isSaving={updateInstructor.isPending}
+                />
+              ) : (
+                <PersonRow key={inst.id} name={inst.display_name} meta={inst.initials} isActive={inst.is_active}
+                  onEdit={() => setEditingInstructor({ ...inst })}
+                  onToggle={() => toggleInstructor.mutate({ id: inst.id, is_active: !inst.is_active }, { onError: () => toast.error("Failed to update.") })}
+                />
+              )
+            )}
+          </div>
+        )}
+      </section>
+
+      {/* Locations section */}
+      <section className="space-y-4">
+        <div className="flex items-center justify-between border-t border-border pt-4">
+          <div>
+            <h2 className="text-sm font-sans font-medium uppercase tracking-wider text-muted-foreground">
+              Locations
+            </h2>
+          </div>
+          <button
+            onClick={() => { setAddLocationOpen((o) => !o); setNewLocation({ name: "", address: "", timezone: "", default_capacity: 20 }); }}
+            className="flex items-center gap-1.5 text-sm px-3 py-1.5 bg-primary text-primary-foreground rounded-md hover:bg-primary/80 transition-colors"
+          >
+            {addLocationOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
+            {addLocationOpen ? "Cancel" : "Add location"}
+          </button>
+        </div>
+
+        {addLocationOpen && (
+          <div className="rounded-lg border border-border p-4 space-y-3 bg-muted/30">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1 col-span-2">
+                <label className="text-xs font-sans text-muted-foreground">Name *</label>
+                <input type="text" value={newLocation.name}
+                  onChange={(e) => setNewLocation((l) => ({ ...l, name: e.target.value }))}
+                  placeholder="e.g. Main Studio"
+                  className="w-full px-3 py-2 text-sm bg-background border border-border rounded-md" />
+              </div>
+              <div className="space-y-1 col-span-2">
+                <label className="text-xs font-sans text-muted-foreground">Address</label>
+                <input type="text" value={newLocation.address}
+                  onChange={(e) => setNewLocation((l) => ({ ...l, address: e.target.value }))}
+                  placeholder="Street address"
+                  className="w-full px-3 py-2 text-sm bg-background border border-border rounded-md" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-sans text-muted-foreground">Timezone</label>
+                <input type="text" value={newLocation.timezone}
+                  onChange={(e) => setNewLocation((l) => ({ ...l, timezone: e.target.value }))}
+                  placeholder="Leave blank to use studio default"
+                  className="w-full px-3 py-2 text-sm bg-background border border-border rounded-md" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-sans text-muted-foreground">Default capacity</label>
+                <input type="number" min={1} value={newLocation.default_capacity}
+                  onChange={(e) => setNewLocation((l) => ({ ...l, default_capacity: Number(e.target.value) }))}
+                  className="w-full px-3 py-2 text-sm bg-background border border-border rounded-md" />
+              </div>
+            </div>
+            <button
+              onClick={async () => {
+                if (!newLocation.name.trim()) { toast.error("Name is required."); return; }
+                try {
+                  await createLocation.mutateAsync({
+                    name: newLocation.name.trim(),
+                    address: newLocation.address || null,
+                    timezone: newLocation.timezone || null,
+                    default_capacity: newLocation.default_capacity,
+                  });
+                  setAddLocationOpen(false);
+                  toast.success("Location added.");
+                } catch (err: any) { toast.error(err.message ?? "Failed to add location."); }
+              }}
+              disabled={createLocation.isPending}
+              className="w-full py-2 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/80 disabled:opacity-50 transition-colors"
+            >
+              {createLocation.isPending ? "Adding…" : "Add location"}
+            </button>
+          </div>
+        )}
+
+        {locationsLoading && <p className="text-sm text-muted-foreground py-4 text-center">Loading…</p>}
+        {!locationsLoading && locations.length === 0 && (
+          <p className="text-sm text-muted-foreground py-4 text-center">No locations yet.</p>
+        )}
+        {!locationsLoading && locations.length > 0 && (
+          <div className="space-y-2">
+            {locations.map((loc) =>
+              editingLocation?.id === loc.id ? (
+                <InlineEditRow key={loc.id}
+                  fields={[
+                    { label: "Name", value: editingLocation.name, onChange: (v) => setEditingLocation((l) => l && ({ ...l, name: v })) },
+                    { label: "Address", value: editingLocation.address ?? "", onChange: (v) => setEditingLocation((l) => l && ({ ...l, address: v || null })) },
+                    { label: "Timezone", value: editingLocation.timezone ?? "", onChange: (v) => setEditingLocation((l) => l && ({ ...l, timezone: v || null })), placeholder: "Leave blank for studio default" },
+                    { label: "Default capacity", value: String(editingLocation.default_capacity), onChange: (v) => setEditingLocation((l) => l && ({ ...l, default_capacity: Number(v) || 20 })), type: "number" },
+                  ]}
+                  onSave={async () => {
+                    try {
+                      await updateLocation.mutateAsync({ id: editingLocation.id, name: editingLocation.name, address: editingLocation.address, timezone: editingLocation.timezone, default_capacity: editingLocation.default_capacity });
+                      setEditingLocation(null);
+                      toast.success("Location updated.");
+                    } catch (err: any) { toast.error(err.message ?? "Failed to update."); }
+                  }}
+                  onCancel={() => setEditingLocation(null)}
+                  isSaving={updateLocation.isPending}
+                />
+              ) : (
+                <PersonRow key={loc.id} name={loc.name} meta={loc.address ?? (loc.timezone ?? "Studio timezone")} isActive={loc.is_active}
+                  onEdit={() => setEditingLocation({ ...loc })}
+                  onToggle={() => toggleLocation.mutate({ id: loc.id, is_active: !loc.is_active }, { onError: () => toast.error("Failed to update.") })}
+                />
+              )
+            )}
           </div>
         )}
       </section>
@@ -823,6 +1052,60 @@ function ProductRow({
       >
         <Pencil className="w-3.5 h-3.5" />
       </button>
+    </div>
+  );
+}
+
+function PersonRow({ name, meta, isActive, onEdit, onToggle }: {
+  name: string; meta: string; isActive: boolean; onEdit: () => void; onToggle: () => void;
+}) {
+  return (
+    <div className={`flex items-center gap-4 p-4 rounded-lg border border-border transition-opacity ${isActive ? "" : "opacity-50"}`}>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-serif">{name}</p>
+        <p className="text-xs text-muted-foreground mt-0.5">{meta}</p>
+      </div>
+      <button onClick={onToggle}
+        className={`text-xs px-2.5 py-1 rounded-full font-sans transition-colors shrink-0 ${isActive ? "bg-green-500/10 text-green-600 hover:bg-green-500/20" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}>
+        {isActive ? "Active" : "Inactive"}
+      </button>
+      <button onClick={onEdit} className="p-1.5 text-muted-foreground hover:text-foreground transition-colors shrink-0">
+        <Pencil className="w-3.5 h-3.5" />
+      </button>
+    </div>
+  );
+}
+
+type FieldDef = { label: string; value: string; onChange: (v: string) => void; multiline?: boolean; maxLength?: number; placeholder?: string; type?: string };
+
+function InlineEditRow({ fields, onSave, onCancel, isSaving }: {
+  fields: FieldDef[]; onSave: () => void; onCancel: () => void; isSaving: boolean;
+}) {
+  return (
+    <div className="rounded-lg border border-primary/40 p-4 space-y-3 bg-muted/20">
+      <div className="grid grid-cols-2 gap-3">
+        {fields.map((f) => (
+          <div key={f.label} className="space-y-1 col-span-2">
+            <label className="text-xs font-sans text-muted-foreground">{f.label}</label>
+            {f.multiline ? (
+              <textarea value={f.value} onChange={(e) => f.onChange(e.target.value)} rows={2}
+                className="w-full px-3 py-2 text-sm bg-background border border-border rounded-md resize-none" />
+            ) : (
+              <input type={f.type ?? "text"} value={f.value} onChange={(e) => f.onChange(e.target.value)}
+                maxLength={f.maxLength} placeholder={f.placeholder}
+                className="w-full px-3 py-2 text-sm bg-background border border-border rounded-md" />
+            )}
+          </div>
+        ))}
+      </div>
+      <div className="flex gap-2 pt-1">
+        <button onClick={onCancel} className="flex items-center gap-1 px-3 py-1.5 text-sm border border-border rounded-md hover:bg-muted transition-colors">
+          <X className="w-3.5 h-3.5" /> Cancel
+        </button>
+        <button onClick={onSave} disabled={isSaving} className="flex items-center gap-1 px-3 py-1.5 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/80 disabled:opacity-50 transition-colors">
+          <Check className="w-3.5 h-3.5" /> {isSaving ? "Saving…" : "Save"}
+        </button>
+      </div>
     </div>
   );
 }
