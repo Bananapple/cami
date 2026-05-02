@@ -18,6 +18,7 @@ import { useStudioContext } from "@/context/StudioContext";
 import { useProducts } from "@/hooks/useProducts";
 import { formatTime, formatDate } from "@/lib/timezone";
 import { inSegment, SEGMENTS, type MemberSummary } from "../hooks/useClientsView";
+import { useNotificationLog, templateLabel } from "../hooks/useNotificationLog";
 
 function MembershipSection({ membership }: { membership: MemberMembership | null }) {
   if (!membership) {
@@ -134,6 +135,7 @@ export function MemberDrawer({
 }) {
   const { data: member, isLoading } = useMember(userId);
   const { data: allBookings = [], isLoading: bookingsLoading } = useMemberBookings(userId);
+  const { data: notifications = [] } = useNotificationLog(userId);
   const cancelBooking = useManagerCancelBooking(userId);
   const studioCtx = useStudioContext();
   const studioTz = studioCtx?.studio?.timezone ?? "Europe/Oslo";
@@ -327,6 +329,25 @@ export function MemberDrawer({
                       })}
                     </div>
                   )}
+                </section>
+              )}
+
+              {/* Email log */}
+              {notifications.length > 0 && (
+                <section className="pt-4 border-t border-border space-y-2">
+                  <h3 className="text-xs uppercase tracking-wider text-muted-foreground">Emails sent</h3>
+                  <div className="space-y-1">
+                    {notifications.map((n) => (
+                      <div key={n.id} className="flex items-center justify-between gap-2 py-1">
+                        <p className="text-sm">{templateLabel(n.template)}</p>
+                        <p className="text-xs text-muted-foreground shrink-0">
+                          {new Date(n.sent_at).toLocaleDateString("nb-NO", { day: "numeric", month: "short" })}
+                          {" "}
+                          {new Date(n.sent_at).toLocaleTimeString("nb-NO", { hour: "2-digit", minute: "2-digit" })}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
                 </section>
               )}
 
