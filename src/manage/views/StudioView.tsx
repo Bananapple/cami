@@ -30,6 +30,8 @@ const EMPTY_CODE = {
 const EMPTY_TEMPLATE = {
   name: "",
   level: "" as string | null,
+  description: "" as string | null,
+  image_url: "" as string | null,
   default_duration_minutes: 60,
   default_price: 250,
   default_max_capacity: 20,
@@ -183,6 +185,26 @@ export function StudioView() {
                   className="w-full px-3 py-2 text-sm bg-background border border-border rounded-md"
                 />
               </div>
+              <div className="space-y-1 col-span-2">
+                <label className="text-xs font-sans text-muted-foreground">Description</label>
+                <textarea
+                  value={newTemplate.description ?? ""}
+                  onChange={(e) => setNewTemplate((t) => ({ ...t, description: e.target.value || null }))}
+                  placeholder="Short description shown on the classes page"
+                  rows={2}
+                  className="w-full px-3 py-2 text-sm bg-background border border-border rounded-md resize-none"
+                />
+              </div>
+              <div className="space-y-1 col-span-2">
+                <label className="text-xs font-sans text-muted-foreground">Image URL</label>
+                <input
+                  type="url"
+                  value={newTemplate.image_url ?? ""}
+                  onChange={(e) => setNewTemplate((t) => ({ ...t, image_url: e.target.value || null }))}
+                  placeholder="https://…"
+                  className="w-full px-3 py-2 text-sm bg-background border border-border rounded-md"
+                />
+              </div>
               <div className="space-y-1">
                 <label className="text-xs font-sans text-muted-foreground">Level</label>
                 <select
@@ -236,6 +258,8 @@ export function StudioView() {
                   await createTemplate.mutateAsync({
                     name: newTemplate.name.trim(),
                     level: newTemplate.level || null,
+                    description: newTemplate.description || null,
+                    image_url: newTemplate.image_url || null,
                     default_duration_minutes: newTemplate.default_duration_minutes,
                     default_price: newTemplate.default_price,
                     default_max_capacity: newTemplate.default_max_capacity,
@@ -277,6 +301,8 @@ export function StudioView() {
                         id: editingTemplate.id,
                         name: editingTemplate.name,
                         level: editingTemplate.level,
+                        description: editingTemplate.description,
+                        image_url: editingTemplate.image_url,
                         default_duration_minutes: editingTemplate.default_duration_minutes,
                         default_price: editingTemplate.default_price,
                         default_max_capacity: editingTemplate.default_max_capacity,
@@ -597,6 +623,25 @@ function TemplateEditRow({
             type="text"
             value={template.name}
             onChange={(e) => onChange({ ...template, name: e.target.value })}
+            className="w-full px-3 py-2 text-sm bg-background border border-border rounded-md"
+          />
+        </div>
+        <div className="space-y-1 col-span-2">
+          <label className="text-xs font-sans text-muted-foreground">Description</label>
+          <textarea
+            value={template.description ?? ""}
+            onChange={(e) => onChange({ ...template, description: e.target.value || null })}
+            rows={2}
+            className="w-full px-3 py-2 text-sm bg-background border border-border rounded-md resize-none"
+          />
+        </div>
+        <div className="space-y-1 col-span-2">
+          <label className="text-xs font-sans text-muted-foreground">Image URL</label>
+          <input
+            type="url"
+            value={template.image_url ?? ""}
+            onChange={(e) => onChange({ ...template, image_url: e.target.value || null })}
+            placeholder="https://…"
             className="w-full px-3 py-2 text-sm bg-background border border-border rounded-md"
           />
         </div>

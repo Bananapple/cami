@@ -5,6 +5,7 @@ import { useStudioContext } from "@/context/StudioContext";
 export type ClassInstance = {
   id: string;
   studio_id: string;
+  template_id: string;
   starts_at: string;
   ends_at: string;
   price: number;
@@ -45,7 +46,7 @@ export function useClassInstances() {
       const { data, error } = await supabase
         .from("class_instances")
         .select(`
-          id, studio_id, starts_at, ends_at, price, max_capacity, booked_count, status,
+          id, studio_id, template_id, starts_at, ends_at, price, max_capacity, booked_count, status,
           class_templates ( name, level ),
           instructors ( display_name, initials ),
           locations ( name, timezone )
@@ -60,6 +61,7 @@ export function useClassInstances() {
       return (data ?? []).map((row: any) => ({
         id: row.id,
         studio_id: row.studio_id,
+        template_id: row.template_id,
         starts_at: row.starts_at,
         ends_at: row.ends_at,
         price: Number(row.price),

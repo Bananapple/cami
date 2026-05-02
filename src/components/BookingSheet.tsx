@@ -22,9 +22,10 @@ type Step = "date" | "confirm" | "auth" | "profile" | "checkout";
 interface BookingSheetProps {
   isOpen: boolean;
   onClose: () => void;
+  templateId?: string;
 }
 
-const BookingSheet = ({ isOpen, onClose }: BookingSheetProps) => {
+const BookingSheet = ({ isOpen, onClose, templateId }: BookingSheetProps) => {
   const [step, setStep] = useState<Step>("date");
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [selectedSession, setSelectedSession] = useState<ClassInstance | null>(null);
@@ -41,7 +42,10 @@ const BookingSheet = ({ isOpen, onClose }: BookingSheetProps) => {
   } | null>(null);
   const [promoError, setPromoError] = useState<string | null>(null);
 
-  const { instances: sessions } = useClassInstances();
+  const { instances: allSessions } = useClassInstances();
+  const sessions = templateId
+    ? allSessions.filter((s) => s.template_id === templateId)
+    : allSessions;
   const { isAuthenticated } = useAuth();
   const { studioName, location } = useStudioConfig();
   const studioCtx = useStudioContext();
