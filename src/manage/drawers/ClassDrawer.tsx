@@ -11,13 +11,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { X } from "lucide-react";
+import { Check, X } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { AttendanceList } from "../components/AttendanceList";
+import { useClassAttendance, attendanceQueryKey } from "../hooks/useClassAttendance";
+import { useClassWaitlist } from "../hooks/useClassWaitlist";
+import { useDrawerStack } from "../hooks/useDrawerStack";
 import { useStudioContext } from "@/context/StudioContext";
 import { formatDateTime } from "@/lib/timezone";
-import { useClassWaitlist } from "../hooks/useClassWaitlist";
 
 type ClassDetail = {
   id: string;
@@ -84,7 +85,14 @@ export function ClassDrawer({
   const tz = cls?.location_timezone ?? studioTz;
   const qc = useQueryClient();
 
+  const { data: allAttendees = [] } = useClassAttendance(cls?.id);
+  const attending = allAttendees.filter((a) => a.status !== "cancelled");
+  const cancelledBookings = allAttendees.filter((a) => a.status === "cancelled");
   const { entries: waitlist, remove: removeFromWaitlist } = useClassWaitlist(cls?.id);
+  const { push } = useDrawerStack();
+
+  type PeopleTab = "attending" | "waitlist" | "cancelled";
+  const [peopleTab, setPeopleTab] = useState<PeopleTab>("attending");
 
   const [cancelOpen, setCancelOpen] = useState(false);
   const [editingCapacity, setEditingCapacity] = useState(false);
@@ -229,68 +237,126 @@ export function ClassDrawer({
                 )}
               </section>
 
-              <section className="pt-4 border-t border-border">
-                <h3 className="text-xs uppercase tracking-wider text-muted-foreground mb-3">
-                  Attendance
-                </h3>
-                <AttendanceList classInstanceId={cls.id} />
-              </section>
+              {/* Segmented people section */}
+              <section className="pt-4 border-t border-border space-y-3">
+                {/* Tab pills */}
+                <div className="flex bg-muted rounded-lg p-1 gap-1">
+                  {([
+                    { key: "attending", label: "Attending", count: attending.length },
+                    { key: "waitlist",  label: "Waitlist",  count: waitlist.length },
+                    { key: "cancelled", label: "Cancelled", count: cancelledBookings.length },
+                  ] as { key: PeopleTab; label: string; count: number }[]).map(({ key, label, count }) => (
+                    <button
+                      key={key}
+                      onClick={() => setPeopleTab(key)}
+                      className={`flex-1 py-1.5 rounded-md text-sm font-sans transition-colors ${
+                        peopleTab === key
+                          ? "bg-background text-foreground shadow-sm"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {label} {count > 0 && <span className="tabular-nums">{count}</span>}
+                    </button>
+                  ))}
+                </div>
 
-              {waitlist.length > 0 && (
-                <section className="pt-4 border-t border-border space-y-2">
-                  <h3 className="text-xs uppercase tracking-wider text-muted-foreground">
-                    Waitlist ({waitlist.length})
-                  </h3>
-                  <div className="divide-y divide-border border border-border rounded-lg overflow-hidden">
-                    {waitlist.map((entry, i) => {
-                      const isOffered = entry.status === "offered";
-                      const expiresIn = entry.offer_expires_at
-                        ? Math.max(0, Math.round((new Date(entry.offer_expires_at).getTime() - Date.now()) / 60_000))
-                        : null;
-                      return (
-                        <div key={entry.id} className="flex items-center gap-3 px-3 py-2.5">
-                          <span className="text-xs text-muted-foreground w-5 shrink-0 tabular-nums">
-                            {i + 1}.
-                          </span>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm truncate">{entry.full_name ?? "—"}</p>
-                            <p className="text-xs text-muted-foreground truncate">{entry.email ?? ""}</p>
-                          </div>
-                          <div className="shrink-0 text-right">
-                            {isOffered ? (
-                              <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600">
-                                Offered{expiresIn !== null ? ` · ${expiresIn}m` : ""}
-                              </span>
-                            ) : (
-                              <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
-                                Waiting
-                              </span>
-                            )}
-                          </div>
-                          <button
-                            onClick={async () => {
-                              if (!confirm(`Remove ${entry.full_name ?? "this person"} from the waitlist?`)) return;
-                              try {
-                                await removeFromWaitlist.mutateAsync(entry.id);
-                                toast.success("Removed from waitlist.");
-                              } catch {
-                                toast.error("Failed to remove.");
-                              }
-                            }}
-                            className="p-1 text-muted-foreground hover:text-destructive transition-colors shrink-0"
-                            title="Remove from waitlist"
-                          >
-                            <X className="w-3.5 h-3.5" />
+                {/* Attending */}
+                {peopleTab === "attending" && (
+                  attending.length === 0 ? (
+                    <p className="text-sm text-muted-foreground py-4 text-center">No bookings yet.</p>
+                  ) : (
+                    <div className="divide-y divide-border border border-border rounded-lg overflow-hidden">
+                      {attending.map((a) => (
+                        <AttendeeRow
+                          key={a.booking_id}
+                          attendee={a}
+                          onNameClick={() => push({ type: "member", id: a.user_id })}
+                          onCheckIn={async () => {
+                            const nowOrNull = a.checked_in_at ? null : new Date().toISOString();
+                            const { error } = await supabase
+                              .from("bookings")
+                              .update({ checked_in_at: nowOrNull })
+                              .eq("id", a.booking_id);
+                            if (error) { toast.error("Failed."); return; }
+                            qc.invalidateQueries({ queryKey: attendanceQueryKey(cls.id) });
+                          }}
+                        />
+                      ))}
+                    </div>
+                  )
+                )}
+
+                {/* Waitlist */}
+                {peopleTab === "waitlist" && (
+                  waitlist.length === 0 ? (
+                    <p className="text-sm text-muted-foreground py-4 text-center">No one on the waitlist.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="divide-y divide-border border border-border rounded-lg overflow-hidden">
+                        {waitlist.map((entry, i) => {
+                          const isOffered = entry.status === "offered";
+                          const expiresIn = entry.offer_expires_at
+                            ? Math.max(0, Math.round((new Date(entry.offer_expires_at).getTime() - Date.now()) / 60_000))
+                            : null;
+                          return (
+                            <div key={entry.id} className="flex items-center gap-3 px-3 py-2.5">
+                              <span className="text-xs text-muted-foreground w-5 shrink-0 tabular-nums">{i + 1}.</span>
+                              <button
+                                onClick={() => push({ type: "member", id: entry.user_id })}
+                                className="flex-1 min-w-0 text-left"
+                              >
+                                <p className="text-sm truncate hover:underline">{entry.full_name ?? "—"}</p>
+                                <p className="text-xs text-muted-foreground truncate">{entry.email ?? ""}</p>
+                              </button>
+                              {isOffered ? (
+                                <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 shrink-0">
+                                  Offered{expiresIn !== null ? ` · ${expiresIn}m` : ""}
+                                </span>
+                              ) : (
+                                <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground shrink-0">
+                                  Waiting
+                                </span>
+                              )}
+                              <button
+                                onClick={async () => {
+                                  if (!confirm(`Remove ${entry.full_name ?? "this person"} from the waitlist?`)) return;
+                                  try {
+                                    await removeFromWaitlist.mutateAsync(entry.id);
+                                    toast.success("Removed from waitlist.");
+                                  } catch { toast.error("Failed to remove."); }
+                                }}
+                                className="p-1 text-muted-foreground hover:text-destructive transition-colors shrink-0"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <p className="text-xs text-muted-foreground">Spots offered automatically when a booking is cancelled.</p>
+                    </div>
+                  )
+                )}
+
+                {/* Cancelled */}
+                {peopleTab === "cancelled" && (
+                  cancelledBookings.length === 0 ? (
+                    <p className="text-sm text-muted-foreground py-4 text-center">No cancellations.</p>
+                  ) : (
+                    <div className="divide-y divide-border border border-border rounded-lg overflow-hidden">
+                      {cancelledBookings.map((a) => (
+                        <div key={a.booking_id} className="flex items-center gap-3 px-3 py-2.5 opacity-60">
+                          <Avatar name={a.full_name} />
+                          <button onClick={() => push({ type: "member", id: a.user_id })} className="flex-1 min-w-0 text-left">
+                            <p className="text-sm truncate hover:underline line-through">{a.full_name}</p>
+                            <p className="text-xs text-muted-foreground truncate">{a.email ?? ""}</p>
                           </button>
                         </div>
-                      );
-                    })}
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Spots are offered automatically when a booking is cancelled.
-                  </p>
-                </section>
-              )}
+                      ))}
+                    </div>
+                  )
+                )}
+              </section>
 
               {!isCancelled && (
                 <section className="space-y-2 pt-4 border-t border-border">
@@ -341,5 +407,51 @@ export function ClassDrawer({
         </AlertDialogContent>
       </AlertDialog>
     </>
+  );
+}
+
+function Avatar({ name }: { name: string }) {
+  const initials = name.split(" ").map((p) => p[0]).join("").slice(0, 2).toUpperCase();
+  return (
+    <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-medium shrink-0">
+      {initials}
+    </div>
+  );
+}
+
+function AttendeeRow({ attendee, onNameClick, onCheckIn }: {
+  attendee: import("../hooks/useClassAttendance").Attendee;
+  onNameClick: () => void;
+  onCheckIn: () => void;
+}) {
+  const checkedIn = !!attendee.checked_in_at;
+  const badge = attendee.membership_id
+    ? { label: "Membership", cls: "bg-muted text-muted-foreground" }
+    : { label: "Paid", cls: "bg-green-500/10 text-green-700" };
+
+  return (
+    <div className="flex items-center gap-3 px-3 py-2.5">
+      <Avatar name={attendee.full_name} />
+      <button onClick={onNameClick} className="flex-1 min-w-0 text-left">
+        <div className="flex items-center gap-2 flex-wrap">
+          <p className="text-sm truncate hover:underline">{attendee.full_name}</p>
+          <span className={`text-xs px-2 py-0.5 rounded-full font-sans ${badge.cls}`}>
+            {badge.label}
+          </span>
+        </div>
+        <p className="text-xs text-muted-foreground truncate">{attendee.email ?? ""}</p>
+      </button>
+      <button
+        onClick={onCheckIn}
+        title={checkedIn ? "Mark as not checked in" : "Check in"}
+        className={`w-7 h-7 rounded-full flex items-center justify-center transition-colors shrink-0 ${
+          checkedIn
+            ? "bg-green-500/15 text-green-600 hover:bg-green-500/25"
+            : "border border-border text-muted-foreground hover:border-primary hover:text-primary"
+        }`}
+      >
+        <Check className="w-3.5 h-3.5" />
+      </button>
+    </div>
   );
 }
