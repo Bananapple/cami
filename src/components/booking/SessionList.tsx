@@ -53,7 +53,7 @@ const SessionList = ({ sessions, selectedDate, onSelectSession }: SessionListPro
               : null;
             const isFull = spotsLeft !== null && spotsLeft <= 0;
             const isPast = new Date(session.starts_at) <= new Date();
-            const isDisabled = isFull || isPast;
+            const isDisabled = isPast;
             const nearlyFull = !isPast && spotsLeft !== null && spotsLeft > 0 && spotsLeft <= 3;
 
             return (
@@ -64,6 +64,8 @@ const SessionList = ({ sessions, selectedDate, onSelectSession }: SessionListPro
                 className={`w-full flex items-center gap-4 p-4 rounded-lg border bg-card transition-all group text-left ${
                   isDisabled
                     ? "border-border opacity-40 cursor-not-allowed"
+                    : isFull
+                    ? "border-border hover:border-primary/30"
                     : "border-border hover:border-primary/50"
                 }`}
               >
@@ -93,14 +95,16 @@ const SessionList = ({ sessions, selectedDate, onSelectSession }: SessionListPro
                   <span className="text-xs font-sans text-muted-foreground shrink-0">Passed</span>
                 )}
                 {!isPast && isFull && (
-                  <span className="text-xs font-sans text-muted-foreground shrink-0">Full</span>
+                  <span className="text-xs font-sans text-muted-foreground shrink-0">
+                    Full · Waitlist →
+                  </span>
                 )}
                 {nearlyFull && (
                   <span className="text-xs font-sans text-amber-600 shrink-0">
                     {spotsLeft} spot{spotsLeft === 1 ? "" : "s"} left
                   </span>
                 )}
-                {!isDisabled && (
+                {!isFull && !isDisabled && (
                   <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors flex-shrink-0" />
                 )}
               </button>

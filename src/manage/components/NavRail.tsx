@@ -1,7 +1,8 @@
 import { NavLink } from "react-router-dom";
-import { Calendar, CalendarDays, Users, Settings } from "lucide-react";
+import { LayoutDashboard, Calendar, CalendarDays, Users, Settings } from "lucide-react";
 
 const items = [
+  { to: "/manage/home", label: "Home", Icon: LayoutDashboard },
   { to: "/manage/today", label: "Today", Icon: Calendar },
   { to: "/manage/schedule", label: "Schedule", Icon: CalendarDays },
   { to: "/manage/clients", label: "Clients", Icon: Users },

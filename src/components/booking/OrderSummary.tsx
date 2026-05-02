@@ -9,9 +9,11 @@ interface OrderSummaryProps {
   bookingMode: "subscription" | "credit" | "dropin";
   planName?: string | null;
   creditsRemaining?: number | null;
+  discountMinor?: number;
+  discountLabel?: string;
 }
 
-const OrderSummary = ({ session, selectedDate, bookingMode, planName, creditsRemaining }: OrderSummaryProps) => {
+const OrderSummary = ({ session, selectedDate, bookingMode, planName, creditsRemaining, discountMinor, discountLabel }: OrderSummaryProps) => {
   const studioCtx = useStudioContext();
   const tz = session.location_timezone ?? studioCtx?.studio?.timezone ?? "Europe/Oslo";
 
@@ -80,17 +82,38 @@ const OrderSummary = ({ session, selectedDate, bookingMode, planName, creditsRem
         </p>
       </div>
 
-      <div className="border-t border-border/50 pt-4 flex items-baseline justify-between">
-        <span className="text-xs font-sans font-medium uppercase tracking-wider text-foreground/60">
-          Total
-        </span>
-        <span className="text-2xl font-serif text-foreground">
-          {bookingMode === "dropin"
-            ? `kr ${(session.price ?? 250).toLocaleString("nb-NO")}`
-            : bookingMode === "credit"
-              ? "1 credit"
-              : "Included"}
-        </span>
+      <div className="border-t border-border/50 pt-4 space-y-1">
+        {bookingMode === "dropin" && discountMinor && discountMinor > 0 && discountLabel && (
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-sans text-green-600">{discountLabel}</span>
+            <span className="text-xs font-sans text-green-600">
+              − kr {(discountMinor / 100).toLocaleString("nb-NO")}
+            </span>
+          </div>
+        )}
+        <div className="flex items-baseline justify-between">
+          <span className="text-xs font-sans font-medium uppercase tracking-wider text-foreground/60">
+            Total
+          </span>
+          {bookingMode === "dropin" && discountMinor && discountMinor > 0 ? (
+            <div className="text-right">
+              <span className="text-sm font-serif text-foreground/40 line-through mr-2">
+                kr {(session.price ?? 250).toLocaleString("nb-NO")}
+              </span>
+              <span className="text-2xl font-serif text-foreground">
+                kr {(((session.price ?? 250) * 100 - discountMinor) / 100).toLocaleString("nb-NO")}
+              </span>
+            </div>
+          ) : (
+            <span className="text-2xl font-serif text-foreground">
+              {bookingMode === "dropin"
+                ? `kr ${(session.price ?? 250).toLocaleString("nb-NO")}`
+                : bookingMode === "credit"
+                  ? "1 credit"
+                  : "Included"}
+            </span>
+          )}
+        </div>
       </div>
     </div>
   );

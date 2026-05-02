@@ -27,6 +27,19 @@ const ScrollToTop = () => {
   return null;
 };
 
+const RefCapture = () => {
+  useEffect(() => {
+    const ref = new URLSearchParams(window.location.search).get("ref");
+    if (ref) {
+      sessionStorage.setItem("brie_ref_code", ref.trim().toUpperCase());
+      const url = new URL(window.location.href);
+      url.searchParams.delete("ref");
+      window.history.replaceState({}, "", url.toString());
+    }
+  }, []);
+  return null;
+};
+
 const App = () => (
   <ErrorBoundary>
   <QueryClientProvider client={queryClient}>
@@ -36,6 +49,7 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
         <ScrollToTop />
+        <RefCapture />
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/classes" element={<Programs />} />

@@ -75,6 +75,8 @@ export interface Studio {
   currency: string;                           // ISO 4217, e.g. "NOK"
   cancellation_window_hours: number;
   waitlist_offer_window_minutes: number;
+  referral_enabled: boolean;
+  referral_discount_percent: number;
   // Payment provider linkage lives on StudioPaymentProvider rows, not here
   is_active: boolean;
   created_at: ISODateTime;

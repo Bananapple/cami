@@ -75,7 +75,7 @@ Deno.serve(async (req) => {
     // --- Always cancel the booking first ---
     await admin
       .from("bookings")
-      .update({ status: "cancelled", cancelled_at: new Date().toISOString() })
+      .update({ status: "cancelled" })
       .eq("id", booking_id);
 
     // --- Credit-paid booking: return credit if within refund window ---

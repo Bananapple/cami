@@ -3,12 +3,13 @@ import { useProfile } from "@/hooks/useProfile";
 import { useBookings } from "@/hooks/useBookings";
 import { useMembership } from "@/hooks/useMembership";
 import { useStudioMember } from "@/hooks/useStudioMember";
+import { useWaitlist } from "@/hooks/useWaitlist";
 import { useState } from "react";
 import { Link, Navigate } from "react-router-dom";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import BookingSheet from "@/components/BookingSheet";
-import { LogOut, CreditCard, User, X } from "lucide-react";
+import { LogOut, CreditCard, User, X, Copy } from "lucide-react";
 import { toast } from "sonner";
 import { useStudioContext } from "@/context/StudioContext";
 import { formatTime, formatDate } from "@/lib/timezone";
@@ -29,6 +30,7 @@ const Dashboard = () => {
   const { bookings, cancelBooking, error: bookingsError } = useBookings();
   const { membership } = useMembership();
   const { studioMember } = useStudioMember();
+  const { waitlist, leave: leaveWaitlist } = useWaitlist();
   const studioCtx = useStudioContext();
   const studioTz = studioCtx?.studio?.timezone ?? "Europe/Oslo";
   const [bookingOpen, setBookingOpen] = useState(false);
@@ -204,6 +206,79 @@ const Dashboard = () => {
               </button>
             </div>
 
+            {/* Waitlist */}
+            {waitlist.length > 0 && (
+              <div className="bg-card rounded-xl p-6 space-y-4">
+                <h2 className="text-lg font-serif text-foreground">Waitlist</h2>
+                <div className="space-y-3">
+                  {waitlist.map((entry) => {
+                    const ci = entry.class_instances;
+                    const tz = ci?.locations?.timezone ?? studioTz;
+                    const startsAt = ci?.starts_at ? new Date(ci.starts_at) : null;
+                    const isOffered = entry.status === "offered";
+                    const offerExpires = entry.offer_expires_at ? new Date(entry.offer_expires_at) : null;
+
+                    return (
+                      <div
+                        key={entry.id}
+                        className={`flex items-start gap-4 p-4 rounded-lg border ${
+                          isOffered ? "border-amber-300 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-700" : "border-border"
+                        }`}
+                      >
+                        {startsAt && (
+                          <div className="text-center min-w-[50px]">
+                            <p className="text-xs font-sans font-medium uppercase text-muted-foreground">
+                              {formatDate(ci!.starts_at, tz, { weekday: "short" })}
+                            </p>
+                            <p className="text-lg font-serif text-foreground">
+                              {startsAt.toLocaleDateString("en-CA", { timeZone: tz }).split("-")[2]}
+                            </p>
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-serif text-foreground">
+                            {ci?.class_templates?.name ?? "Class"}
+                          </p>
+                          {startsAt && (
+                            <p className="text-xs text-muted-foreground font-sans mt-0.5">
+                              {formatTime(ci!.starts_at, tz)}
+                            </p>
+                          )}
+                          {isOffered && (
+                            <p className="text-xs font-sans text-amber-700 dark:text-amber-400 mt-1">
+                              Spot available!{offerExpires ? ` Accept before ${offerExpires.toLocaleTimeString("nb-NO", { hour: "2-digit", minute: "2-digit" })}` : ""}
+                            </p>
+                          )}
+                          {!isOffered && (
+                            <p className="text-xs text-muted-foreground font-sans mt-0.5">Waiting for a spot</p>
+                          )}
+                        </div>
+                        <div className="flex flex-col gap-2 shrink-0">
+                          {isOffered && (
+                            <button
+                              onClick={() => setBookingOpen(true)}
+                              className="text-xs px-3 py-1.5 bg-primary text-primary-foreground rounded-md font-sans hover:bg-primary/80 transition-colors"
+                            >
+                              Book now
+                            </button>
+                          )}
+                          <button
+                            onClick={() => leaveWaitlist.mutate(entry.id, {
+                              onError: () => toast("Failed to leave waitlist."),
+                              onSuccess: () => toast("Removed from waitlist."),
+                            })}
+                            className="text-xs px-3 py-1.5 border border-border rounded-md text-muted-foreground font-sans hover:text-foreground transition-colors"
+                          >
+                            Leave
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* Membership */}
             <div className="bg-card rounded-xl p-6 space-y-4">
               <h2 className="text-lg font-serif text-foreground">Membership</h2>
@@ -238,6 +313,39 @@ const Dashboard = () => {
                 </div>
               )}
             </div>
+
+            {/* Referral link — only show when the program is active */}
+            {studioMember?.referral_code && studioCtx?.studio?.referral_enabled && (() => {
+              const referralEnabled = studioCtx?.studio?.referral_enabled;
+              const referralPct = (studioCtx?.studio as any)?.referral_discount_percent;
+              return (
+                <div className="bg-card rounded-xl p-6 space-y-3">
+                  <h2 className="text-lg font-serif text-foreground">Invite a Friend</h2>
+                  <p className="text-sm text-muted-foreground font-serif">
+                    {referralEnabled && referralPct
+                      ? `Share your link — your friend gets ${referralPct}% off their first class.`
+                      : "Share your link and invite friends to try a class."}
+                  </p>
+                  <div className="flex gap-2">
+                    <input
+                      readOnly
+                      value={`${window.location.origin}?ref=${studioMember.referral_code}`}
+                      className="flex-1 text-xs font-sans bg-muted rounded-lg px-3 py-2.5 text-foreground/70 truncate border border-border"
+                    />
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(`${window.location.origin}?ref=${studioMember.referral_code}`);
+                        toast("Link copied to clipboard!");
+                      }}
+                      className="shrink-0 flex items-center gap-1.5 px-3 py-2.5 bg-primary text-primary-foreground text-xs font-sans rounded-lg hover:bg-primary/80 transition-colors"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                      Copy
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* FAQ link */}
             <p className="text-sm text-muted-foreground font-serif text-center">

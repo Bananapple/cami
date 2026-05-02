@@ -41,7 +41,7 @@ const JoinNow = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
             {products.map((product) => (
               <div key={product.id} className="bg-card rounded-xl overflow-hidden flex flex-col">
-                {product.image_url && (
+                {product.image_url ? (
                   <div className="relative">
                     <img
                       src={product.image_url}
@@ -55,7 +55,13 @@ const JoinNow = () => {
                       </span>
                     )}
                   </div>
-                )}
+                ) : product.tag ? (
+                  <div className="px-6 pt-5">
+                    <span className="text-xs font-sans font-medium uppercase tracking-wider bg-background/90 text-foreground border border-border px-3 py-1.5 rounded-full">
+                      {product.tag}
+                    </span>
+                  </div>
+                ) : null}
                 <div className="p-6 flex flex-col flex-1">
                   <h3 className="font-serif text-xl text-card-foreground mb-2">{product.name}</h3>
                   {product.description && (

@@ -169,6 +169,101 @@ Deno.serve(async (req) => {
       }
     }
 
+    // --- Validate and apply discount code ---
+    // Two paths: (1) staff-created promo code in discount_codes, (2) peer referral code
+    // from studio_members.referral_code. Promo codes apply to anything; referral codes
+    // apply to first-time drop-in bookings only and are governed by the studio's
+    // referral program settings.
+    let discountMinor = 0;
+    let resolvedDiscountCodeId: string | null = null;
+
+    if (discount_code) {
+      const normalizedCode = discount_code.trim().toUpperCase();
+
+      // --- Path 1: promo code ---
+      const { data: promoCode } = await adminClient
+        .from("discount_codes")
+        .select("id, discount_type, discount_value, valid_from, valid_until, max_redemptions, times_redeemed")
+        .eq("studio_id", studioId)
+        .eq("code", normalizedCode)
+        .eq("is_active", true)
+        .maybeSingle();
+
+      if (promoCode) {
+        const now = new Date();
+        const withinWindow =
+          (!promoCode.valid_from || now >= new Date(promoCode.valid_from)) &&
+          (!promoCode.valid_until || now <= new Date(promoCode.valid_until));
+        const withinLimit = promoCode.max_redemptions === null || promoCode.times_redeemed < promoCode.max_redemptions;
+        const { count: alreadyUsed } = await adminClient
+          .from("discount_redemptions")
+          .select("*", { count: "exact", head: true })
+          .eq("code_id", promoCode.id)
+          .eq("redeemed_by_user_id", user.id);
+
+        if (withinWindow && withinLimit && (alreadyUsed ?? 0) === 0) {
+          if (promoCode.discount_type === "percent") {
+            discountMinor = Math.round(amountMinor * Number(promoCode.discount_value) / 100);
+          } else {
+            discountMinor = Math.round(Number(promoCode.discount_value) * 100);
+          }
+          discountMinor = Math.min(discountMinor, amountMinor);
+          resolvedDiscountCodeId = promoCode.id;
+        }
+      }
+
+      // --- Path 2: referral code (class bookings only, first-time customers only) ---
+      if (!resolvedDiscountCodeId && resolvedClassInstance) {
+        const { data: referrerMember } = await adminClient
+          .from("studio_members")
+          .select("user_id")
+          .eq("studio_id", studioId)
+          .eq("referral_code", normalizedCode)
+          .maybeSingle();
+
+        if (referrerMember && referrerMember.user_id !== user.id) {
+          const { data: studioSettings } = await adminClient
+            .from("studios")
+            .select("referral_enabled, referral_discount_percent")
+            .eq("id", studioId)
+            .single();
+
+          if (studioSettings?.referral_enabled && studioSettings.referral_discount_percent > 0) {
+            // First-time check: no prior confirmed bookings at this studio
+            const { count: priorBookings } = await adminClient
+              .from("bookings")
+              .select("*", { count: "exact", head: true })
+              .eq("user_id", user.id)
+              .eq("studio_id", studioId)
+              .eq("status", "confirmed");
+
+            // One referral per user per studio
+            const { count: priorReferrals } = await adminClient
+              .from("referrals")
+              .select("*", { count: "exact", head: true })
+              .eq("referred_user_id", user.id)
+              .eq("studio_id", studioId);
+
+            if ((priorBookings ?? 0) === 0 && (priorReferrals ?? 0) === 0) {
+              discountMinor = Math.round(amountMinor * studioSettings.referral_discount_percent / 100);
+              discountMinor = Math.min(discountMinor, amountMinor);
+
+              await adminClient.from("referrals").insert({
+                studio_id: studioId,
+                referrer_user_id: referrerMember.user_id,
+                referred_user_id: user.id,
+                referral_code: normalizedCode,
+                status: "pending",
+                discount_applied_percent: studioSettings.referral_discount_percent,
+              });
+            }
+          }
+        }
+      }
+
+      amountMinor -= discountMinor;
+    }
+
     // --- Auto-enroll user as a member of this studio ---
     await adminClient.from("studio_members").upsert(
       { studio_id: studioId, user_id: user.id, role: "member", is_active: true },
@@ -214,6 +309,16 @@ Deno.serve(async (req) => {
       .select("id")
       .single();
     if (paymentErr || !payment) return json({ error: "Failed to create payment record" }, 500);
+
+    // --- Record discount redemption (trigger auto-increments times_redeemed) ---
+    if (resolvedDiscountCodeId && discountMinor > 0) {
+      await adminClient.from("discount_redemptions").insert({
+        code_id: resolvedDiscountCodeId,
+        redeemed_by_user_id: user.id,
+        payment_id: payment.id,
+        discount_applied_minor: discountMinor,
+      });
+    }
 
     // --- Class booking only: insert pending booking row ---
     let bookingId: string | null = null;

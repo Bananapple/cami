@@ -24,8 +24,7 @@ export function useProfile() {
     mutationFn: async (updates: { full_name?: string; avatar_initials?: string; phone_number?: string; billing_address?: Record<string, string> }) => {
       const { data, error } = await supabase
         .from("profiles")
-        .update(updates)
-        .eq("id", user!.id)
+        .upsert({ id: user!.id, email: user!.email, ...updates })
         .select()
         .single();
       if (error) throw error;

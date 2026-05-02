@@ -79,9 +79,10 @@ To activate for a studio: set `FRISBII_API_KEY` + `FRISBII_WEBHOOK_SECRET` secre
 ### Staff product management UI
 Add/edit/deactivate products from manager panel without touching the DB directly.
 
-### Referral System
-- `studio_members.referral_code` (unique per studio) and `studio_members.referred_by_user_id` already in `0001`
-- Still need: `referral_rewards` table `(studio_id, referrer_id, referred_id, reward_type, redeemed_at)` and the trigger/Edge Function that issues rewards on first booking or plan activation
+### ✅ Discount Codes + Referral Program — IMPLEMENTED (2026-05-02)
+- `discount_codes` + `discount_redemptions` tables (`0012`); staff UI in StudioView; promo input in BookingSheet; `validate-discount` Edge Function for client-side preview; applied in `create-checkout`
+- `referral_enabled` / `referral_discount_percent` on `studios`; `referrals` table; auto-generated `referral_code` per `studio_members` row; first-timer-only validation in `create-checkout`; Dashboard referral link; `?ref=CODE` URL capture via `RefCapture` component
+- **Still TODO**: referrer reward (e.g. +1 credit after referred user completes first booking)
 
 ### Guest Passes
 - New table: `guest_passes (studio_id, owner_user_id, guest_email, class_instance_id, used_at)`
