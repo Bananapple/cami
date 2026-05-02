@@ -9,9 +9,10 @@ DROP POLICY IF EXISTS "anon_read_schedule_rules" ON schedule_rules;
 CREATE POLICY "anon_read_schedule_rules" ON schedule_rules
   FOR SELECT TO anon
   USING (
-    studio_id IN (
+    studio_id = (
       SELECT id FROM studios
-      WHERE slug = current_setting('request.headers', true)::json->>'x-studio-slug'
+      WHERE slug = nullif(current_setting('request.headers', true)::json->>'x-studio-slug', '')
+      LIMIT 1
     )
   );
 
