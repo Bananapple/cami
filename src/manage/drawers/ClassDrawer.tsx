@@ -267,13 +267,18 @@ export function ClassDrawer({
                   ) : (
                     <div className="space-y-2">
                       {cls.ends_at < new Date().toISOString() && (
-                        <div className="flex gap-3 text-sm px-1">
+                        <div className="flex flex-wrap gap-x-3 gap-y-1 text-sm px-1">
                           <span className="text-green-600 font-medium">
                             {attending.filter((a) => a.checked_in_at).length} attended
                           </span>
                           {attending.filter((a) => !a.checked_in_at).length > 0 && (
                             <span className="text-amber-600">
                               · {attending.filter((a) => !a.checked_in_at).length} no-show
+                            </span>
+                          )}
+                          {waitlist.length > 0 && (
+                            <span className="text-muted-foreground">
+                              · {waitlist.length} waitlisted
                             </span>
                           )}
                         </div>

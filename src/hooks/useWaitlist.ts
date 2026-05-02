@@ -42,7 +42,11 @@ export function useWaitlist() {
         .in("status", ["waiting", "offered"])
         .order("joined_at");
       if (error) throw error;
-      return (data ?? []) as any[];
+      // Filter out entries for classes that have already started — those are stale
+      const now = new Date().toISOString();
+      return ((data ?? []) as any[]).filter(
+        (e) => e.class_instances?.starts_at && e.class_instances.starts_at > now
+      );
     },
   });
 
