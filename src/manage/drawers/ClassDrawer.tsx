@@ -11,11 +11,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { X } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { AttendanceList } from "../components/AttendanceList";
 import { useStudioContext } from "@/context/StudioContext";
 import { formatDateTime } from "@/lib/timezone";
+import { useClassWaitlist } from "../hooks/useClassWaitlist";
 
 type ClassDetail = {
   id: string;
@@ -81,6 +83,8 @@ export function ClassDrawer({
   const studioTz = studioCtx?.studio?.timezone ?? "Europe/Oslo";
   const tz = cls?.location_timezone ?? studioTz;
   const qc = useQueryClient();
+
+  const { entries: waitlist, remove: removeFromWaitlist } = useClassWaitlist(cls?.id);
 
   const [cancelOpen, setCancelOpen] = useState(false);
   const [editingCapacity, setEditingCapacity] = useState(false);
@@ -231,6 +235,62 @@ export function ClassDrawer({
                 </h3>
                 <AttendanceList classInstanceId={cls.id} />
               </section>
+
+              {waitlist.length > 0 && (
+                <section className="pt-4 border-t border-border space-y-2">
+                  <h3 className="text-xs uppercase tracking-wider text-muted-foreground">
+                    Waitlist ({waitlist.length})
+                  </h3>
+                  <div className="divide-y divide-border border border-border rounded-lg overflow-hidden">
+                    {waitlist.map((entry, i) => {
+                      const isOffered = entry.status === "offered";
+                      const expiresIn = entry.offer_expires_at
+                        ? Math.max(0, Math.round((new Date(entry.offer_expires_at).getTime() - Date.now()) / 60_000))
+                        : null;
+                      return (
+                        <div key={entry.id} className="flex items-center gap-3 px-3 py-2.5">
+                          <span className="text-xs text-muted-foreground w-5 shrink-0 tabular-nums">
+                            {i + 1}.
+                          </span>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm truncate">{entry.full_name ?? "—"}</p>
+                            <p className="text-xs text-muted-foreground truncate">{entry.email ?? ""}</p>
+                          </div>
+                          <div className="shrink-0 text-right">
+                            {isOffered ? (
+                              <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600">
+                                Offered{expiresIn !== null ? ` · ${expiresIn}m` : ""}
+                              </span>
+                            ) : (
+                              <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+                                Waiting
+                              </span>
+                            )}
+                          </div>
+                          <button
+                            onClick={async () => {
+                              if (!confirm(`Remove ${entry.full_name ?? "this person"} from the waitlist?`)) return;
+                              try {
+                                await removeFromWaitlist.mutateAsync(entry.id);
+                                toast.success("Removed from waitlist.");
+                              } catch {
+                                toast.error("Failed to remove.");
+                              }
+                            }}
+                            className="p-1 text-muted-foreground hover:text-destructive transition-colors shrink-0"
+                            title="Remove from waitlist"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Spots are offered automatically when a booking is cancelled.
+                  </p>
+                </section>
+              )}
 
               {!isCancelled && (
                 <section className="space-y-2 pt-4 border-t border-border">
