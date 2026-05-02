@@ -7,6 +7,8 @@ export type MemberBooking = {
   starts_at: string;
   class_name: string;
   location_timezone: string | null;
+  booked_at: string | null;
+  cancelled_at: string | null;
 };
 
 export function useMemberBookings(userId: string | undefined) {
@@ -17,7 +19,7 @@ export function useMemberBookings(userId: string | undefined) {
       const { data, error } = await supabase
         .from("bookings")
         .select(`
-          id, status,
+          id, status, booked_at, cancelled_at,
           class_instances (
             starts_at,
             class_templates ( name ),
@@ -25,23 +27,21 @@ export function useMemberBookings(userId: string | undefined) {
           )
         `)
         .eq("user_id", userId)
-        .eq("status", "confirmed")
-        .order("id");
+        .in("status", ["confirmed", "cancelled"])
+        .order("booked_at", { ascending: false })
+        .limit(30);
 
       if (error) throw error;
 
-      return (data ?? [])
-        .filter((b: any) => {
-          const startsAt = b.class_instances?.starts_at;
-          return startsAt && new Date(startsAt) > new Date();
-        })
-        .map((b: any) => ({
-          id: b.id,
-          status: b.status,
-          starts_at: b.class_instances?.starts_at ?? "",
-          class_name: b.class_instances?.class_templates?.name ?? "Class",
-          location_timezone: b.class_instances?.locations?.timezone ?? null,
-        }));
+      return (data ?? []).map((b: any) => ({
+        id: b.id,
+        status: b.status,
+        starts_at: b.class_instances?.starts_at ?? "",
+        class_name: b.class_instances?.class_templates?.name ?? "Class",
+        location_timezone: b.class_instances?.locations?.timezone ?? null,
+        booked_at: b.booked_at ?? null,
+        cancelled_at: b.cancelled_at ?? null,
+      }));
     },
   });
 }
@@ -70,6 +70,7 @@ export function useManagerCancelBooking(userId: string | undefined) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["manage", "member", userId, "bookings"] });
+      queryClient.invalidateQueries({ queryKey: ["manage", "clients"] });
       queryClient.invalidateQueries({ queryKey: ["manage", "today", "classes"] });
       queryClient.invalidateQueries({ queryKey: ["manage", "class"] });
     },

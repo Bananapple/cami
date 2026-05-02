@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
@@ -8,6 +8,20 @@ import { useProducts, type Product } from "@/hooks/useProducts";
 const JoinNow = () => {
   const { products, isLoading, error } = useProducts();
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [highlightedProductId, setHighlightedProductId] = useState<string | null>(null);
+  const cardRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+  useEffect(() => {
+    const productId = new URLSearchParams(window.location.search).get("product");
+    if (!productId || products.length === 0) return;
+    setHighlightedProductId(productId);
+    const el = cardRefs.current[productId];
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+    const timer = setTimeout(() => setHighlightedProductId(null), 2000);
+    return () => clearTimeout(timer);
+  }, [products]);
 
   const formatPrice = (p: Product) => {
     const symbol = p.currency === "NOK" ? "kr" : p.currency;
@@ -40,7 +54,15 @@ const JoinNow = () => {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
             {products.map((product) => (
-              <div key={product.id} className="bg-card rounded-xl overflow-hidden flex flex-col">
+              <div
+                key={product.id}
+                ref={(el) => { cardRefs.current[product.id] = el; }}
+                className={`bg-card rounded-xl overflow-hidden flex flex-col transition-shadow duration-500 ${
+                  highlightedProductId === product.id
+                    ? "ring-2 ring-primary shadow-lg"
+                    : ""
+                }`}
+              >
                 {product.image_url ? (
                   <div className="relative">
                     <img
