@@ -224,7 +224,7 @@ export function MemberDrawer({
 
               {/* Stats */}
               <section className="pt-4 border-t border-border space-y-3">
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-4 gap-3">
                   <div>
                     <p className="text-xs uppercase tracking-wider text-muted-foreground">Level</p>
                     <p className="text-base font-serif mt-1">{member.level ?? "—"}</p>
@@ -234,7 +234,13 @@ export function MemberDrawer({
                     <p className="text-base font-serif mt-1">{member.total_sessions}</p>
                   </div>
                   <div>
-                    <p className="text-xs uppercase tracking-wider text-muted-foreground">Member since</p>
+                    <p className="text-xs uppercase tracking-wider text-muted-foreground">No-shows</p>
+                    <p className={`text-base font-serif mt-1 ${member.no_shows > 0 ? "text-amber-600" : ""}`}>
+                      {member.no_shows}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-wider text-muted-foreground">Since</p>
                     <p className="text-base font-serif mt-1">
                       {member.joined_at
                         ? new Date(member.joined_at).toLocaleDateString("nb-NO", { month: "short", year: "numeric" })

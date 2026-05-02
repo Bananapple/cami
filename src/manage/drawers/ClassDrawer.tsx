@@ -265,6 +265,19 @@ export function ClassDrawer({
                   attending.length === 0 ? (
                     <p className="text-sm text-muted-foreground py-4 text-center">No bookings yet.</p>
                   ) : (
+                    <div className="space-y-2">
+                      {cls.ends_at < new Date().toISOString() && (
+                        <div className="flex gap-3 text-sm px-1">
+                          <span className="text-green-600 font-medium">
+                            {attending.filter((a) => a.checked_in_at).length} attended
+                          </span>
+                          {attending.filter((a) => !a.checked_in_at).length > 0 && (
+                            <span className="text-amber-600">
+                              · {attending.filter((a) => !a.checked_in_at).length} no-show
+                            </span>
+                          )}
+                        </div>
+                      )}
                     <div className="divide-y divide-border border border-border rounded-lg overflow-hidden">
                       {attending.map((a) => (
                         <AttendeeRow
@@ -282,6 +295,7 @@ export function ClassDrawer({
                           }}
                         />
                       ))}
+                    </div>
                     </div>
                   )
                 )}

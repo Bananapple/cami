@@ -16,6 +16,7 @@ export type ManagerMember = {
   phone_number: string | null;
   level: string | null;
   total_sessions: number;
+  no_shows: number;
   joined_at: string | null;
   membership: MemberMembership | null;
 };
@@ -27,10 +28,12 @@ export function useMember(userId: string | undefined) {
     queryFn: async (): Promise<ManagerMember | null> => {
       if (!userId) return null;
 
+      const now = new Date().toISOString();
       const [
         { data: profile, error: profileErr },
         { data: studioMember },
         { data: memberships },
+        { data: noShowBookings },
       ] = await Promise.all([
         supabase
           .from("profiles")
@@ -48,6 +51,13 @@ export function useMember(userId: string | undefined) {
           .eq("user_id", userId)
           .eq("status", "active")
           .limit(1),
+        supabase
+          .from("bookings")
+          .select("id, class_instances!inner(ends_at)")
+          .eq("user_id", userId)
+          .eq("status", "confirmed")
+          .is("checked_in_at", null)
+          .lt("class_instances.ends_at", now),
       ]);
 
       if (profileErr) throw profileErr;
@@ -71,6 +81,7 @@ export function useMember(userId: string | undefined) {
         phone_number: profile.phone_number ?? null,
         level: studioMember?.level ?? null,
         total_sessions: studioMember?.total_sessions ?? 0,
+        no_shows: (noShowBookings ?? []).length,
         joined_at: (studioMember as any)?.joined_at ?? null,
         membership,
       };
