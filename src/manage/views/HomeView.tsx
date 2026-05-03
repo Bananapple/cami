@@ -98,11 +98,15 @@ function Sparkline({ data }: { data: SparkPoint[] }) {
 
   return (
     <div className="border border-border rounded-xl p-5 space-y-3">
-      <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Booking trend</p>
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Booking trend</p>
+        <span className="text-[10px] text-muted-foreground/60">last bar = in progress</span>
+      </div>
       <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-14" preserveAspectRatio="none">
         {data.map((d, i) => {
           const barH = max > 0 ? (d.count / max) * h : 0;
           const x = i * (w / data.length);
+          const isCurrent = i === data.length - 1;
           return (
             <rect
               key={i}
@@ -110,7 +114,7 @@ function Sparkline({ data }: { data: SparkPoint[] }) {
               y={h - barH}
               width={barW}
               height={barH}
-              className="fill-primary/60"
+              className={isCurrent ? "fill-primary/25" : "fill-primary/60"}
               rx="2"
             />
           );
