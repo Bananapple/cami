@@ -67,7 +67,7 @@ function getSparkPeriods(period: Period): { start: Date; end: Date; label: strin
   const now = new Date();
   const periods: { start: Date; end: Date; label: string }[] = [];
 
-  for (let i = 12; i >= 1; i--) {
+  for (let i = 11; i >= 0; i--) {
     if (period === "week") {
       const day = now.getDay();
       const diff = (day + 6) % 7;
@@ -82,7 +82,7 @@ function getSparkPeriods(period: Period): { start: Date; end: Date; label: strin
         label: weekStart.toLocaleDateString("en-GB", { day: "numeric", month: "short" }),
       });
     } else if (period === "month") {
-      const d = new Date(now.getFullYear(), now.getMonth() - i - 1, 1);
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const end = new Date(d.getFullYear(), d.getMonth() + 1, 1);
       periods.push({
         start: d,
