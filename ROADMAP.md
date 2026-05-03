@@ -100,6 +100,8 @@ Products CRUD lives in StudioView → Products section.
 ### ✅ Discount Codes + Referral Program — IMPLEMENTED (2026-05-02)
 - `discount_codes` + `discount_redemptions` tables (`0012`); staff UI in StudioView; promo input in BookingSheet; `validate-discount` Edge Function for client-side preview; applied in `create-checkout`
 - `referral_enabled` / `referral_discount_percent` on `studios`; `referrals` table; auto-generated `referral_code` per `studio_members` row; first-timer-only validation in `create-checkout`; Dashboard referral link; `?ref=CODE` URL capture via `RefCapture` component
+- Referral status promoted to `completed` in `payment-webhook` when the referred user's class booking payment is confirmed (not on membership purchases — referral codes are class-booking-only)
+- **Decision — referral discount is one-time, not re-usable after cancellation**: if the referred user cancels within the 24h window and re-books, they pay full price. The `referrals` table has `UNIQUE(studio_id, referred_user_id)` and `create-checkout` checks `priorReferrals > 0` before applying a discount — so the discount cannot be re-applied. This is intentional: the discount incentivises the first *transaction*, not the first *attended class*. No one gains unfairly — the refund returns exactly what was paid (the discounted amount, not the full price).
 - **Still TODO**: referrer reward (e.g. +1 credit after referred user completes first booking)
 
 ### Guest Passes
