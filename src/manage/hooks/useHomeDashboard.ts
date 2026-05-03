@@ -156,7 +156,7 @@ export function useHomeDashboard(period: Period) {
           .gte("created_at", prs).lt("created_at", prfe),
       ]);
       const sum = (rows: { amount: number }[] | null) =>
-        (rows ?? []).reduce((s, r) => s + (r.amount ?? 0), 0) / 100;
+        (rows ?? []).reduce((s, r) => s + (r.amount ?? 0), 0);
       return {
         current: sum(cur.data),
         prior: sum(prior.data),
