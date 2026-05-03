@@ -4,7 +4,7 @@ const key = import.meta.env.VITE_POSTHOG_KEY as string | undefined;
 
 if (key) {
   posthog.init(key, {
-    api_host: "https://eu.i.posthog.com",
+    api_host: "https://us.i.posthog.com",
     capture_pageview: true,
     capture_pageleave: true,
     persistence: "localStorage",

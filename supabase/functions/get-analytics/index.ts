@@ -4,7 +4,7 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 const POSTHOG_SECRET_KEY = Deno.env.get("POSTHOG_SECRET_KEY");
 const POSTHOG_PROJECT_ID = Deno.env.get("POSTHOG_PROJECT_ID") ?? "undefined";
-const POSTHOG_HOST = "https://eu.posthog.com";
+const POSTHOG_HOST = "https://us.posthog.com";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
