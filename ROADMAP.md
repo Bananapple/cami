@@ -54,17 +54,18 @@ Architecture assessment conducted 2026-04-23. v2 cutover completed 2026-04-24 �
 - Trigger on `bookings` cancel auto-offers the freed spot
 - UI work remaining: "Join waitlist" button when `booked_count + waitlist_offered_count ≥ max_capacity`; waitlist status on dashboard; notification dispatch wiring
 
-### Multi-Location — designed in `0003_recurrence_engine.sql`
-- `locations` table `(studio_id, name, address, timezone, default_capacity)`
+### ✅ Multi-Location — LIVE (2026-05-02)
+- `locations` table `(studio_id, name, address, timezone, default_capacity)` — CRUD in StudioView
 - `class_instances.location_id` FK (replaces the old `sessions.location TEXT`)
 - Conflict detection: `EXCLUDE USING GIST (location_id WITH =, time_range WITH &&)` — DB refuses room double-booking
-- UI work remaining: location selector in manager dashboard; filter schedule by location
+- Model: each `locations` row = one bookable room/space (a studio with 2 rooms = 2 location rows)
 
-### Recurrence Engine — designed in `0003_recurrence_engine.sql`
+### ✅ Recurrence Engine + Schedule Management — LIVE (2026-05-02)
 - `class_templates` (what the class IS) + `schedule_rules` (one row per weekday slot) + `schedule_exceptions` (cancel/reschedule/sub) → materialized into `class_instances`
-- Daily pg_cron job materializes a rolling 90-day window
-- Instructor conflict detection via same exclusion-constraint pattern as locations
-- UI work remaining: schedule builder for owners/managers; exception handler ("cancel this Tuesday")
+- pg_cron job materializes rolling 90-day window; `expire_stale_waitlist_offers()` sweeper runs every minute
+- Manager UI: `CreateRuleSheet` — multi-day chip selector, template picker, pre-fills duration/capacity/price
+- `materialize_class_instances()` RPC called after any `schedule_rules` change
+- **Still TODO**: exception handler ("cancel this Tuesday's class"), schedule exception UI
 
 ### ✅ Frisbii Payment Adapter — IMPLEMENTED (2026-05-01, untested live)
 `supabase/functions/_shared/providers/frisbii.ts` — full `PaymentProviderAdapter`:
@@ -76,8 +77,25 @@ Architecture assessment conducted 2026-04-23. v2 cutover completed 2026-04-24 �
 
 To activate for a studio: set `FRISBII_API_KEY` + `FRISBII_WEBHOOK_SECRET` secrets; insert `studio_payment_providers` row with `provider='frisbii'`; set webhook URL to `.../payment-webhook/frisbii`.
 
-### Staff product management UI
-Add/edit/deactivate products from manager panel without touching the DB directly.
+### ✅ Staff product management UI — LIVE (2026-05-02)
+Products CRUD lives in StudioView → Products section.
+
+### ✅ Waitlist Notifications — LIVE (2026-05-02)
+- `notify-waitlist-offer` Edge Function deployed with `--no-verify-jwt`
+- DB webhook wired: `waitlists UPDATE` → `notify-waitlist-offer` (fires when status becomes 'offered')
+- Email includes class name, time, expiry, "Book your spot" CTA
+- Idempotent: `notification_log` key = `waitlist_offer_{waitlistId}`
+
+### ✅ Manual Check-in + No-show Tracking — LIVE (2026-05-02)
+- `bookings.checked_in_at` timestamp; manager toggles per-attendee in ClassDrawer
+- Post-class summary in ClassDrawer: attended / no-show / waitlisted counts
+- MemberDrawer stats: Level / Sessions / No-shows / Since (4-col grid)
+
+### ✅ Clients View + Member Management — LIVE (2026-05-02)
+- `member_activity_summary` DB view (`0015`) — joins studio_members, profiles, memberships, products; last booking timestamp
+- `/manage/clients` — full member list, 7 segments (all/new/one_timer/regular/lapsing/inactive/no_plan), real-time search
+- MemberDrawer: past 20 bookings (upcoming + history), membership section (plan/credits/valid_until), "Sell package" copy-link flow
+- `JoinNow` page: `?product=PRODUCT_ID` scrolls + highlights the matching product card
 
 ### ✅ Discount Codes + Referral Program — IMPLEMENTED (2026-05-02)
 - `discount_codes` + `discount_redemptions` tables (`0012`); staff UI in StudioView; promo input in BookingSheet; `validate-discount` Edge Function for client-side preview; applied in `create-checkout`
@@ -109,10 +127,9 @@ Add/edit/deactivate products from manager panel without touching the DB directly
 - Booking flow step: insert between auth and checkout, only if user lacks a current-version signature
 - Re-prompt when `waiver_configs.version` changes
 
-### Smart Member Segmentation
-- Data already captured (`bookings`, `memberships`, `studio_members.total_sessions`)
-- Build view `member_activity_summary`: last visit, visit frequency, plan type, total spend
-- CRM filter UI for audience targeting ("inactive 14+ days", "clip card < 2 credits remaining")
+### ✅ Smart Member Segmentation — LIVE (2026-05-02)
+- `member_activity_summary` view is live (`0015`)
+- Clients view has 7 segment filters with live counts — see above
 
 ---
 
@@ -120,12 +137,10 @@ Add/edit/deactivate products from manager panel without touching the DB directly
 
 | Table / Column | Feature |
 |---|---|
-| `referral_rewards` (new table) | Referrals |
+| `referral_rewards` (new table) | Referrer reward after first referred booking |
+| `payments.discount_code_id` (column) | Per-booking promo/referral tracking |
 | `guest_passes` (new table) | Guest passes |
-| `notification_log` (new table) | CRM / SMS / WhatsApp |
 | `review_requests` (new table) | Google review tracking |
-| `waiver_configs` (new table) | Digital waivers |
-| `waivers` (new table) | Digital waivers |
-| `member_activity_summary` (view) | Segmentation |
+| `waiver_configs` / `waivers` (new tables) | Digital waivers |
 
-*Tables already live: `studios`, `studio_members`, `studio_payment_providers`, `locations`, `instructors`, `class_templates`, `schedule_rules`, `schedule_exceptions`, `class_instances`, `waitlists`, `payments`, `payment_webhook_events`, `notification_log`, `bookings` (with `membership_id`), `memberships` (with `product_id`, `credits_remaining`), `products`.*
+*Tables already live: `studios`, `studio_members`, `studio_payment_providers`, `locations`, `instructors` (+ `specialty`), `class_templates` (+ `description`, `image_url`), `schedule_rules`, `schedule_exceptions`, `class_instances`, `waitlists`, `bookings` (+ `membership_id`, `checked_in_at`), `payments`, `payment_webhook_events`, `notification_log`, `memberships` (+ `product_id`, `credits_remaining`), `products`, `discount_codes`, `discount_redemptions`, `referrals`, `member_activity_summary` (view).*

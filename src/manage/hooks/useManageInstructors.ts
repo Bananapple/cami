@@ -6,6 +6,7 @@ export type ManagedInstructor = {
   id: string;
   display_name: string;
   initials: string;
+  specialty: string | null;
   bio: string | null;
   image_url: string | null;
   is_active: boolean;
@@ -23,7 +24,7 @@ export function useManageInstructors() {
     queryFn: async (): Promise<ManagedInstructor[]> => {
       const { data, error } = await supabase
         .from("instructors")
-        .select("id, display_name, initials, bio, image_url, is_active")
+        .select("id, display_name, initials, specialty, bio, image_url, is_active")
         .eq("studio_id", studioId!)
         .order("display_name");
       if (error) throw error;

@@ -52,7 +52,7 @@ export function StudioView() {
 
   const { instructors, isLoading: instructorsLoading, create: createInstructor, update: updateInstructor, toggleActive: toggleInstructor } = useManageInstructors();
   const [addInstructorOpen, setAddInstructorOpen] = useState(false);
-  const [newInstructor, setNewInstructor] = useState({ display_name: "", initials: "", bio: "", image_url: "" });
+  const [newInstructor, setNewInstructor] = useState({ display_name: "", initials: "", specialty: "", bio: "", image_url: "" });
   const [editingInstructor, setEditingInstructor] = useState<ManagedInstructor | null>(null);
 
   const { locations, isLoading: locationsLoading, create: createLocation, update: updateLocation, toggleActive: toggleLocation } = useManageLocations();
@@ -383,6 +383,13 @@ export function StudioView() {
                   className="w-full px-3 py-2 text-sm bg-background border border-border rounded-md uppercase" />
               </div>
               <div className="space-y-1 col-span-2">
+                <label className="text-xs font-sans text-muted-foreground">Specialty</label>
+                <input type="text" value={newInstructor.specialty}
+                  onChange={(e) => setNewInstructor((i) => ({ ...i, specialty: e.target.value }))}
+                  placeholder="e.g. Ashtanga Yoga & Pilates"
+                  className="w-full px-3 py-2 text-sm bg-background border border-border rounded-md" />
+              </div>
+              <div className="space-y-1 col-span-2">
                 <label className="text-xs font-sans text-muted-foreground">Bio</label>
                 <textarea value={newInstructor.bio}
                   onChange={(e) => setNewInstructor((i) => ({ ...i, bio: e.target.value }))}
@@ -406,6 +413,7 @@ export function StudioView() {
                   await createInstructor.mutateAsync({
                     display_name: newInstructor.display_name.trim(),
                     initials: newInstructor.initials.trim(),
+                    specialty: newInstructor.specialty || null,
                     bio: newInstructor.bio || null,
                     image_url: newInstructor.image_url || null,
                   });
@@ -433,12 +441,13 @@ export function StudioView() {
                   fields={[
                     { label: "Name", value: editingInstructor.display_name, onChange: (v) => setEditingInstructor((i) => i && ({ ...i, display_name: v })) },
                     { label: "Initials", value: editingInstructor.initials, onChange: (v) => setEditingInstructor((i) => i && ({ ...i, initials: v.toUpperCase() })), maxLength: 4 },
+                    { label: "Specialty", value: editingInstructor.specialty ?? "", onChange: (v) => setEditingInstructor((i) => i && ({ ...i, specialty: v || null })) },
                     { label: "Bio", value: editingInstructor.bio ?? "", onChange: (v) => setEditingInstructor((i) => i && ({ ...i, bio: v || null })), multiline: true },
                     { label: "Photo URL", value: editingInstructor.image_url ?? "", onChange: (v) => setEditingInstructor((i) => i && ({ ...i, image_url: v || null })) },
                   ]}
                   onSave={async () => {
                     try {
-                      await updateInstructor.mutateAsync({ id: editingInstructor.id, display_name: editingInstructor.display_name, initials: editingInstructor.initials, bio: editingInstructor.bio, image_url: editingInstructor.image_url });
+                      await updateInstructor.mutateAsync({ id: editingInstructor.id, display_name: editingInstructor.display_name, initials: editingInstructor.initials, specialty: editingInstructor.specialty, bio: editingInstructor.bio, image_url: editingInstructor.image_url });
                       setEditingInstructor(null);
                       toast.success("Instructor updated.");
                     } catch (err: any) { toast.error(err.message ?? "Failed to update."); }
@@ -447,7 +456,7 @@ export function StudioView() {
                   isSaving={updateInstructor.isPending}
                 />
               ) : (
-                <PersonRow key={inst.id} name={inst.display_name} meta={inst.initials} isActive={inst.is_active}
+                <PersonRow key={inst.id} name={inst.display_name} meta={inst.specialty ?? inst.initials} isActive={inst.is_active}
                   onEdit={() => setEditingInstructor({ ...inst })}
                   onToggle={() => toggleInstructor.mutate({ id: inst.id, is_active: !inst.is_active }, { onError: () => toast.error("Failed to update.") })}
                 />

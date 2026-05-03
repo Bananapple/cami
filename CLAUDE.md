@@ -8,7 +8,7 @@ This is a **multi-tenant SaaS platform** for yoga studios in Scandinavia, Europe
 
 **Architectural state**: YogaBrie (`xskqpxfjhhxontirezjd`, eu-north-1) has completed the v2 cutover as of 2026-04-24. The multi-tenant schema is live. The legacy `sessions` table and `session_id`/`session_date` columns on `bookings` are still present but inert — drop them once rollback confidence is established. The migration SQL is in `supabase/migrations-v2/` and the execution record is in `docs/MIGRATION-MULTITENANT.md`.
 
-**Live features (as of 2026-05-01):**
+**Live features (as of 2026-05-02):**
 - Passwordless email OTP auth
 - Class schedule from `class_instances` (14-day rolling window)
 - Stripe Checkout booking flow (server-side via Edge Functions)
@@ -17,11 +17,18 @@ This is a **multi-tenant SaaS platform** for yoga studios in Scandinavia, Europe
 - **Membership purchase** (Phase 1A, 2026-04-30): DB-driven products catalog; users buy subscriptions/clip cards via Stripe Checkout from `/joinnow`; webhook calls `activate_membership()` RPC on success; subscription renewal/cancellation handled via `invoice.paid` / `customer.subscription.deleted`
 - **Book with membership** (Phase 1B, 2026-04-30): `create-checkout` detects active membership before creating Stripe session; calls `book_with_credit()` for subscription/clip-card holders (no Stripe redirect); `issue-refund` returns credits on cancellation within window; `BookingSheet` adapts UI to show "Included" or "X credits remaining"
 - **Frisbii payment adapter** (2026-05-01, untested live): `_shared/providers/frisbii.ts` implements full `PaymentProviderAdapter`; supports one-time charges and webhook reconciliation via invoice handle = payment_id trick; subscription checkout deferred
+- **Schedule & class management** (2026-05-02): Manager can create/edit `class_templates` + `schedule_rules` via `CreateRuleSheet`; `/classes` public page is DB-driven via `usePublicClasses`; `BookingSheet` accepts `templateId` prop for pre-filtered class selection; `template_id` on `ClassInstance` type
+- **Instructor & location management** (2026-05-02): Manager can CRUD instructors (with specialty field) and locations from StudioView; `/coaches` public page is DB-driven via `usePublicInstructors`; `instructors.specialty` column added (`0019`)
+- **Waitlist** (2026-05-02): Full state machine (`waiting→offered→accepted/expired`); `expire_stale_waitlist_offers()` pg_cron sweeper runs every minute; `notify-waitlist-offer` Edge Function deployed + wired via DB webhook (fires on `waitlists UPDATE` where status becomes 'offered'); idempotent email send via `notification_log`; manager ClassDrawer shows Attending/Waitlist/Cancelled tabs with counts and post-class no-show summary
+- **Manual check-in** (2026-05-02): `bookings.checked_in_at` timestamp; manager toggles per-attendee in ClassDrawer; no-shows = confirmed past bookings without `checked_in_at`; MemberDrawer shows no-show count stat
+- **Clients view** (2026-05-02): `/manage/clients` — full member list via `member_activity_summary` DB view (`0015`); segment filters (New/One-timer/Regular/Lapsing/Inactive/No plan) with counts; real-time search; MemberDrawer shows past bookings, membership status, and "sell package" copy-link flow
+- **Discount codes + referral program** (2026-05-02): `discount_codes` table + staff UI; `validate-discount` Edge Function; referral links per member via `studio_members.referral_code`; `referrals` table; first-timer discount applied in `create-checkout`
 
 **Security hardening (2026-04-30):** 28-finding audit implemented — see `docs/SECURITY-HARDENING.md`.
 
 **Edge Function deploy notes:**
 - `payment-webhook` must be deployed with `--no-verify-jwt` (Stripe sends no JWT)
+- `notify-waitlist-offer` must be deployed with `--no-verify-jwt` (DB webhook sends no JWT)
 - `create-checkout` and `issue-refund` use standard JWT auth (no flag needed)
 
 ## Commands
@@ -56,13 +63,25 @@ All Supabase access goes through the client in `src/integrations/supabase/client
 
 Key hooks (current):
 - `useAuth()` — passwordless OTP (`sendOtp`, `verifyOtp`), `signOut`, current user/session
-- `useClassInstances()` — fetches 14-day window of scheduled class instances with joined template/instructor/location data
+- `useClassInstances()` — fetches 14-day window of scheduled class instances with joined template/instructor/location data; `ClassInstance` type includes `template_id`
 - `useBookings()` — user's bookings + `cancelBooking` mutation (booking creation is now handled server-side by the `create-checkout` Edge Function)
 - `usePaymentMethods()` — saved payment methods
 - `useStudioConfig()` — studio branding (legacy; v2 replaces this with `StudioContext`)
 - `useProfile()`, `useMembership()` — `useMembership` returns the user's active membership for the current studio (status='active'); used in `BookingSheet` to determine booking mode
 - `useProducts()` — fetches the studio's active product catalog; uses `useEffect`+`useState` (not TanStack Query) due to a TanStack Query v5 subscriber notification bug with anon queries
 - `useStudioMember()` — fetches the current user's `studio_members` row (`level`, `total_sessions`, `referral_code`). Use this for per-studio user stats — these columns no longer live on `profiles`.
+- `usePublicInstructors()` — fetches active instructors + class names derived from `schedule_rules`; used on `/coaches` page
+- `usePublicClasses()` — fetches class templates + schedule rules, formats human-readable schedule strings; used on `/classes` page
+- `useWaitlist()` — user's waitlist entries; client-side filters out past classes (`starts_at > now`)
+
+Manager-only hooks in `src/manage/hooks/`:
+- `useClientsView()` — queries `member_activity_summary` view; client-side segment filtering + search
+- `useClassAttendance()` — all booking statuses for a class instance (confirmed/cancelled/pending)
+- `useClassWaitlist()` — waitlist entries (waiting/offered) for a class instance; `remove` mutation
+- `useClassTemplates()` / `useScheduleRules()` — class type and recurring rule CRUD
+- `useManageInstructors()` / `useManageLocations()` — instructor + location CRUD (includes `specialty` field)
+- `useMember()` / `useMemberBookings()` — member detail + booking history (past 20, both confirmed+cancelled)
+- `useSchedule()` — manager schedule view with class instances
 
 All user-facing hooks (`useBookings`, `useMembership`, `usePaymentMethods`, `useClassInstances`, `useStudioMember`) require `studioId` from `useStudioContext()` and scope their queries by it. All hooks expose an `error` field in their return value.
 

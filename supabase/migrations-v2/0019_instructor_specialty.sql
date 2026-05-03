@@ -1,0 +1,1 @@
+ALTER TABLE instructors ADD COLUMN IF NOT EXISTS specialty TEXT;
