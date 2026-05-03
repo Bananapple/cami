@@ -4,6 +4,7 @@ import { useStudioContext } from "@/context/StudioContext";
 
 export type ScheduleClass = {
   id: string;
+  rule_id: string | null;
   starts_at: string;
   ends_at: string;
   status: string;
@@ -50,7 +51,7 @@ export function useSchedule(weeksAhead = 4) {
       const { data, error } = await supabase
         .from("class_instances")
         .select(`
-          id, starts_at, ends_at, status, max_capacity, booked_count, price, notes,
+          id, rule_id, starts_at, ends_at, status, max_capacity, booked_count, price, notes,
           template_id, instructor_id, location_id,
           class_templates ( name ),
           instructors ( display_name ),
@@ -64,6 +65,7 @@ export function useSchedule(weeksAhead = 4) {
 
       return (data ?? []).map((r: any) => ({
         id: r.id,
+        rule_id: r.rule_id ?? null,
         starts_at: r.starts_at,
         ends_at: r.ends_at,
         status: r.status,

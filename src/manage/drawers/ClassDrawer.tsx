@@ -137,12 +137,13 @@ export function ClassDrawer({
       if (error) throw error;
       if (cls?.rule_id) {
         const exceptionDate = cls.starts_at.slice(0, 10);
-        await supabase.from("schedule_exceptions").upsert({
+        const { error: exErr } = await supabase.from("schedule_exceptions").upsert({
           studio_id: studioId,
           rule_id: cls.rule_id,
           exception_date: exceptionDate,
           kind: "cancel",
         }, { onConflict: "rule_id,exception_date" });
+        if (exErr) throw exErr;
       }
     },
     onSuccess: () => { invalidate(); toast.success("Class cancelled."); onOpenChange(false); },
@@ -151,6 +152,7 @@ export function ClassDrawer({
 
   const subInstructorMutation = useMutation({
     mutationFn: async (newInstructorId: string) => {
+      if (newInstructorId === cls?.instructor_id) return;
       const { error } = await supabase
         .from("class_instances")
         .update({ instructor_id: newInstructorId })
@@ -158,13 +160,14 @@ export function ClassDrawer({
       if (error) throw error;
       if (cls?.rule_id) {
         const exceptionDate = cls.starts_at.slice(0, 10);
-        await supabase.from("schedule_exceptions").upsert({
+        const { error: exErr } = await supabase.from("schedule_exceptions").upsert({
           studio_id: studioId,
           rule_id: cls.rule_id,
           exception_date: exceptionDate,
           kind: "sub_instructor",
           new_instructor_id: newInstructorId,
         }, { onConflict: "rule_id,exception_date" });
+        if (exErr) throw exErr;
       }
     },
     onSuccess: () => { invalidate(); setSubInstructorOpen(false); toast.success("Instructor updated for this class."); },

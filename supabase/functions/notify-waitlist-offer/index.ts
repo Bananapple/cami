@@ -1,5 +1,6 @@
 // Called by a Supabase Database Webhook on waitlists UPDATE where status = 'offered'.
 // Deploy with --no-verify-jwt (the webhook sends no user JWT).
+// Set WEBHOOK_SECRET secret and add `Authorization: Bearer <secret>` header in the DB webhook config.
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
@@ -7,7 +8,18 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 const FROM_EMAIL = Deno.env.get("FROM_EMAIL") ?? "onboarding@resend.dev";
+const WEBHOOK_SECRET = Deno.env.get("WEBHOOK_SECRET");
+
 Deno.serve(async (req) => {
+  // Verify the request comes from our Supabase DB webhook, not arbitrary callers.
+  if (WEBHOOK_SECRET) {
+    const authHeader = req.headers.get("Authorization");
+    const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
+    if (token !== WEBHOOK_SECRET) {
+      return new Response("Unauthorized", { status: 401 });
+    }
+  }
+
   let body: any;
   try {
     body = await req.json();

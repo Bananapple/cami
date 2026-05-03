@@ -16,6 +16,7 @@ export function usePublicInstructors() {
   const studioId = studioCtx?.studio?.id;
   const [instructors, setInstructors] = useState<PublicInstructor[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
     if (!studioId) return;
@@ -23,7 +24,8 @@ export function usePublicInstructors() {
 
     async function load() {
       setIsLoading(true);
-      const [{ data: insts }, { data: rules }] = await Promise.all([
+      setError(null);
+      const [{ data: insts, error: instsErr }, { data: rules, error: rulesErr }] = await Promise.all([
         supabase
           .from("instructors")
           .select("id, display_name, specialty, bio, image_url")
@@ -38,6 +40,9 @@ export function usePublicInstructors() {
       ]);
 
       if (cancelled) return;
+
+      if (instsErr) { setError(new Error(instsErr.message)); setIsLoading(false); return; }
+      if (rulesErr) { setError(new Error(rulesErr.message)); setIsLoading(false); return; }
 
       const classesByInstructor = new Map<string, Set<string>>();
       for (const r of (rules ?? []) as any[]) {
@@ -66,5 +71,5 @@ export function usePublicInstructors() {
     return () => { cancelled = true; };
   }, [studioId]);
 
-  return { instructors, isLoading };
+  return { instructors, isLoading, error };
 }

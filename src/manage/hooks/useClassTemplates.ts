@@ -11,6 +11,7 @@ export type ClassTemplate = {
   default_duration_minutes: number;
   default_price: number;
   default_max_capacity: number;
+  default_instructor_id: string | null;
   is_active: boolean;
 };
 
@@ -25,7 +26,7 @@ export function useClassTemplates() {
     queryFn: async (): Promise<ClassTemplate[]> => {
       const { data, error } = await supabase
         .from("class_templates")
-        .select("id, name, level, description, image_url, default_duration_minutes, default_price, default_max_capacity, is_active")
+        .select("id, name, level, description, image_url, default_duration_minutes, default_price, default_max_capacity, default_instructor_id, is_active")
         .eq("studio_id", studioId)
         .order("name");
       if (error) throw error;
