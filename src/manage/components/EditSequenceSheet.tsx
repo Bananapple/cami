@@ -169,7 +169,7 @@ function TemplateEditForm({
   onDone: () => void;
 }) {
   const studioCtx = useStudioContext();
-  const studioId = studioCtx?.studio?.id!;
+  const studioId = studioCtx?.studio?.id ?? "";
   const qc = useQueryClient();
   const { deactivateRule } = useScheduleRules();
 
