@@ -171,18 +171,50 @@ function UnmetDemandPanel({ total, bottleneckName, loading }: { total: number; b
   );
 }
 
+// ── Daily traffic sparkline ────────────────────────────────────────────────────
+
+function DailySparkline({ data }: { data: { date: string; count: number }[] }) {
+  if (!data.length) return null;
+  const max = Math.max(...data.map((d) => d.count), 1);
+  const w = 400;
+  const h = 40;
+  const barW = Math.max(Math.floor(w / 30) - 1, 2);
+
+  // Fill all 30 days, zeroing missing dates
+  const today = new Date();
+  const days: number[] = [];
+  const dateMap = Object.fromEntries(data.map((d) => [d.date, d.count]));
+  for (let i = 29; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(today.getDate() - i);
+    const key = d.toISOString().slice(0, 10);
+    days.push(dateMap[key] ?? 0);
+  }
+
+  return (
+    <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-10" preserveAspectRatio="none">
+      {days.map((count, i) => {
+        const barH = max > 0 ? (count / max) * h : 0;
+        const x = i * (w / 30);
+        return (
+          <rect key={i} x={x + 0.5} y={h - barH} width={barW} height={barH}
+            className="fill-primary/50" rx="1" />
+        );
+      })}
+    </svg>
+  );
+}
+
 // ── Traffic panel ─────────────────────────────────────────────────────────────
 
 function TrafficPanel({ data, loading }: { data: ReturnType<typeof useHomeDashboard>["analytics"]; loading: boolean }) {
   return (
     <div className="border border-border rounded-xl p-5 space-y-3 col-span-full">
-      <div className="flex items-baseline justify-between">
-        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Traffic (last 30 days)</p>
-      </div>
+      <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Traffic (last 30 days)</p>
       {loading ? (
         <div className="space-y-2">
           <div className="h-4 w-40 bg-muted/50 rounded animate-pulse" />
-          <div className="h-4 w-56 bg-muted/50 rounded animate-pulse" />
+          <div className="h-10 w-full bg-muted/50 rounded animate-pulse" />
         </div>
       ) : !data || data.noData ? (
         <p className="text-sm text-muted-foreground">No traffic data yet — check back after visitors arrive on the site.</p>
@@ -190,8 +222,8 @@ function TrafficPanel({ data, loading }: { data: ReturnType<typeof useHomeDashbo
         <div className="space-y-3">
           <div className="flex items-baseline gap-4">
             <div>
-              <p className="text-2xl font-serif">{data.visitors?.toLocaleString()}</p>
-              <p className="text-xs text-muted-foreground">visitors</p>
+              <p className="text-2xl font-serif">{data.avgPerDay ?? 0}</p>
+              <p className="text-xs text-muted-foreground">avg visitors/day</p>
             </div>
             <div className="text-muted-foreground">→</div>
             <div>
@@ -202,6 +234,11 @@ function TrafficPanel({ data, loading }: { data: ReturnType<typeof useHomeDashbo
               <p className="text-2xl font-serif">{data.conversionRate}%</p>
               <p className="text-xs text-muted-foreground">conversion</p>
             </div>
+          </div>
+          <DailySparkline data={data.dailyBreakdown ?? []} />
+          <div className="flex justify-between text-[10px] text-muted-foreground">
+            <span>30 days ago</span>
+            <span>Today</span>
           </div>
           {data.sources?.length > 0 && (
             <div className="flex flex-wrap gap-2">

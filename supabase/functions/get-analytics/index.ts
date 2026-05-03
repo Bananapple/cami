@@ -34,9 +34,8 @@ Deno.serve(async (req) => {
     const { data: { user }, error: authError } = await userClient.auth.getUser();
     if (authError || !user) return json({ error: "Unauthorized" }, 401);
 
-    const { studio_id, studio_slug } = await req.json();
+    const { studio_id } = await req.json();
     if (!studio_id) return json({ error: "studio_id required" }, 400);
-    if (!studio_slug) return json({ error: "studio_slug required" }, 400);
 
     // --- Verify caller is admin for this studio ---
     const { data: member, error: memberError } = await userClient
@@ -65,8 +64,8 @@ Deno.serve(async (req) => {
     };
 
     // Run queries in parallel
-    const [visitorsRes, conversionsRes, sourcesRes] = await Promise.all([
-      // Unique visitors (unique sessions)
+    const [visitorsRes, dailyRes, conversionsRes, sourcesRes] = await Promise.all([
+      // Unique people over 30 days (distinct_id = stable per-device cookie)
       fetch(`${POSTHOG_HOST}/api/projects/${POSTHOG_PROJECT_ID}/query/`, {
         method: "POST",
         headers: phHeaders,
@@ -74,11 +73,30 @@ Deno.serve(async (req) => {
           query: {
             kind: "HogQLQuery",
             query: `
-              SELECT count(DISTINCT session_id) as visitors
+              SELECT count(DISTINCT distinct_id) as visitors
               FROM events
               WHERE event = '$pageview'
                 AND timestamp >= '${dateFrom}'
-                AND properties.studio_id = '${studio_slug}'
+                AND properties.studio_id = '${studio_id}'
+            `,
+          },
+        }),
+      }),
+      // Daily unique visitors for sparkline
+      fetch(`${POSTHOG_HOST}/api/projects/${POSTHOG_PROJECT_ID}/query/`, {
+        method: "POST",
+        headers: phHeaders,
+        body: JSON.stringify({
+          query: {
+            kind: "HogQLQuery",
+            query: `
+              SELECT toDate(timestamp) as date, count(DISTINCT distinct_id) as daily_uniques
+              FROM events
+              WHERE event = '$pageview'
+                AND timestamp >= '${dateFrom}'
+                AND properties.studio_id = '${studio_id}'
+              GROUP BY date
+              ORDER BY date
             `,
           },
         }),
@@ -95,7 +113,7 @@ Deno.serve(async (req) => {
               FROM events
               WHERE event = 'booking_completed'
                 AND timestamp >= '${dateFrom}'
-                AND properties.studio_id = '${studio_slug}'
+                AND properties.studio_id = '${studio_id}'
             `,
           },
         }),
@@ -120,7 +138,7 @@ Deno.serve(async (req) => {
               FROM events
               WHERE event = '$pageview'
                 AND timestamp >= '${dateFrom}'
-                AND properties.studio_id = '${studio_slug}'
+                AND properties.studio_id = '${studio_id}'
               GROUP BY source
               ORDER BY visits DESC
             `,
@@ -129,8 +147,9 @@ Deno.serve(async (req) => {
       }),
     ]);
 
-    const [visitorsData, conversionsData, sourcesData] = await Promise.all([
+    const [visitorsData, dailyData, conversionsData, sourcesData] = await Promise.all([
       visitorsRes.json(),
+      dailyRes.json(),
       conversionsRes.json(),
       sourcesRes.json(),
     ]);
@@ -138,6 +157,12 @@ Deno.serve(async (req) => {
     const visitors = visitorsData?.results?.[0]?.[0] ?? 0;
     const conversions = conversionsData?.results?.[0]?.[0] ?? 0;
     const conversionRate = visitors > 0 ? Math.round((conversions / visitors) * 1000) / 10 : 0;
+
+    const dailyBreakdown: { date: string; count: number }[] =
+      (dailyData?.results ?? []).map(([date, count]: [string, number]) => ({ date, count }));
+    const avgPerDay = dailyBreakdown.length > 0
+      ? Math.round(dailyBreakdown.reduce((s, d) => s + d.count, 0) / 30)
+      : 0;
 
     const sourcesRaw: [string, number][] = sourcesData?.results ?? [];
     const totalVisits = sourcesRaw.reduce((s, [, v]) => s + v, 0);
@@ -147,7 +172,7 @@ Deno.serve(async (req) => {
       pct: totalVisits > 0 ? Math.round((visits / totalVisits) * 100) : 0,
     }));
 
-    return json({ visitors, conversions, conversionRate, sources, noData: visitors === 0 });
+    return json({ visitors, avgPerDay, dailyBreakdown, conversions, conversionRate, sources, noData: visitors === 0 });
   } catch (err) {
     console.error("get-analytics error:", err);
     return json({ error: "Internal error" }, 500);
