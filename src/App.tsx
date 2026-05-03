@@ -6,7 +6,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useEffect } from "react";
 import { useLocation } from "react-router-dom";
-import { StudioProvider } from "@/context/StudioContext";
+import { StudioProvider, useStudioContext } from "@/context/StudioContext";
+import { setStudioId } from "@/integrations/posthog";
 import Index from "./pages/Index";
 import Programs from "./pages/Programs";
 import Coaches from "./pages/Coaches";
@@ -24,6 +25,14 @@ const ScrollToTop = () => {
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [pathname]);
+  return null;
+};
+
+const PostHogStudioSync = () => {
+  const ctx = useStudioContext();
+  useEffect(() => {
+    if (ctx?.studio?.id) setStudioId(ctx.studio.id);
+  }, [ctx?.studio?.id]);
   return null;
 };
 
@@ -50,6 +59,7 @@ const App = () => (
         <BrowserRouter>
         <ScrollToTop />
         <RefCapture />
+        <PostHogStudioSync />
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/classes" element={<Programs />} />

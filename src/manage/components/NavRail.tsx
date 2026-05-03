@@ -1,15 +1,19 @@
 import { NavLink } from "react-router-dom";
 import { LayoutDashboard, Calendar, CalendarDays, Users, Settings } from "lucide-react";
-
-const items = [
-  { to: "/manage/home", label: "Home", Icon: LayoutDashboard },
-  { to: "/manage/today", label: "Today", Icon: Calendar },
-  { to: "/manage/schedule", label: "Schedule", Icon: CalendarDays },
-  { to: "/manage/clients", label: "Clients", Icon: Users },
-  { to: "/manage/studio", label: "Studio", Icon: Settings },
-];
+import { useStudioContext } from "@/context/StudioContext";
 
 export function NavRail() {
+  const ctx = useStudioContext();
+  const isAdmin = ctx?.role === "admin";
+
+  const items = [
+    ...(isAdmin ? [{ to: "/manage/home", label: "Home", Icon: LayoutDashboard }] : []),
+    { to: "/manage/today", label: "Today", Icon: Calendar },
+    { to: "/manage/schedule", label: "Schedule", Icon: CalendarDays },
+    { to: "/manage/clients", label: "Clients", Icon: Users },
+    { to: "/manage/studio", label: "Studio", Icon: Settings },
+  ];
+
   return (
     <nav className="w-16 border-r border-border bg-background flex flex-col items-center py-4 gap-2">
       {items.map(({ to, label, Icon }) => (

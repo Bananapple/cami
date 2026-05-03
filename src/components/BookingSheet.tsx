@@ -10,6 +10,7 @@ import OrderSummary from "@/components/booking/OrderSummary";
 import AuthForm from "@/components/booking/AuthForm";
 import ProfileForm from "@/components/booking/ProfileForm";
 import { supabase } from "@/integrations/supabase/client";
+import { posthog } from "@/integrations/posthog";
 import { useStudioConfig } from "@/hooks/useStudioConfig";
 import { useStudioContext } from "@/context/StudioContext";
 import { useMembership } from "@/hooks/useMembership";
@@ -221,6 +222,11 @@ const BookingSheet = ({ isOpen, onClose, templateId }: BookingSheetProps) => {
 
       // Free booking (active membership covered the class)
       if (data?.booking_id && !data?.checkout_url) {
+        posthog.capture("booking_completed", {
+          booking_id: data.booking_id,
+          class_name: selectedSession?.class_name,
+          price: 0,
+        });
         window.location.href = `${returnUrl}?booking_id=${data.booking_id}&status=success`;
         return;
       }

@@ -13,12 +13,12 @@ export function useStudioMember() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("studio_members")
-        .select("level, total_sessions, referral_code")
+        .select("level, total_sessions, referral_code, role")
         .eq("user_id", user!.id)
         .eq("studio_id", studioId!)
         .maybeSingle();
       if (error) throw error;
-      return data as { level: string | null; total_sessions: number; referral_code: string | null } | null;
+      return data as { level: string | null; total_sessions: number; referral_code: string | null; role: string | null } | null;
     },
     enabled: !!user && !!studioId,
   });

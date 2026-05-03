@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
+import { posthog } from "@/integrations/posthog";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import BookingSheet from "@/components/BookingSheet";
@@ -92,7 +93,9 @@ const Index = () => {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const status = params.get("status");
+    const bookingId = params.get("booking_id");
     if (status === "success") {
+      posthog.capture("booking_completed", { booking_id: bookingId, price: undefined });
       toast.success("Booking confirmed!", {
         description: "You're all set. See you on the mat.",
         duration: 6000,
