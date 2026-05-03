@@ -21,8 +21,4 @@ export function identifyUser(userId: string, props?: Record<string, unknown>) {
   if (key) posthog.identify(userId, props);
 }
 
-export function identifyUser(userId: string, props?: Record<string, unknown>) {
-  if (key) posthog.identify(userId, props);
-}
-
 export { posthog };

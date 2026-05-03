@@ -306,11 +306,20 @@ export function useHomeDashboard(period: Period) {
     queryKey: ["home", "analytics", studioId],
     enabled: !!studioId && isStaff,
     queryFn: async () => {
-      const { data, error } = await supabase.functions.invoke("get-analytics", {
-        body: { studio_id: studioId },
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("No session");
+      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/get-analytics`;
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session.access_token}`,
+          "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        },
+        body: JSON.stringify({ studio_id: studioId }),
       });
-      if (error) throw error;
-      return data as AnalyticsData;
+      if (!res.ok) throw new Error(`get-analytics ${res.status}`);
+      return res.json() as Promise<AnalyticsData>;
     },
   });
 
