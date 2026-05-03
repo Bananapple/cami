@@ -64,7 +64,7 @@ Deno.serve(async (req) => {
     };
 
     // Run queries in parallel
-    const [visitorsRes, dailyRes, conversionsRes, sourcesRes] = await Promise.all([
+    const [visitorsRes, dailyRes, conversionsRes, dailyConversionsRes, sourcesRes] = await Promise.all([
       // Unique people over 30 days — any event with studio_id (catches pageleave + pageview)
       fetch(`${POSTHOG_HOST}/api/projects/${POSTHOG_PROJECT_ID}/query/`, {
         method: "POST",
@@ -101,7 +101,7 @@ Deno.serve(async (req) => {
           },
         }),
       }),
-      // booking_completed events
+      // booking_completed events (total)
       fetch(`${POSTHOG_HOST}/api/projects/${POSTHOG_PROJECT_ID}/query/`, {
         method: "POST",
         headers: phHeaders,
@@ -114,6 +114,25 @@ Deno.serve(async (req) => {
               WHERE event = 'booking_completed'
                 AND timestamp >= '${dateFrom}'
                 AND properties.studio_id = '${studio_id}'
+            `,
+          },
+        }),
+      }),
+      // booking_completed events per day
+      fetch(`${POSTHOG_HOST}/api/projects/${POSTHOG_PROJECT_ID}/query/`, {
+        method: "POST",
+        headers: phHeaders,
+        body: JSON.stringify({
+          query: {
+            kind: "HogQLQuery",
+            query: `
+              SELECT toDate(timestamp) as date, count() as daily_conversions
+              FROM events
+              WHERE event = 'booking_completed'
+                AND timestamp >= '${dateFrom}'
+                AND properties.studio_id = '${studio_id}'
+              GROUP BY date
+              ORDER BY date
             `,
           },
         }),
@@ -147,12 +166,23 @@ Deno.serve(async (req) => {
       }),
     ]);
 
-    const [visitorsData, dailyData, conversionsData, sourcesData] = await Promise.all([
+    const [visitorsData, dailyData, conversionsData, dailyConversionsData, sourcesData] = await Promise.all([
       visitorsRes.json(),
       dailyRes.json(),
       conversionsRes.json(),
+      dailyConversionsRes.json(),
       sourcesRes.json(),
     ]);
+
+    const debug = {
+      projectId: POSTHOG_PROJECT_ID,
+      studioId: studio_id,
+      visitorsStatus: visitorsRes.status,
+      dailyStatus: dailyRes.status,
+      visitorsRaw: visitorsData,
+      dailyRaw: dailyData,
+    };
+    console.log("get-analytics debug:", JSON.stringify(debug));
 
     const visitors = visitorsData?.results?.[0]?.[0] ?? 0;
     const conversions = conversionsData?.results?.[0]?.[0] ?? 0;
@@ -160,6 +190,8 @@ Deno.serve(async (req) => {
 
     const dailyBreakdown: { date: string; count: number }[] =
       (dailyData?.results ?? []).map(([date, count]: [string, number]) => ({ date, count }));
+    const dailyConversions: { date: string; count: number }[] =
+      (dailyConversionsData?.results ?? []).map(([date, count]: [string, number]) => ({ date, count }));
     const avgPerDay = dailyBreakdown.length > 0
       ? Math.round(dailyBreakdown.reduce((s, d) => s + d.count, 0) / 30)
       : 0;
@@ -172,7 +204,7 @@ Deno.serve(async (req) => {
       pct: totalVisits > 0 ? Math.round((visits / totalVisits) * 100) : 0,
     }));
 
-    return json({ visitors, avgPerDay, dailyBreakdown, conversions, conversionRate, sources, noData: dailyBreakdown.length === 0 });
+    return json({ visitors, avgPerDay, dailyBreakdown, dailyConversions, conversions, conversionRate, sources, noData: dailyBreakdown.length === 0, _debug: debug });
   } catch (err) {
     console.error("get-analytics error:", err);
     return json({ error: "Internal error" }, 500);

@@ -175,35 +175,62 @@ function UnmetDemandPanel({ total, bottleneckName, loading }: { total: number; b
   );
 }
 
-// ── Daily traffic sparkline ────────────────────────────────────────────────────
+// ── Daily traffic chart (bars = visitors, line = conversion rate) ──────────────
 
-function DailySparkline({ data }: { data: { date: string; count: number }[] }) {
-  if (!data.length) return null;
-  const max = Math.max(...data.map((d) => d.count), 1);
+function DailyTrafficChart({
+  visitors,
+  conversions,
+}: {
+  visitors: { date: string; count: number }[];
+  conversions: { date: string; count: number }[];
+}) {
   const w = 400;
-  const h = 40;
+  const h = 60;
   const barW = Math.max(Math.floor(w / 30) - 1, 2);
 
-  // Fill all 30 days, zeroing missing dates
+  // Build aligned 30-day arrays
   const today = new Date();
-  const days: number[] = [];
-  const dateMap = Object.fromEntries(data.map((d) => [d.date, d.count]));
-  for (let i = 29; i >= 0; i--) {
+  const visMap = Object.fromEntries(visitors.map((d) => [d.date, d.count]));
+  const convMap = Object.fromEntries(conversions.map((d) => [d.date, d.count]));
+  const days = Array.from({ length: 30 }, (_, i) => {
     const d = new Date(today);
-    d.setDate(today.getDate() - i);
+    d.setDate(today.getDate() - (29 - i));
     const key = d.toISOString().slice(0, 10);
-    days.push(dateMap[key] ?? 0);
-  }
+    return { v: visMap[key] ?? 0, c: convMap[key] ?? 0 };
+  });
+
+  const maxV = Math.max(...days.map((d) => d.v), 1);
+
+  // Build conversion rate line path (only connect days with visitors)
+  let linePath = "";
+  days.forEach((d, i) => {
+    if (d.v === 0) return;
+    const rate = Math.min((d.c / d.v) * 100, 100);
+    const x = i * (w / 30) + barW / 2;
+    const y = h - (rate / 100) * h;
+    linePath += linePath === "" ? `M ${x} ${y}` : ` L ${x} ${y}`;
+  });
 
   return (
-    <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-10" preserveAspectRatio="none">
-      {days.map((count, i) => {
-        const barH = max > 0 ? (count / max) * h : 0;
+    <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-16" preserveAspectRatio="none">
+      {days.map((d, i) => {
+        const barH = (d.v / maxV) * h;
         const x = i * (w / 30);
         return (
           <rect key={i} x={x + 0.5} y={h - barH} width={barW} height={barH}
-            className="fill-primary/50" rx="1" />
+            className="fill-primary/40" rx="1" />
         );
+      })}
+      {linePath && (
+        <path d={linePath} fill="none" className="stroke-primary" strokeWidth="1.5"
+          strokeLinecap="round" strokeLinejoin="round" />
+      )}
+      {days.map((d, i) => {
+        if (d.v === 0) return null;
+        const rate = Math.min((d.c / d.v) * 100, 100);
+        const x = i * (w / 30) + barW / 2;
+        const y = h - (rate / 100) * h;
+        return <circle key={i} cx={x} cy={y} r="2" className="fill-primary" />;
       })}
     </svg>
   );
@@ -239,7 +266,7 @@ function TrafficPanel({ data, loading }: { data: ReturnType<typeof useHomeDashbo
               <p className="text-xs text-muted-foreground">conversion</p>
             </div>
           </div>
-          <DailySparkline data={data.dailyBreakdown ?? []} />
+          <DailyTrafficChart visitors={data.dailyBreakdown ?? []} conversions={data.dailyConversions ?? []} />
           <div className="flex justify-between text-[10px] text-muted-foreground">
             <span>30 days ago</span>
             <span>Today</span>

@@ -8,6 +8,7 @@ export type AnalyticsData = {
   visitors: number | null;
   avgPerDay: number | null;
   dailyBreakdown: { date: string; count: number }[];
+  dailyConversions: { date: string; count: number }[];
   conversions: number | null;
   conversionRate: number | null;
   sources: { name: string; visits: number; pct: number }[];
