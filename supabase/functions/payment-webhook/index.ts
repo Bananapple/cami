@@ -89,7 +89,7 @@ Deno.serve(async (req) => {
           // Branch on product_id: NULL = class booking, set = membership/clip card purchase
           const { data: pRow } = await admin
             .from("payments")
-            .select("product_id")
+            .select("product_id, user_id, studio_id")
             .eq("id", paymentId)
             .single();
 
@@ -106,6 +106,16 @@ Deno.serve(async (req) => {
           } else {
             // Class booking — atomic confirm via existing DB function
             await admin.rpc("confirm_booking", { p_payment_id: paymentId });
+
+            // Complete any pending referral for this user+studio
+            if (pRow?.user_id && pRow?.studio_id) {
+              await admin
+                .from("referrals")
+                .update({ status: "completed", completed_at: new Date().toISOString() })
+                .eq("referred_user_id", pRow.user_id)
+                .eq("studio_id", pRow.studio_id)
+                .eq("status", "pending");
+            }
           }
 
           // Capture the provider payment id in both cases
