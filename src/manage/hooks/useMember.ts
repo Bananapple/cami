@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useStudioContext } from "@/context/StudioContext";
 
 export type MemberMembership = {
   id: string;
@@ -19,14 +20,19 @@ export type ManagerMember = {
   no_shows: number;
   joined_at: string | null;
   membership: MemberMembership | null;
+  referrals_sent: number;
+  referrals_converted: number;
 };
 
 export function useMember(userId: string | undefined) {
+  const studioCtx = useStudioContext();
+  const studioId = studioCtx?.studio?.id;
+
   return useQuery({
-    queryKey: ["manage", "member", userId],
-    enabled: !!userId,
+    queryKey: ["manage", "member", userId, studioId],
+    enabled: !!userId && !!studioId,
     queryFn: async (): Promise<ManagerMember | null> => {
-      if (!userId) return null;
+      if (!userId || !studioId) return null;
 
       const now = new Date().toISOString();
       const [
@@ -34,6 +40,7 @@ export function useMember(userId: string | undefined) {
         { data: studioMember },
         { data: memberships },
         { data: noShowBookings },
+        { data: referrals },
       ] = await Promise.all([
         supabase
           .from("profiles")
@@ -58,6 +65,11 @@ export function useMember(userId: string | undefined) {
           .eq("status", "confirmed")
           .is("checked_in_at", null)
           .lt("class_instances.ends_at", now),
+        supabase
+          .from("referrals")
+          .select("id, status")
+          .eq("referrer_user_id", userId)
+          .eq("studio_id", studioId),
       ]);
 
       if (profileErr) throw profileErr;
@@ -84,6 +96,8 @@ export function useMember(userId: string | undefined) {
         no_shows: (noShowBookings ?? []).length,
         joined_at: (studioMember as any)?.joined_at ?? null,
         membership,
+        referrals_sent: (referrals ?? []).length,
+        referrals_converted: (referrals ?? []).filter((r: any) => r.status === "completed").length,
       };
     },
   });

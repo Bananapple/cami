@@ -248,6 +248,17 @@ export function MemberDrawer({
                     </p>
                   </div>
                 </div>
+                {member.referrals_sent > 0 && (
+                  <div className="pt-2">
+                    <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Referrals</p>
+                    <p className="text-sm">
+                      {member.referrals_sent} sent
+                      {member.referrals_converted > 0 && (
+                        <span className="text-green-700"> · {member.referrals_converted} converted</span>
+                      )}
+                    </p>
+                  </div>
+                )}
                 {activeSegment && (
                   <div>
                     <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs border border-border text-muted-foreground">

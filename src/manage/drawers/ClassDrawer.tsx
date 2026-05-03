@@ -11,7 +11,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Check, X } from "lucide-react";
+import { Check, UserRound, X } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useClassAttendance, attendanceQueryKey } from "../hooks/useClassAttendance";
@@ -22,6 +22,8 @@ import { formatDateTime } from "@/lib/timezone";
 
 type ClassDetail = {
   id: string;
+  rule_id: string | null;
+  instructor_id: string | null;
   starts_at: string;
   ends_at: string;
   max_capacity: number;
@@ -42,7 +44,7 @@ function useClassInstance(id: string | undefined) {
       const { data, error } = await supabase
         .from("class_instances")
         .select(`
-          id, starts_at, ends_at, max_capacity, booked_count, status, notes,
+          id, rule_id, instructor_id, starts_at, ends_at, max_capacity, booked_count, status, notes,
           class_templates ( name ),
           instructors ( display_name ),
           locations ( name, timezone )
@@ -55,6 +57,8 @@ function useClassInstance(id: string | undefined) {
 
       return {
         id: data.id,
+        rule_id: (data as any).rule_id ?? null,
+        instructor_id: (data as any).instructor_id ?? null,
         starts_at: data.starts_at,
         ends_at: data.ends_at,
         max_capacity: data.max_capacity,
@@ -99,12 +103,30 @@ export function ClassDrawer({
   const [capacityInput, setCapacityInput] = useState("");
   const [editingNotes, setEditingNotes] = useState(false);
   const [notesInput, setNotesInput] = useState("");
+  const [subInstructorOpen, setSubInstructorOpen] = useState(false);
+  const [subInstructorId, setSubInstructorId] = useState<string>("");
+
+  const studioId = studioCtx?.studio?.id;
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ["manage", "class", classId] });
     qc.invalidateQueries({ queryKey: ["manage", "schedule"] });
     qc.invalidateQueries({ queryKey: ["manage", "today"] });
   };
+
+  const { data: instructors = [] } = useQuery({
+    queryKey: ["manage", "instructors", studioId],
+    enabled: !!studioId,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("instructors")
+        .select("id, display_name")
+        .eq("studio_id", studioId!)
+        .eq("is_active", true)
+        .order("display_name");
+      return (data ?? []) as { id: string; display_name: string }[];
+    },
+  });
 
   const cancelMutation = useMutation({
     mutationFn: async () => {
@@ -113,9 +135,40 @@ export function ClassDrawer({
         .update({ status: "cancelled" })
         .eq("id", classId);
       if (error) throw error;
+      if (cls?.rule_id) {
+        const exceptionDate = cls.starts_at.slice(0, 10);
+        await supabase.from("schedule_exceptions").upsert({
+          studio_id: studioId,
+          rule_id: cls.rule_id,
+          exception_date: exceptionDate,
+          kind: "cancel",
+        }, { onConflict: "rule_id,exception_date" });
+      }
     },
     onSuccess: () => { invalidate(); toast.success("Class cancelled."); onOpenChange(false); },
     onError: () => toast.error("Failed to cancel class."),
+  });
+
+  const subInstructorMutation = useMutation({
+    mutationFn: async (newInstructorId: string) => {
+      const { error } = await supabase
+        .from("class_instances")
+        .update({ instructor_id: newInstructorId })
+        .eq("id", classId);
+      if (error) throw error;
+      if (cls?.rule_id) {
+        const exceptionDate = cls.starts_at.slice(0, 10);
+        await supabase.from("schedule_exceptions").upsert({
+          studio_id: studioId,
+          rule_id: cls.rule_id,
+          exception_date: exceptionDate,
+          kind: "sub_instructor",
+          new_instructor_id: newInstructorId,
+        }, { onConflict: "rule_id,exception_date" });
+      }
+    },
+    onSuccess: () => { invalidate(); setSubInstructorOpen(false); toast.success("Instructor updated for this class."); },
+    onError: () => toast.error("Failed to update instructor."),
   });
 
   const updateMutation = useMutation({
@@ -380,6 +433,46 @@ export function ClassDrawer({
               {!isCancelled && (
                 <section className="space-y-2 pt-4 border-t border-border">
                   <h3 className="text-xs uppercase tracking-wider text-muted-foreground">Actions</h3>
+
+                  {/* Sub instructor */}
+                  {subInstructorOpen ? (
+                    <div className="space-y-2">
+                      <select
+                        className="w-full px-3 py-2 text-sm bg-background border border-border rounded-md"
+                        value={subInstructorId || cls.instructor_id || ""}
+                        onChange={(e) => setSubInstructorId(e.target.value)}
+                      >
+                        <option value="" disabled>Pick instructor…</option>
+                        {instructors.map((inst) => (
+                          <option key={inst.id} value={inst.id}>{inst.display_name}</option>
+                        ))}
+                      </select>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => subInstructorMutation.mutate(subInstructorId || cls.instructor_id || "")}
+                          disabled={subInstructorMutation.isPending || !subInstructorId}
+                          className="flex-1 text-sm py-1.5 bg-primary text-primary-foreground rounded-md hover:bg-primary/80 disabled:opacity-50 transition-colors"
+                        >
+                          {subInstructorMutation.isPending ? "Saving…" : "Save"}
+                        </button>
+                        <button
+                          onClick={() => { setSubInstructorOpen(false); setSubInstructorId(""); }}
+                          className="flex-1 text-sm py-1.5 border border-border rounded-md text-muted-foreground hover:bg-muted transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => { setSubInstructorId(cls.instructor_id ?? ""); setSubInstructorOpen(true); }}
+                      className="w-full text-sm py-2 border border-border rounded-md hover:bg-muted transition-colors flex items-center justify-center gap-2"
+                    >
+                      <UserRound className="w-3.5 h-3.5" />
+                      Sub instructor for this class
+                    </button>
+                  )}
+
                   <button
                     onClick={() => setCancelOpen(true)}
                     className="w-full text-sm py-2 border border-destructive/40 text-destructive rounded-md hover:bg-destructive/10 transition-colors"
