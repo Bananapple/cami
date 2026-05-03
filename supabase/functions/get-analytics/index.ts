@@ -45,7 +45,7 @@ Deno.serve(async (req) => {
       .eq("user_id", user.id)
       .single();
 
-    if (memberError || !member || member.role !== "admin") {
+    if (memberError || !member || !["owner", "manager"].includes(member.role)) {
       return json({ error: "Forbidden" }, 403);
     }
 

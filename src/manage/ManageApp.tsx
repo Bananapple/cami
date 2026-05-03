@@ -10,7 +10,7 @@ import { useStudioContext } from "@/context/StudioContext";
 
 function DefaultRedirect() {
   const ctx = useStudioContext();
-  const isAdmin = ctx?.role === "admin";
+  const isAdmin = ctx?.role === "owner" || ctx?.role === "manager";
   return <Navigate to={isAdmin ? "home" : "today"} replace />;
 }
 

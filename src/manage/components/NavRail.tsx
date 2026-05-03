@@ -4,7 +4,7 @@ import { useStudioContext } from "@/context/StudioContext";
 
 export function NavRail() {
   const ctx = useStudioContext();
-  const isAdmin = ctx?.role === "admin";
+  const isAdmin = ctx?.role === "owner" || ctx?.role === "manager";
 
   const items = [
     ...(isAdmin ? [{ to: "/manage/home", label: "Home", Icon: LayoutDashboard }] : []),
