@@ -123,13 +123,13 @@ export function useHomeDashboard(period: Period) {
       const [cur, prior, priorFull] = await Promise.all([
         supabase.from("bookings").select("id", { count: "exact", head: true })
           .eq("studio_id", studioId).eq("status", "confirmed")
-          .gte("created_at", ps).lt("created_at", pe),
+          .gte("booked_at", ps).lt("booked_at", pe),
         supabase.from("bookings").select("id", { count: "exact", head: true })
           .eq("studio_id", studioId).eq("status", "confirmed")
-          .gte("created_at", prs).lt("created_at", pre),
+          .gte("booked_at", prs).lt("booked_at", pre),
         supabase.from("bookings").select("id", { count: "exact", head: true })
           .eq("studio_id", studioId).eq("status", "confirmed")
-          .gte("created_at", prs).lt("created_at", prfe),
+          .gte("booked_at", prs).lt("booked_at", prfe),
       ]);
       return {
         current: cur.count ?? 0,
@@ -145,18 +145,18 @@ export function useHomeDashboard(period: Period) {
     enabled: !!studioId,
     queryFn: async () => {
       const [cur, prior, priorFull] = await Promise.all([
-        supabase.from("payments").select("amount_minor")
+        supabase.from("payments").select("amount")
           .eq("studio_id", studioId).eq("status", "succeeded")
           .gte("created_at", ps).lt("created_at", pe),
-        supabase.from("payments").select("amount_minor")
+        supabase.from("payments").select("amount")
           .eq("studio_id", studioId).eq("status", "succeeded")
           .gte("created_at", prs).lt("created_at", pre),
-        supabase.from("payments").select("amount_minor")
+        supabase.from("payments").select("amount")
           .eq("studio_id", studioId).eq("status", "succeeded")
           .gte("created_at", prs).lt("created_at", prfe),
       ]);
-      const sum = (rows: { amount_minor: number }[] | null) =>
-        (rows ?? []).reduce((s, r) => s + (r.amount_minor ?? 0), 0) / 100;
+      const sum = (rows: { amount: number }[] | null) =>
+        (rows ?? []).reduce((s, r) => s + (r.amount ?? 0), 0) / 100;
       return {
         current: sum(cur.data),
         prior: sum(prior.data),
@@ -193,10 +193,9 @@ export function useHomeDashboard(period: Period) {
       const [newRows, churnRows] = await Promise.all([
         supabase.from("studio_members").select("id", { count: "exact", head: true })
           .eq("studio_id", studioId)
-          .gte("created_at", ps).lt("created_at", pe),
+          .gte("joined_at", ps).lt("joined_at", pe),
         supabase.from("memberships").select("id", { count: "exact", head: true })
-          .eq("studio_id", studioId).eq("status", "cancelled")
-          .gte("updated_at", ps).lt("updated_at", pe),
+          .eq("studio_id", studioId).eq("status", "cancelled"),
       ]);
       const added = newRows.count ?? 0;
       const churned = churnRows.count ?? 0;
@@ -217,8 +216,8 @@ export function useHomeDashboard(period: Period) {
           .select("id", { count: "exact", head: true })
           .eq("studio_id", studioId)
           .eq("status", "confirmed")
-          .gte("created_at", p.start.toISOString())
-          .lt("created_at", p.end.toISOString());
+          .gte("booked_at", p.start.toISOString())
+          .lt("booked_at", p.end.toISOString());
         results.push({ label: p.label, count: count ?? 0 });
       }
       return results;
