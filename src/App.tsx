@@ -7,7 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import { StudioProvider, useStudioContext } from "@/context/StudioContext";
-import { setStudioId } from "@/integrations/posthog";
+import { setStudioSlug } from "@/integrations/posthog";
 import Index from "./pages/Index";
 import Programs from "./pages/Programs";
 import Coaches from "./pages/Coaches";
@@ -31,8 +31,8 @@ const ScrollToTop = () => {
 const PostHogStudioSync = () => {
   const ctx = useStudioContext();
   useEffect(() => {
-    if (ctx?.studio?.id) setStudioId(ctx.studio.id);
-  }, [ctx?.studio?.id]);
+    if (ctx?.studio?.slug) setStudioSlug(ctx.studio.slug);
+  }, [ctx?.studio?.slug]);
   return null;
 };
 

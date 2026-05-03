@@ -34,8 +34,9 @@ Deno.serve(async (req) => {
     const { data: { user }, error: authError } = await userClient.auth.getUser();
     if (authError || !user) return json({ error: "Unauthorized" }, 401);
 
-    const { studio_id } = await req.json();
+    const { studio_id, studio_slug } = await req.json();
     if (!studio_id) return json({ error: "studio_id required" }, 400);
+    if (!studio_slug) return json({ error: "studio_slug required" }, 400);
 
     // --- Verify caller is admin for this studio ---
     const { data: member, error: memberError } = await userClient
@@ -77,7 +78,7 @@ Deno.serve(async (req) => {
               FROM events
               WHERE event = '$pageview'
                 AND timestamp >= '${dateFrom}'
-                AND properties.studio_id = '${studio_id}'
+                AND properties.studio_id = '${studio_slug}'
             `,
           },
         }),
@@ -94,7 +95,7 @@ Deno.serve(async (req) => {
               FROM events
               WHERE event = 'booking_completed'
                 AND timestamp >= '${dateFrom}'
-                AND properties.studio_id = '${studio_id}'
+                AND properties.studio_id = '${studio_slug}'
             `,
           },
         }),
@@ -119,7 +120,7 @@ Deno.serve(async (req) => {
               FROM events
               WHERE event = '$pageview'
                 AND timestamp >= '${dateFrom}'
-                AND properties.studio_id = '${studio_id}'
+                AND properties.studio_id = '${studio_slug}'
               GROUP BY source
               ORDER BY visits DESC
             `,

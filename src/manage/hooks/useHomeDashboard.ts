@@ -102,6 +102,7 @@ function getSparkPeriods(period: Period): { start: Date; end: Date; label: strin
 export function useHomeDashboard(period: Period) {
   const studioCtx = useStudioContext();
   const studioId = studioCtx?.studio?.id ?? "";
+  const studioSlug = studioCtx?.studio?.slug ?? "";
   const currency = studioCtx?.studio?.currency ?? "NOK";
 
   const { periodStart, periodEnd, priorStart, priorEnd, priorFullEnd } = getPeriodBounds(period);
@@ -301,11 +302,11 @@ export function useHomeDashboard(period: Period) {
   // --- Traffic (PostHog via Edge Function) ---
   const analyticsQuery = useQuery({
     queryKey: ["home", "analytics", studioId],
-    enabled: !!studioId,
+    enabled: !!studioId && !!studioSlug,
     queryFn: async () => {
       const { data: { session } } = await supabase.auth.getSession();
       const { data, error } = await supabase.functions.invoke("get-analytics", {
-        body: { studio_id: studioId },
+        body: { studio_id: studioId, studio_slug: studioSlug },
         headers: session ? { Authorization: `Bearer ${session.access_token}` } : {},
       });
       if (error) throw error;
