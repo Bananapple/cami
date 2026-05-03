@@ -65,7 +65,7 @@ Deno.serve(async (req) => {
 
     // Run queries in parallel
     const [visitorsRes, dailyRes, conversionsRes, sourcesRes] = await Promise.all([
-      // Unique people over 30 days (distinct_id = stable per-device cookie)
+      // Unique people over 30 days — any event with studio_id (catches pageleave + pageview)
       fetch(`${POSTHOG_HOST}/api/projects/${POSTHOG_PROJECT_ID}/query/`, {
         method: "POST",
         headers: phHeaders,
@@ -75,9 +75,9 @@ Deno.serve(async (req) => {
             query: `
               SELECT count(DISTINCT distinct_id) as visitors
               FROM events
-              WHERE event = '$pageview'
-                AND timestamp >= '${dateFrom}'
+              WHERE timestamp >= '${dateFrom}'
                 AND properties.studio_id = '${studio_id}'
+                AND event NOT IN ('$feature_flag_called', '$exception')
             `,
           },
         }),
@@ -92,9 +92,9 @@ Deno.serve(async (req) => {
             query: `
               SELECT toDate(timestamp) as date, count(DISTINCT distinct_id) as daily_uniques
               FROM events
-              WHERE event = '$pageview'
-                AND timestamp >= '${dateFrom}'
+              WHERE timestamp >= '${dateFrom}'
                 AND properties.studio_id = '${studio_id}'
+                AND event NOT IN ('$feature_flag_called', '$exception')
               GROUP BY date
               ORDER BY date
             `,
@@ -172,7 +172,7 @@ Deno.serve(async (req) => {
       pct: totalVisits > 0 ? Math.round((visits / totalVisits) * 100) : 0,
     }));
 
-    return json({ visitors, avgPerDay, dailyBreakdown, conversions, conversionRate, sources, noData: visitors === 0 });
+    return json({ visitors, avgPerDay, dailyBreakdown, conversions, conversionRate, sources, noData: dailyBreakdown.length === 0 });
   } catch (err) {
     console.error("get-analytics error:", err);
     return json({ error: "Internal error" }, 500);
