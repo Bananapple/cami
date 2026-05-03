@@ -227,7 +227,7 @@ function formatCurrency(amount: number, currency: string) {
 
 function periodLabel(period: Period, start: Date): string {
   if (period === "week") {
-    return `Week of ${start.toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`;
+    return `Week commencing ${start.toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`;
   }
   if (period === "month") {
     return start.toLocaleDateString("en-GB", { month: "long", year: "numeric" });
@@ -300,15 +300,17 @@ export function HomeView() {
           priorLabel={priorLabel(period)}
           loading={isLoading}
         />
-        <KpiTile
-          label="Active subscription value"
-          value={formatCurrency(mrr?.total ?? 0, currency)}
-          current={mrr?.total ?? 0}
-          prior={0}
-          priorFull={0}
-          priorLabel=""
-          loading={isLoading}
-        />
+        <div className="border border-border rounded-xl p-5 space-y-1">
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Active subscription value</p>
+          {isLoading ? (
+            <div className="h-7 w-28 bg-muted/50 rounded animate-pulse" />
+          ) : (
+            <>
+              <p className="text-2xl font-serif">{formatCurrency(mrr?.total ?? 0, currency)}</p>
+              <p className="text-xs text-muted-foreground">Point-in-time · active subscriptions</p>
+            </>
+          )}
+        </div>
         <div className="border border-border rounded-xl p-5 space-y-1">
           <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Net members</p>
           {isLoading ? (
