@@ -76,7 +76,16 @@ export function useScheduleRules() {
   };
 
   const rematerialize = async () => {
-    await supabase.rpc("materialize_class_instances" as any);
+    if (!studioId) return;
+    const today = new Date().toISOString().slice(0, 10);
+    const ninetyDays = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .slice(0, 10);
+    await supabase.rpc("materialize_class_instances" as any, {
+      _studio_id: studioId,
+      _from: today,
+      _to: ninetyDays,
+    });
   };
 
   const createRules = useMutation({
@@ -157,6 +166,16 @@ export function useScheduleRules() {
     onSuccess: invalidate,
   });
 
+  // Patch a single field on a rule (e.g. start_time when the user edits a chip).
+  const updateRule = useMutation({
+    mutationFn: async ({ id, ...patch }: { id: string } & Partial<Pick<ScheduleRule, "start_time" | "duration_minutes" | "max_capacity" | "price" | "instructor_id" | "location_id">>) => {
+      const { error } = await supabase.from("schedule_rules").update(patch).eq("id", id);
+      if (error) throw error;
+      await rematerialize();
+    },
+    onSuccess: invalidate,
+  });
+
   // Cancel a single time slot. Soft-deletes the rule AND deletes any
   // already-materialized future un-booked instances tied to it. Booked
   // instances are kept so the manager can handle them manually.
@@ -190,6 +209,7 @@ export function useScheduleRules() {
     createRules,
     deactivateRule,
     addRule,
+    updateRule,
     cancelRule,
   };
 }

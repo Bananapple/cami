@@ -1,14 +1,14 @@
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { Drawer, DrawerSection } from "../components/Drawer";
 import { Button } from "../components/Button";
 import { Field, FieldRow, inputStyle } from "../components/Field";
-import { StateBadge } from "../components/Badge";
+import { StateBadge, CategoryChip } from "../components/Badge";
 import { EmptyState } from "../components/EmptyState";
+import { RowList } from "../components/Row";
 import { useClassTemplates, type ClassTemplate } from "@/manage/hooks/useClassTemplates";
-import { useScheduleRules, type ScheduleRule, DAY_NAMES, DAY_FULL } from "@/manage/hooks/useScheduleRules";
+import { useScheduleRules, type ScheduleRule, DAY_FULL } from "@/manage/hooks/useScheduleRules";
 import { useGlobalExceptions, type GlobalException } from "@/manage/hooks/useGlobalExceptions";
 import { useManageInstructors } from "@/manage/hooks/useManageInstructors";
-import { useManageLocations } from "@/manage/hooks/useManageLocations";
 import { useStudioContext } from "@/context/StudioContext";
 import { formatDate } from "@/lib/timezone";
 import { toast } from "sonner";
@@ -20,12 +20,10 @@ export function EditSequenceDrawer({ open, onClose }: { open: boolean; onClose: 
   const studioCtx = useStudioContext();
   const studioTz = studioCtx?.studio?.timezone ?? "Europe/Oslo";
 
-  // Single template expanded at a time (collapse others when one opens)
   const [expandedTemplateId, setExpandedTemplateId] = useState<string | null>(null);
   const [creatingTemplate, setCreatingTemplate] = useState(false);
   const [addingException, setAddingException] = useState(false);
 
-  // Reset expansion on close
   useEffect(() => {
     if (!open) {
       setExpandedTemplateId(null);
@@ -55,38 +53,46 @@ export function EditSequenceDrawer({ open, onClose }: { open: boolean; onClose: 
             + Add class type
           </button>
         }
+        flush
       >
-        {tLoading && <p style={{ margin: 0, color: "var(--ink-muted)", fontSize: 13 }}>Loading…</p>}
+        {tLoading && (
+          <p style={{ margin: 0, padding: "12px 16px", color: "var(--ink-muted)", fontSize: 13 }}>
+            Loading…
+          </p>
+        )}
 
         {!tLoading && templates.length === 0 && !creatingTemplate && (
-          <EmptyState
-            title="No class types yet"
-            hint="Add your first class type to start scheduling."
-          />
+          <EmptyState title="No class types yet" hint="Add your first class type to start scheduling." />
         )}
 
         {creatingTemplate && (
           <NewTemplateForm
             onCancel={() => setCreatingTemplate(false)}
-            onSaved={(newId) => {
-              setCreatingTemplate(false);
-              setExpandedTemplateId(newId);
-            }}
+            onSaved={() => setCreatingTemplate(false)}
             create={createTemplate.mutateAsync}
           />
         )}
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          {templates.map((t) => (
-            <TemplateBlock
-              key={t.id}
-              template={t}
-              rules={rules.filter((r) => r.template_id === t.id && r.is_active)}
-              expanded={expandedTemplateId === t.id}
-              onToggle={() => setExpandedTemplateId((id) => (id === t.id ? null : t.id))}
-            />
-          ))}
-        </div>
+        {templates.length > 0 && (
+          <RowList style={{ borderRadius: 0, border: 0, borderTop: creatingTemplate ? "1px solid var(--line-soft)" : 0 }}>
+            {templates.map((t) => (
+              <Fragment key={t.id}>
+                <TemplateRow
+                  template={t}
+                  expanded={expandedTemplateId === t.id}
+                  onToggle={() => setExpandedTemplateId((id) => (id === t.id ? null : t.id))}
+                />
+                {expandedTemplateId === t.id && (
+                  <ExpandedTemplate
+                    template={t}
+                    rules={rules.filter((r) => r.template_id === t.id && r.is_active)}
+                    onClose={() => setExpandedTemplateId(null)}
+                  />
+                )}
+              </Fragment>
+            ))}
+          </RowList>
+        )}
       </DrawerSection>
 
       {/* ── GLOBAL EXCEPTIONS ── */}
@@ -102,6 +108,7 @@ export function EditSequenceDrawer({ open, onClose }: { open: boolean; onClose: 
             + Add exception
           </button>
         }
+        flush
       >
         {addingException && (
           <NewExceptionForm
@@ -112,13 +119,22 @@ export function EditSequenceDrawer({ open, onClose }: { open: boolean; onClose: 
         )}
 
         {!addingException && exceptions.length === 0 && (
-          <p style={{ margin: 0, color: "var(--ink-muted)", fontSize: 13, fontStyle: "italic" }}>
+          <p
+            style={{
+              margin: 0,
+              padding: "16px",
+              color: "var(--ink-muted)",
+              fontSize: 13,
+              fontStyle: "italic",
+              textAlign: "center",
+            }}
+          >
             Studio-wide closures (e.g. holidays). When you add a date here, all classes on that day are cancelled.
           </p>
         )}
 
         {exceptions.length > 0 && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: addingException ? 12 : 0 }}>
+          <RowList style={{ borderRadius: 0, border: 0, borderTop: addingException ? "1px solid var(--line-soft)" : 0 }}>
             {exceptions.map((exc) => (
               <ExceptionRow
                 key={exc.date}
@@ -131,22 +147,20 @@ export function EditSequenceDrawer({ open, onClose }: { open: boolean; onClose: 
                 }}
               />
             ))}
-          </div>
+          </RowList>
         )}
       </DrawerSection>
     </Drawer>
   );
 }
 
-// ── Class type block (collapsed row + inline edit form) ────────────
-function TemplateBlock({
+// ── Class type collapsed row ───────────────────────────────────────
+function TemplateRow({
   template,
-  rules,
   expanded,
   onToggle,
 }: {
   template: ClassTemplate;
-  rules: ScheduleRule[];
   expanded: boolean;
   onToggle: () => void;
 }) {
@@ -154,61 +168,42 @@ function TemplateBlock({
   const currency = studioCtx?.studio?.currency ?? "NOK";
 
   return (
-    <div
-      style={{
-        border: "1px solid var(--line)",
-        borderRadius: "var(--r-card)",
-        background: "var(--surface)",
-        overflow: "hidden",
-      }}
+    <button
+      type="button"
+      onClick={onToggle}
+      className={"sm-row" + (expanded ? " on" : "")}
+      style={{ borderRadius: 0 }}
     >
-      <button
-        type="button"
-        onClick={onToggle}
-        style={{
-          all: "unset",
-          cursor: "pointer",
-          width: "100%",
-          display: "grid",
-          gridTemplateColumns: "1fr auto",
-          alignItems: "center",
-          gap: 12,
-          padding: "12px 14px",
-        }}
-      >
-        <div style={{ minWidth: 0 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>
-              {template.name}
-            </span>
-            <span className="sm-cat">{template.level ?? "All levels"}</span>
-          </div>
-          <p style={{ margin: "2px 0 0", fontSize: 13, color: "var(--ink-muted)" }}>
-            {template.default_duration_minutes} min · {template.default_max_capacity} spots ·{" "}
-            {currency} {template.default_price}
-          </p>
+      <span /> {/* lead slot empty */}
+      <div className="body">
+        <div className="title">
+          <span>{template.name}</span>
+          <CategoryChip>{template.level ?? "All levels"}</CategoryChip>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <StateBadge tone={template.is_active ? "good" : "neutral"}>
-            {template.is_active ? "Active" : "Inactive"}
-          </StateBadge>
-          <Chevron expanded={expanded} />
+        <div className="meta-line">
+          {template.default_duration_minutes} min · {template.default_max_capacity} spots ·{" "}
+          {currency} {template.default_price}
         </div>
-      </button>
-
-      {expanded && (
-        <div style={{ borderTop: "1px solid var(--line-soft)", padding: "12px 14px 14px" }}>
-          <TemplateEditForm template={template} />
-          <div style={{ height: 16 }} />
-          <ScheduleGrid templateId={template.id} rules={rules} />
-        </div>
-      )}
-    </div>
+      </div>
+      <div className="trail">
+        <StateBadge tone={template.is_active ? "good" : "neutral"}>
+          {template.is_active ? "Active" : "Inactive"}
+        </StateBadge>
+      </div>
+    </button>
   );
 }
 
-// ── Template basics edit form (saved on Save changes) ──────────────
-function TemplateEditForm({ template }: { template: ClassTemplate }) {
+// ── Class type expanded edit area ──────────────────────────────────
+function ExpandedTemplate({
+  template,
+  rules,
+  onClose,
+}: {
+  template: ClassTemplate;
+  rules: ScheduleRule[];
+  onClose: () => void;
+}) {
   const { updateTemplate, toggleActive } = useClassTemplates();
   const { instructors } = useManageInstructors();
   const studioCtx = useStudioContext();
@@ -225,7 +220,6 @@ function TemplateEditForm({ template }: { template: ClassTemplate }) {
   });
   const [pending, setPending] = useState(false);
 
-  // Reset when template changes
   useEffect(() => {
     setDraft({
       name: template.name,
@@ -251,7 +245,8 @@ function TemplateEditForm({ template }: { template: ClassTemplate }) {
         default_price: Number(draft.default_price),
         default_instructor_id: draft.default_instructor_id || null,
       });
-      toast.success("Class type updated");
+      toast.success("Saved");
+      onClose();
     } catch (e: any) {
       toast.error(e.message ?? "Failed to save");
     } finally {
@@ -260,16 +255,74 @@ function TemplateEditForm({ template }: { template: ClassTemplate }) {
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+    <div
+      style={{
+        padding: "14px 16px 16px",
+        background: "var(--paper)",
+        borderBottom: "1px solid var(--line-soft)",
+        display: "flex",
+        flexDirection: "column",
+        gap: 14,
+      }}
+    >
+      <TemplateForm
+        draft={draft}
+        setDraft={setDraft}
+        instructors={instructors}
+        currency={currency}
+      />
+
+      <ScheduleGrid templateId={template.id} rules={rules} />
+
+      {/* Bottom action bar: Deactivate (left) + Cancel + Save (right) */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 4 }}>
+        <Button
+          variant="danger"
+          size="sm"
+          onClick={() =>
+            toggleActive.mutate(
+              { id: template.id, is_active: !template.is_active },
+              {
+                onSuccess: () =>
+                  toast.success(template.is_active ? "Class type deactivated" : "Class type activated"),
+              }
+            )
+          }
+        >
+          {template.is_active ? "Deactivate type" : "Activate type"}
+        </Button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <Button variant="ghost" size="sm" onClick={onClose}>Cancel</Button>
+          <Button variant="primary" size="sm" onClick={save} loading={pending}>Save</Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Shared template form (used by both Add + Edit) ─────────────────
+function TemplateForm({
+  draft,
+  setDraft,
+  instructors,
+  currency,
+}: {
+  draft: any;
+  setDraft: (fn: (d: any) => any) => void;
+  instructors: { id: string; display_name: string }[];
+  currency: string;
+}) {
+  return (
+    <>
       <Field label="Name">
         <input
           type="text"
           value={draft.name}
           onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
           style={inputStyle}
+          autoFocus={!draft.name}
         />
       </Field>
-
       <Field label="Description">
         <textarea
           rows={2}
@@ -278,7 +331,6 @@ function TemplateEditForm({ template }: { template: ClassTemplate }) {
           style={{ ...inputStyle, height: "auto", padding: "8px 10px", resize: "vertical" }}
         />
       </Field>
-
       <FieldRow>
         <Field label="Level">
           <select
@@ -300,14 +352,11 @@ function TemplateEditForm({ template }: { template: ClassTemplate }) {
           >
             <option value="">—</option>
             {instructors.map((i) => (
-              <option key={i.id} value={i.id}>
-                {i.display_name}
-              </option>
+              <option key={i.id} value={i.id}>{i.display_name}</option>
             ))}
           </select>
         </Field>
       </FieldRow>
-
       <FieldRow>
         <Field label="Duration (min)">
           <input
@@ -328,7 +377,6 @@ function TemplateEditForm({ template }: { template: ClassTemplate }) {
           />
         </Field>
       </FieldRow>
-
       <Field label={`Drop-in price (${currency})`}>
         <input
           type="number"
@@ -338,37 +386,15 @@ function TemplateEditForm({ template }: { template: ClassTemplate }) {
           style={inputStyle}
         />
       </Field>
-
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <button
-          type="button"
-          onClick={() =>
-            toggleActive.mutate(
-              { id: template.id, is_active: !template.is_active },
-              {
-                onSuccess: () => toast.success(template.is_active ? "Class type deactivated" : "Class type activated"),
-              }
-            )
-          }
-          className="sm-btn sm ghost danger"
-          style={{ color: template.is_active ? "var(--bad)" : "var(--good)" }}
-        >
-          {template.is_active ? "Deactivate type" : "Activate type"}
-        </button>
-        <Button variant="primary" size="sm" onClick={save} loading={pending}>
-          Save changes
-        </Button>
-      </div>
-    </div>
+    </>
   );
 }
 
 // ── Schedule grid (per template) ───────────────────────────────────
 function ScheduleGrid({ templateId, rules }: { templateId: string; rules: ScheduleRule[] }) {
-  const { addRule, cancelRule } = useScheduleRules();
+  const { addRule, updateRule, cancelRule } = useScheduleRules();
   const [pickingDay, setPickingDay] = useState(false);
 
-  // Group rules by day_of_week
   const byDay = new Map<number, ScheduleRule[]>();
   for (const r of rules) {
     if (!byDay.has(r.day_of_week)) byDay.set(r.day_of_week, []);
@@ -378,21 +404,21 @@ function ScheduleGrid({ templateId, rules }: { templateId: string; rules: Schedu
 
   const addDay = (day: number) => {
     setPickingDay(false);
-    // Optimistically add a default 09:00 time slot for that day
+    const sample = activeDays.length > 0 ? byDay.get(activeDays[0])![0] : null;
     addRule.mutate(
       {
         template_id: templateId,
         day_of_week: day,
         start_time: "09:00",
-        duration_minutes: 60,
-        max_capacity: 12,
-        price: 250,
-        instructor_id: null,
-        location_id: null,
+        duration_minutes: sample?.duration_minutes ?? 60,
+        max_capacity: sample?.max_capacity ?? 12,
+        price: sample?.price ?? 250,
+        instructor_id: sample?.instructor_id ?? null,
+        location_id: sample?.location_id ?? null,
       },
       {
         onSuccess: () => toast.success(`${DAY_FULL[day]} 09:00 added`),
-        onError: (e: any) => toast.error(e.message ?? "Failed to add"),
+        onError: (e: any) => toast.error(e.message ?? "Failed"),
       }
     );
   };
@@ -413,11 +439,7 @@ function ScheduleGrid({ templateId, rules }: { templateId: string; rules: Schedu
       </div>
 
       {activeDays.length === 0 && !pickingDay && (
-        <button
-          type="button"
-          onClick={() => setPickingDay(true)}
-          className="sm-btn sm ghost"
-        >
+        <button type="button" onClick={() => setPickingDay(true)} className="sm-btn sm ghost">
           + Add schedule
         </button>
       )}
@@ -429,26 +451,34 @@ function ScheduleGrid({ templateId, rules }: { templateId: string; rules: Schedu
               key={day}
               day={day}
               rules={byDay.get(day)!.sort((a, b) => a.start_time.localeCompare(b.start_time))}
-              templateId={templateId}
-              onAddTime={(time) =>
+              onAddTime={(time) => {
+                const sample = byDay.get(day)![0];
                 addRule.mutate(
                   {
                     template_id: templateId,
                     day_of_week: day,
                     start_time: time,
-                    duration_minutes: byDay.get(day)![0]?.duration_minutes ?? 60,
-                    max_capacity: byDay.get(day)![0]?.max_capacity ?? 12,
-                    price: byDay.get(day)![0]?.price ?? 250,
-                    instructor_id: byDay.get(day)![0]?.instructor_id ?? null,
-                    location_id: byDay.get(day)![0]?.location_id ?? null,
+                    duration_minutes: sample.duration_minutes,
+                    max_capacity: sample.max_capacity,
+                    price: sample.price,
+                    instructor_id: sample.instructor_id,
+                    location_id: sample.location_id,
                   },
                   {
                     onSuccess: () => toast.success(`${DAY_FULL[day]} ${time} added`),
                     onError: (e: any) => toast.error(e.message ?? "Failed"),
                   }
+                );
+              }}
+              onUpdateTime={(ruleId, newTime) =>
+                updateRule.mutate(
+                  { id: ruleId, start_time: newTime },
+                  { onSuccess: () => toast.success("Time updated") }
                 )
               }
-              onRemoveTime={(ruleId) => cancelRule.mutate(ruleId, { onSuccess: () => toast.success("Time slot removed") })}
+              onRemoveTime={(ruleId) =>
+                cancelRule.mutate(ruleId, { onSuccess: () => toast.success("Time slot removed") })
+              }
             />
           ))}
         </div>
@@ -457,11 +487,7 @@ function ScheduleGrid({ templateId, rules }: { templateId: string; rules: Schedu
       {(activeDays.length > 0 || pickingDay) && (
         <div style={{ marginTop: 8 }}>
           {!pickingDay ? (
-            <button
-              type="button"
-              onClick={() => setPickingDay(true)}
-              className="sm-btn sm ghost"
-            >
+            <button type="button" onClick={() => setPickingDay(true)} className="sm-btn sm ghost">
               + Add day
             </button>
           ) : (
@@ -477,7 +503,7 @@ function ScheduleGrid({ templateId, rules }: { templateId: string; rules: Schedu
   );
 }
 
-// ── Day picker popover ─────────────────────────────────────────────
+// ── Day picker ─────────────────────────────────────────────────────
 function DayPicker({
   disabledDays,
   onPick,
@@ -493,7 +519,7 @@ function DayPicker({
         display: "flex",
         gap: 6,
         padding: 8,
-        background: "var(--paper)",
+        background: "var(--surface)",
         border: "1px solid var(--line)",
         borderRadius: "var(--r-card)",
         flexWrap: "wrap",
@@ -531,22 +557,21 @@ function DayPicker({
   );
 }
 
-// ── Day row (day name + time chips + add time) ─────────────────────
+// ── Day row (day name + time chips + + Add time) ───────────────────
 function DayRow({
   day,
   rules,
-  templateId: _templateId,
   onAddTime,
+  onUpdateTime,
   onRemoveTime,
 }: {
   day: number;
   rules: ScheduleRule[];
-  templateId: string;
   onAddTime: (time: string) => void;
+  onUpdateTime: (ruleId: string, newTime: string) => void;
   onRemoveTime: (ruleId: string) => void;
 }) {
-  const [addingTime, setAddingTime] = useState(false);
-  const [newTime, setNewTime] = useState("09:00");
+  const [adding, setAdding] = useState(false);
 
   return (
     <div
@@ -555,7 +580,8 @@ function DayRow({
         gap: 12,
         alignItems: "flex-start",
         padding: "8px 10px",
-        background: "var(--paper)",
+        background: "var(--surface)",
+        border: "1px solid var(--line-soft)",
         borderRadius: "var(--r-card)",
         flexWrap: "wrap",
       }}
@@ -570,52 +596,27 @@ function DayRow({
           flexShrink: 0,
         }}
       >
-        <span className="sm-day-mobile" style={{ display: "none" }}>{DAY_NAMES[day]}</span>
-        <span className="sm-day-desktop">{DAY_FULL[day]}</span>
+        {DAY_FULL[day]}
       </span>
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", flex: 1, alignItems: "center" }}>
         {rules.map((r) => (
-          <TimeChip key={r.id} time={r.start_time.slice(0, 5)} onCancel={() => onRemoveTime(r.id)} />
+          <TimeChip
+            key={r.id}
+            initialTime={r.start_time.slice(0, 5)}
+            onSave={(t) => onUpdateTime(r.id, t)}
+            onDelete={() => onRemoveTime(r.id)}
+          />
         ))}
-        {addingTime ? (
-          <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-            <input
-              type="time"
-              value={newTime}
-              onChange={(e) => setNewTime(e.target.value)}
-              autoFocus
-              style={{
-                ...inputStyle,
-                width: 110,
-                height: 28,
-                fontSize: 12,
-                padding: "0 8px",
-              }}
-            />
-            <button
-              type="button"
-              onClick={() => {
-                onAddTime(newTime);
-                setAddingTime(false);
-              }}
-              className="sm-btn sm primary"
-            >
-              Add
-            </button>
-            <button
-              type="button"
-              onClick={() => setAddingTime(false)}
-              className="sm-btn sm ghost"
-            >
-              Cancel
-            </button>
-          </div>
+        {adding ? (
+          <NewTimeChip
+            onSave={(t) => {
+              onAddTime(t);
+              setAdding(false);
+            }}
+            onCancel={() => setAdding(false)}
+          />
         ) : (
-          <button
-            type="button"
-            onClick={() => setAddingTime(true)}
-            className="sm-btn sm ghost"
-          >
+          <button type="button" onClick={() => setAdding(true)} className="sm-btn sm ghost">
             + Add time
           </button>
         )}
@@ -624,124 +625,224 @@ function DayRow({
   );
 }
 
-// ── TimeChip with overflow → cancel ────────────────────────────────
-function TimeChip({ time, onCancel }: { time: string; onCancel: () => void }) {
-  const [showCancel, setShowCancel] = useState(false);
+// ── TimeChip — click time to edit, expands inline ──────────────────
+function TimeChip({
+  initialTime,
+  onSave,
+  onDelete,
+}: {
+  initialTime: string;
+  onSave: (newTime: string) => void;
+  onDelete: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [time, setTime] = useState(initialTime);
 
-  if (showCancel) {
+  if (editing) {
     return (
-      <span
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 4,
-          background: "var(--surface)",
-          padding: "0 0 0 10px",
-          borderRadius: "var(--r-input)",
-          border: "1px solid var(--bad)",
-          height: 28,
-          fontSize: 12,
-          fontFamily: "'JetBrains Mono', monospace",
-          fontVariantNumeric: "tabular-nums",
-        }}
-      >
-        {time}
+      <span style={chipExpandedStyle}>
+        <input
+          type="time"
+          value={time}
+          onChange={(e) => setTime(e.target.value)}
+          autoFocus
+          style={chipInputStyle}
+        />
+        <CircleButton
+          variant="primary"
+          aria-label="Save"
+          onClick={() => {
+            if (time !== initialTime) onSave(time);
+            setEditing(false);
+          }}
+        >
+          <PlusIcon />
+        </CircleButton>
+        <CircleButton
+          variant="ghost"
+          aria-label="Delete"
+          onClick={() => {
+            onDelete();
+            setEditing(false);
+          }}
+        >
+          <TrashIcon />
+        </CircleButton>
         <button
           type="button"
-          onClick={onCancel}
-          style={{
-            border: 0,
-            background: "transparent",
-            color: "var(--bad)",
-            fontFamily: "inherit",
-            fontSize: 11,
-            fontWeight: 500,
-            padding: "0 8px",
-            height: "100%",
-            cursor: "pointer",
-            borderLeft: "1px solid var(--bad)",
+          onClick={() => {
+            setTime(initialTime);
+            setEditing(false);
           }}
+          style={chipCancelButtonStyle}
         >
           Cancel
-        </button>
-        <button
-          type="button"
-          onClick={() => setShowCancel(false)}
-          aria-label="Dismiss"
-          style={{
-            border: 0,
-            background: "transparent",
-            color: "var(--ink-muted)",
-            padding: "0 8px 0 4px",
-            cursor: "pointer",
-            height: "100%",
-          }}
-        >
-          ×
         </button>
       </span>
     );
   }
 
   return (
-    <span
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 6,
-        background: "var(--surface)",
-        padding: "0 4px 0 10px",
-        borderRadius: "var(--r-input)",
-        border: "1px solid var(--line-soft)",
-        height: 28,
-        fontSize: 12,
-        fontFamily: "'JetBrains Mono', monospace",
-        fontVariantNumeric: "tabular-nums",
-        color: "var(--ink)",
-      }}
-    >
-      {time}
-      <button
-        type="button"
-        onClick={() => setShowCancel(true)}
-        aria-label="More"
-        style={{
-          border: 0,
-          background: "transparent",
-          color: "var(--ink-muted)",
-          padding: "0 4px",
-          cursor: "pointer",
-          height: "100%",
-          display: "flex",
-          alignItems: "center",
-        }}
-      >
-        <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor">
-          <circle cx="8" cy="3.5" r="1" />
-          <circle cx="8" cy="8" r="1" />
-          <circle cx="8" cy="12.5" r="1" />
-        </svg>
+    <button type="button" onClick={() => setEditing(true)} style={chipCollapsedStyle}>
+      {initialTime}
+    </button>
+  );
+}
+
+// ── NewTimeChip — used for "+ Add time" interaction ────────────────
+function NewTimeChip({
+  onSave,
+  onCancel,
+}: {
+  onSave: (time: string) => void;
+  onCancel: () => void;
+}) {
+  const [time, setTime] = useState("09:00");
+  return (
+    <span style={chipExpandedStyle}>
+      <input
+        type="time"
+        value={time}
+        onChange={(e) => setTime(e.target.value)}
+        autoFocus
+        style={chipInputStyle}
+      />
+      <CircleButton variant="primary" aria-label="Add" onClick={() => onSave(time)}>
+        <PlusIcon />
+      </CircleButton>
+      <button type="button" onClick={onCancel} style={chipCancelButtonStyle}>
+        Cancel
       </button>
     </span>
   );
 }
 
-// ── New template form (Add class type) ─────────────────────────────
+// ── Chip styles ────────────────────────────────────────────────────
+const chipCollapsedStyle: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  background: "var(--surface)",
+  border: "1px solid var(--line-soft)",
+  borderRadius: "var(--r-input)",
+  height: 28,
+  padding: "0 12px",
+  fontSize: 12,
+  fontFamily: "'JetBrains Mono', monospace",
+  fontVariantNumeric: "tabular-nums",
+  color: "var(--ink)",
+  cursor: "pointer",
+};
+
+const chipExpandedStyle: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 6,
+  background: "var(--surface)",
+  border: "1px solid var(--line)",
+  borderRadius: "var(--r-input)",
+  padding: "4px 6px 4px 6px",
+  height: 32,
+};
+
+const chipInputStyle: React.CSSProperties = {
+  height: 24,
+  border: "1px solid var(--line-soft)",
+  borderRadius: 4,
+  padding: "0 6px",
+  fontSize: 12,
+  fontFamily: "'JetBrains Mono', monospace",
+  fontVariantNumeric: "tabular-nums",
+  color: "var(--ink)",
+  background: "var(--surface)",
+  outline: "none",
+  width: 100,
+};
+
+const chipCancelButtonStyle: React.CSSProperties = {
+  border: 0,
+  background: "transparent",
+  color: "var(--ink-soft)",
+  fontFamily: "inherit",
+  fontSize: 12,
+  fontWeight: 500,
+  padding: "0 6px",
+  cursor: "pointer",
+};
+
+// ── CircleButton (small filled/ghost circular button for chip actions) ──
+function CircleButton({
+  children,
+  variant = "primary",
+  onClick,
+  ...rest
+}: {
+  children: React.ReactNode;
+  variant?: "primary" | "ghost";
+  onClick?: () => void;
+} & React.ButtonHTMLAttributes<HTMLButtonElement>) {
+  const filled = variant === "primary";
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      {...rest}
+      style={{
+        width: 22,
+        height: 22,
+        borderRadius: "50%",
+        border: filled ? "1px solid var(--action)" : "1px solid var(--line)",
+        background: filled ? "var(--action)" : "var(--surface)",
+        color: filled ? "var(--action-on)" : "var(--ink-muted)",
+        cursor: "pointer",
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 0,
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+function PlusIcon() {
+  return (
+    <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+      <path d="M8 3v10M3 8h10" />
+    </svg>
+  );
+}
+
+function TrashIcon() {
+  return (
+    <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 4h10M6 4V3a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v1M5 4l1 9a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1l1-9" />
+    </svg>
+  );
+}
+
+// ── New template form (Add class type — full fields) ──────────────
 function NewTemplateForm({
   onCancel,
   onSaved,
   create,
 }: {
   onCancel: () => void;
-  onSaved: (id: string) => void;
+  onSaved: () => void;
   create: ReturnType<typeof useClassTemplates>["createTemplate"]["mutateAsync"];
 }) {
+  const { instructors } = useManageInstructors();
+  const studioCtx = useStudioContext();
+  const currency = studioCtx?.studio?.currency ?? "NOK";
+
   const [draft, setDraft] = useState({
     name: "",
+    description: "",
     level: "all levels",
     default_duration_minutes: 60,
     default_max_capacity: 12,
     default_price: 250,
+    default_instructor_id: "",
   });
   const [pending, setPending] = useState(false);
 
@@ -754,18 +855,16 @@ function NewTemplateForm({
     try {
       await create({
         name: draft.name.trim(),
-        description: null,
+        description: draft.description.trim() || null,
         image_url: null,
         level: draft.level,
         default_duration_minutes: draft.default_duration_minutes,
         default_max_capacity: draft.default_max_capacity,
         default_price: draft.default_price,
-        default_instructor_id: null,
+        default_instructor_id: draft.default_instructor_id || null,
       } as any);
-      toast.success("Class type created");
-      // We don't have the new id here without a separate refetch — for MVP just close the form.
-      // The new template will appear at the top of the list (sorted by name) once the query invalidates.
-      onSaved(""); // closes form; user can click the new row to expand
+      toast.success("Class type created — add a schedule by expanding the new row");
+      onSaved();
     } catch (e: any) {
       toast.error(e.message ?? "Failed");
     } finally {
@@ -776,78 +875,31 @@ function NewTemplateForm({
   return (
     <div
       style={{
-        border: "1px solid var(--line)",
-        borderRadius: "var(--r-card)",
         background: "var(--paper)",
         padding: 14,
         display: "flex",
         flexDirection: "column",
-        gap: 12,
-        marginBottom: 8,
+        gap: 14,
+        borderBottom: "1px solid var(--line-soft)",
       }}
     >
-      <Field label="Name">
-        <input
-          type="text"
-          value={draft.name}
-          onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
-          placeholder="Vinyasa Flow"
-          autoFocus
-          style={inputStyle}
-        />
-      </Field>
-      <FieldRow>
-        <Field label="Level">
-          <select
-            value={draft.level}
-            onChange={(e) => setDraft((d) => ({ ...d, level: e.target.value }))}
-            style={inputStyle as React.CSSProperties}
-          >
-            <option value="beginner">Beginner</option>
-            <option value="all levels">All levels</option>
-            <option value="intermediate">Intermediate</option>
-            <option value="advanced">Advanced</option>
-          </select>
-        </Field>
-        <Field label="Duration (min)">
-          <input
-            type="number"
-            min={1}
-            value={draft.default_duration_minutes}
-            onChange={(e) => setDraft((d) => ({ ...d, default_duration_minutes: Number(e.target.value) }))}
-            style={inputStyle}
-          />
-        </Field>
-      </FieldRow>
-      <FieldRow>
-        <Field label="Capacity">
-          <input
-            type="number"
-            min={1}
-            value={draft.default_max_capacity}
-            onChange={(e) => setDraft((d) => ({ ...d, default_max_capacity: Number(e.target.value) }))}
-            style={inputStyle}
-          />
-        </Field>
-        <Field label="Drop-in price">
-          <input
-            type="number"
-            min={0}
-            value={draft.default_price}
-            onChange={(e) => setDraft((d) => ({ ...d, default_price: Number(e.target.value) }))}
-            style={inputStyle}
-          />
-        </Field>
-      </FieldRow>
+      <TemplateForm
+        draft={draft}
+        setDraft={setDraft}
+        instructors={instructors}
+        currency={currency}
+      />
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
         <Button variant="ghost" size="sm" onClick={onCancel}>Cancel</Button>
-        <Button variant="primary" size="sm" onClick={save} loading={pending}>Create class type</Button>
+        <Button variant="primary" size="sm" onClick={save} loading={pending}>
+          Create class type
+        </Button>
       </div>
     </div>
   );
 }
 
-// ── New global exception form ──────────────────────────────────────
+// ── Global exception form ──────────────────────────────────────────
 function NewExceptionForm({
   onCancel,
   onSaved,
@@ -881,13 +933,12 @@ function NewExceptionForm({
   return (
     <div
       style={{
-        border: "1px solid var(--line)",
-        borderRadius: "var(--r-card)",
         background: "var(--paper)",
-        padding: 12,
+        padding: 14,
         display: "flex",
         flexDirection: "column",
         gap: 12,
+        borderBottom: "1px solid var(--line-soft)",
       }}
     >
       <FieldRow>
@@ -917,7 +968,7 @@ function NewExceptionForm({
   );
 }
 
-// ── Exception row ──────────────────────────────────────────────────
+// ── Exception row (flush, hairline-separated) ─────────────────────
 function ExceptionRow({
   exc,
   tz,
@@ -929,61 +980,29 @@ function ExceptionRow({
 }) {
   return (
     <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: "auto 1fr auto",
-        alignItems: "center",
-        gap: 12,
-        padding: "10px 12px",
-        background: "var(--paper)",
-        borderRadius: "var(--r-card)",
-      }}
+      className="sm-row"
+      style={{ borderRadius: 0, cursor: "default" }}
     >
       <span
+        className="lead time"
         style={{
+          minWidth: 110,
           fontFamily: "'JetBrains Mono', monospace",
           fontSize: 12,
           color: "var(--ink)",
           fontVariantNumeric: "tabular-nums",
-          minWidth: 110,
         }}
       >
         {formatDate(exc.date, tz, { weekday: "short", day: "numeric", month: "short" })}
       </span>
-      <span style={{ fontSize: 13, color: "var(--ink-soft)" }}>
-        {exc.reason ?? "All classes cancelled"}
-      </span>
-      <button
-        type="button"
-        onClick={onRemove}
-        className="sm-btn sm ghost danger"
-        aria-label="Remove exception"
-      >
-        Remove
-      </button>
+      <div className="body">
+        <div className="title">
+          <span style={{ fontWeight: 400 }}>{exc.reason ?? "All classes cancelled"}</span>
+        </div>
+      </div>
+      <div className="trail">
+        <Button variant="danger" size="sm" onClick={onRemove}>Remove</Button>
+      </div>
     </div>
-  );
-}
-
-// ── Chevron ────────────────────────────────────────────────────────
-function Chevron({ expanded }: { expanded: boolean }) {
-  return (
-    <svg
-      width="12"
-      height="12"
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      style={{
-        color: "var(--ink-muted)",
-        transform: expanded ? "rotate(90deg)" : "rotate(0deg)",
-        transition: "transform 80ms",
-      }}
-    >
-      <path d="M6 4l4 4-4 4" />
-    </svg>
   );
 }

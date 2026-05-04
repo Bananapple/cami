@@ -175,17 +175,15 @@ export function ClassDrawerV2({
 
       {/* ── Details tab ── */}
       {tab === "details" && (
-        <>
-          <DrawerSection title="Class details">
-            <DetailRow label="Date" value={dateStr} />
-            <DetailRow label="Time" value={`${startStr} – ${endStr}`} />
-            <DetailRow label="Instructor" value={cls.instructor_name} />
-            <DetailRow label="Location" value={cls.location_name} />
-            <DetailRow label="Level" value={cls.level ?? "All levels"} />
-            <DetailRow label="Capacity" value={`${cls.booked_count} / ${cls.max_capacity}`} />
-            <DetailRow label="Drop-in price" value={`${cls.price} kr`} />
-          </DrawerSection>
-        </>
+        <DrawerSection>
+          <KV label="Date" value={dateStr} />
+          <KV label="Time" value={`${startStr} – ${endStr}`} />
+          <KV label="Instructor" value={cls.instructor_name} />
+          <KV label="Location" value={cls.location_name} />
+          <KV label="Level" value={cls.level ?? "All levels"} />
+          <KV label="Capacity" value={`${cls.booked_count} / ${cls.max_capacity}`} />
+          <KV label="Drop-in price" value={`${cls.price} kr`} />
+        </DrawerSection>
       )}
     </Drawer>
   );
@@ -234,20 +232,12 @@ function AttendeeRow({
   );
 }
 
-// ── DetailRow ──────────────────────────────────────────────────────
-function DetailRow({ label, value }: { label: string; value: string }) {
+// ── KV (matches Member information line items) ────────────────────
+function KV({ label, value }: { label: string; value: string }) {
   return (
-    <div
-      style={{
-        display: "flex",
-        justifyContent: "space-between",
-        padding: "8px 0",
-        borderBottom: "1px solid var(--line-soft)",
-        fontSize: 13,
-      }}
-    >
+    <div style={{ padding: "6px 0", fontSize: 13, display: "flex", justifyContent: "space-between" }}>
       <span style={{ color: "var(--ink-muted)" }}>{label}</span>
-      <span style={{ color: "var(--ink)", fontVariantNumeric: "tabular-nums" }}>{value}</span>
+      <span style={{ color: "var(--ink)", textAlign: "right" }}>{value}</span>
     </div>
   );
 }

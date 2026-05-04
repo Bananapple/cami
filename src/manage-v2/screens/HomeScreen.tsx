@@ -18,7 +18,7 @@ export function HomeScreen() {
   const dash = useHomeDashboard(period);
 
   return (
-    <div style={{ maxWidth: 1080 }}>
+    <>
       <Greeting period={period} setPeriod={setPeriod} periodStart={dash.periodStart} />
 
       <Kpis period={period} dash={dash} currency={currency} />
@@ -28,7 +28,7 @@ export function HomeScreen() {
       <BookingTrend spark={dash.spark} period={period} />
 
       <Traffic data={dash.analytics} loading={dash.analyticsLoading} />
-    </div>
+    </>
   );
 }
 

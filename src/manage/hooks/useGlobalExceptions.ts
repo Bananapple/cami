@@ -16,6 +16,20 @@ export type GlobalException = {
 
 const TAG = "global_cancel";
 
+// Re-materialize a 90-day window forward from today. Required after any
+// rule or exception change so class_instances reflect the new schedule.
+async function rematerialize(studioId: string) {
+  const today = new Date().toISOString().slice(0, 10);
+  const ninetyDays = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000)
+    .toISOString()
+    .slice(0, 10);
+  await supabase.rpc("materialize_class_instances" as any, {
+    _studio_id: studioId,
+    _from: today,
+    _to: ninetyDays,
+  });
+}
+
 export function useGlobalExceptions() {
   const studioCtx = useStudioContext();
   const studioId = studioCtx?.studio?.id;
@@ -95,8 +109,8 @@ export function useGlobalExceptions() {
       if (e2) throw e2;
 
       // Re-materialize so the existing un-booked instances on that date
-      // get cleaned up.
-      await supabase.rpc("materialize_class_instances" as any);
+      // get cleaned up. The RPC requires studio_id + a date range.
+      await rematerialize(studioId);
     },
     onSuccess: invalidate,
   });
@@ -112,7 +126,7 @@ export function useGlobalExceptions() {
         .eq("kind", "cancel")
         .like("reason", `${TAG}%`);
       if (error) throw error;
-      await supabase.rpc("materialize_class_instances" as any);
+      await rematerialize(studioId);
     },
     onSuccess: invalidate,
   });

@@ -40,7 +40,7 @@ export function ClientsScreen() {
             ? "Loading…"
             : `${members.length} member${members.length === 1 ? "" : "s"} · ${newThisMonth} new this month`
         }
-        actions={<Button variant="primary" onClick={() => setAddClientOpen(true)}>+ Add client</Button>}
+        actions={<Button variant="ghost" onClick={() => setAddClientOpen(true)}>+ Add client</Button>}
       />
 
       {/* Segments */}

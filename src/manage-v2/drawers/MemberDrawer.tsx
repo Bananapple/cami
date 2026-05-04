@@ -110,7 +110,7 @@ export function MemberDrawerV2({
             </p>
           </DrawerSection>
 
-          <DrawerSection title="Recent activity">
+          <DrawerSection title="Recent activity" flush>
             {recentActivity.length === 0 ? (
               <EmptyState title="No bookings yet" hint="Once they book a class, it'll show up here." />
             ) : (
