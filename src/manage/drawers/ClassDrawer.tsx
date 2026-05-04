@@ -91,7 +91,7 @@ export function ClassDrawer({
 
   const { data: allAttendees = [] } = useClassAttendance(cls?.id);
   const attending = allAttendees.filter((a) => a.status === "confirmed" || a.status === "pending");
-  const cancelledBookings = allAttendees.filter((a) => a.status === "cancelled" || a.status === "payment_failed");
+  const cancelledBookings = allAttendees.filter((a) => a.status === "cancelled");
   const { entries: waitlist, remove: removeFromWaitlist } = useClassWaitlist(cls?.id);
   const { push } = useDrawerStack();
 
