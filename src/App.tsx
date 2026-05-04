@@ -17,6 +17,7 @@ import Dashboard from "./pages/Dashboard";
 import ArticleDetail from "./pages/ArticleDetail";
 import NotFound from "./pages/NotFound";
 import { ManageApp } from "./manage/ManageApp";
+import { PrimitivesPreview } from "./manage-v2/_dev/PrimitivesPreview";
 
 const queryClient = new QueryClient();
 
@@ -68,6 +69,7 @@ const App = () => (
           <Route path="/joinnow" element={<JoinNow />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/manage/*" element={<ManageApp />} />
+          <Route path="/_v2/primitives" element={<PrimitivesPreview />} />
           <Route path="/insights/:slug" element={<ArticleDetail />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
