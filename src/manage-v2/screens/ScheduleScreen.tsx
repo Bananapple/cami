@@ -9,12 +9,14 @@ import { useSchedule, type ScheduleClass } from "@/manage/hooks/useSchedule";
 import { useStudioContext } from "@/context/StudioContext";
 import { formatDate, formatTime } from "@/lib/timezone";
 import { ClassDrawerV2 } from "../drawers/ClassDrawer";
+import { MemberDrawerV2 } from "../drawers/MemberDrawer";
 
 export function ScheduleScreen() {
   const studioCtx = useStudioContext();
   const studioTz = studioCtx?.studio?.timezone ?? "Europe/Oslo";
   const { classes, isLoading } = useSchedule(4);
   const [activeClassId, setActiveClassId] = useState<string | null>(null);
+  const [activeMemberId, setActiveMemberId] = useState<string | null>(null);
 
   const grouped = useMemo(() => groupByDay(classes ?? [], studioTz), [classes, studioTz]);
   const totalCount = classes?.length ?? 0;
@@ -62,6 +64,14 @@ export function ScheduleScreen() {
         cls={activeClass}
         open={!!activeClass}
         onClose={() => setActiveClassId(null)}
+        onMemberClick={(uid) => setActiveMemberId(uid)}
+      />
+
+      {/* Nested member drawer (one nesting level allowed per spec) */}
+      <MemberDrawerV2
+        userId={activeMemberId}
+        open={!!activeMemberId}
+        onClose={() => setActiveMemberId(null)}
       />
     </>
   );
