@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { PageHeader } from "../shell/PageHeader";
 import { Button } from "../components/Button";
 import { Row, RowList } from "../components/Row";
@@ -8,6 +9,9 @@ import { useManageProducts, type Product } from "@/manage/hooks/useManageProduct
 import { useManageInstructors, type ManagedInstructor } from "@/manage/hooks/useManageInstructors";
 import { useManageLocations, type ManagedLocation } from "@/manage/hooks/useManageLocations";
 import { useStudioContext } from "@/context/StudioContext";
+import { ProductDrawerV2 } from "../drawers/ProductDrawer";
+import { InstructorDrawerV2 } from "../drawers/InstructorDrawer";
+import { LocationDrawerV2 } from "../drawers/LocationDrawer";
 
 const TYPE_LABEL: Record<string, string> = {
   drop_in: "Drop-in",
@@ -17,6 +21,8 @@ const TYPE_LABEL: Record<string, string> = {
   addon: "Add-on",
 };
 
+type DrawerState<T> = { mode: "create" } | { mode: "edit"; entity: T } | null;
+
 export function StudioScreen() {
   const studioCtx = useStudioContext();
   const currency = studioCtx?.studio?.currency ?? "NOK";
@@ -24,6 +30,10 @@ export function StudioScreen() {
   const { data: products = [], isLoading: pLoading, toggleActive: toggleProduct } = useManageProducts();
   const { instructors, isLoading: iLoading, toggleActive: toggleInstructor } = useManageInstructors();
   const { locations, isLoading: lLoading, toggleActive: toggleLocation } = useManageLocations();
+
+  const [productDrawer, setProductDrawer] = useState<DrawerState<Product>>(null);
+  const [instructorDrawer, setInstructorDrawer] = useState<DrawerState<ManagedInstructor>>(null);
+  const [locationDrawer, setLocationDrawer] = useState<DrawerState<ManagedLocation>>(null);
 
   return (
     <>
@@ -34,7 +44,7 @@ export function StudioScreen() {
       />
 
       {/* Products */}
-      <SectionHead title="Products" cta="Add product" onClick={() => alert("TODO: open product drawer")} />
+      <SectionHead title="Products" cta="Add product" onClick={() => setProductDrawer({ mode: "create" })} />
       <RowList>
         {pLoading && <LoadingRow text="Loading products…" />}
         {!pLoading && products.length === 0 && (
@@ -45,13 +55,14 @@ export function StudioScreen() {
             key={p.id}
             product={p}
             currency={currency}
+            onEdit={() => setProductDrawer({ mode: "edit", entity: p })}
             onToggle={() => toggleProduct.mutate({ id: p.id, is_active: !p.is_active })}
           />
         ))}
       </RowList>
 
       {/* Instructors */}
-      <SectionHead title="Instructors" cta="Add instructor" onClick={() => alert("TODO: open instructor drawer")} />
+      <SectionHead title="Instructors" cta="Add instructor" onClick={() => setInstructorDrawer({ mode: "create" })} />
       <RowList>
         {iLoading && <LoadingRow text="Loading instructors…" />}
         {!iLoading && instructors.length === 0 && (
@@ -61,13 +72,14 @@ export function StudioScreen() {
           <InstructorRow
             key={i.id}
             instructor={i}
+            onEdit={() => setInstructorDrawer({ mode: "edit", entity: i })}
             onToggle={() => toggleInstructor.mutate({ id: i.id, is_active: !i.is_active })}
           />
         ))}
       </RowList>
 
       {/* Locations */}
-      <SectionHead title="Locations" cta="Add location" onClick={() => alert("TODO: open location drawer")} />
+      <SectionHead title="Locations" cta="Add location" onClick={() => setLocationDrawer({ mode: "create" })} />
       <RowList>
         {lLoading && <LoadingRow text="Loading locations…" />}
         {!lLoading && locations.length === 0 && (
@@ -77,10 +89,31 @@ export function StudioScreen() {
           <LocationRow
             key={l.id}
             location={l}
+            onEdit={() => setLocationDrawer({ mode: "edit", entity: l })}
             onToggle={() => toggleLocation.mutate({ id: l.id, is_active: !l.is_active })}
           />
         ))}
       </RowList>
+
+      {/* Drawers */}
+      <ProductDrawerV2
+        mode={productDrawer?.mode ?? "create"}
+        product={productDrawer?.mode === "edit" ? productDrawer.entity : null}
+        open={!!productDrawer}
+        onClose={() => setProductDrawer(null)}
+      />
+      <InstructorDrawerV2
+        mode={instructorDrawer?.mode ?? "create"}
+        instructor={instructorDrawer?.mode === "edit" ? instructorDrawer.entity : null}
+        open={!!instructorDrawer}
+        onClose={() => setInstructorDrawer(null)}
+      />
+      <LocationDrawerV2
+        mode={locationDrawer?.mode ?? "create"}
+        location={locationDrawer?.mode === "edit" ? locationDrawer.entity : null}
+        open={!!locationDrawer}
+        onClose={() => setLocationDrawer(null)}
+      />
     </>
   );
 }
@@ -108,10 +141,12 @@ function LoadingRow({ text }: { text: string }) {
 function ProductRow({
   product,
   currency,
+  onEdit,
   onToggle,
 }: {
   product: Product;
   currency: string;
+  onEdit: () => void;
   onToggle: () => void;
 }) {
   const priceFormatted = `${currency} ${(product.price_minor / 100).toLocaleString("nb-NO")}`;
@@ -141,22 +176,20 @@ function ProductRow({
           <OverflowMenu
             items={[
               { id: "edit", label: "Edit", group: 1 },
-              { id: "duplicate", label: "Duplicate", group: 1 },
               {
                 id: "toggle",
                 label: product.is_active ? "Deactivate" : "Activate",
                 group: 2,
               },
-              { id: "delete", label: "Delete", group: 3, danger: true, dialog: true },
             ]}
             onAction={(id) => {
               if (id === "toggle") onToggle();
-              else alert("TODO: " + id);
+              else if (id === "edit") onEdit();
             }}
           />
         </>
       }
-      onSelect={() => alert("TODO: open product drawer")}
+      onSelect={onEdit}
     />
   );
 }
@@ -186,9 +219,11 @@ function ProductGlyph({ type }: { type: string }) {
 // ── Instructor row ──────────────────────────────────────────────────
 function InstructorRow({
   instructor,
+  onEdit,
   onToggle,
 }: {
   instructor: ManagedInstructor;
+  onEdit: () => void;
   onToggle: () => void;
 }) {
   const statusBadge = (() => {
@@ -230,12 +265,12 @@ function InstructorRow({
             ]}
             onAction={(id) => {
               if (id === "toggle") onToggle();
-              else alert("TODO: " + id);
+              else if (id === "edit") onEdit();
             }}
           />
         </>
       }
-      onSelect={() => alert("TODO: open instructor drawer")}
+      onSelect={onEdit}
     />
   );
 }
@@ -243,9 +278,11 @@ function InstructorRow({
 // ── Location row ────────────────────────────────────────────────────
 function LocationRow({
   location,
+  onEdit,
   onToggle,
 }: {
   location: ManagedLocation;
+  onEdit: () => void;
   onToggle: () => void;
 }) {
   return (
@@ -283,12 +320,12 @@ function LocationRow({
             ]}
             onAction={(id) => {
               if (id === "toggle") onToggle();
-              else alert("TODO: " + id);
+              else if (id === "edit") onEdit();
             }}
           />
         </>
       }
-      onSelect={() => alert("TODO: open location drawer")}
+      onSelect={onEdit}
     />
   );
 }
