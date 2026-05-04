@@ -90,8 +90,8 @@ export function ClassDrawer({
   const qc = useQueryClient();
 
   const { data: allAttendees = [] } = useClassAttendance(cls?.id);
-  const attending = allAttendees.filter((a) => a.status !== "cancelled");
-  const cancelledBookings = allAttendees.filter((a) => a.status === "cancelled");
+  const attending = allAttendees.filter((a) => a.status === "confirmed" || a.status === "pending");
+  const cancelledBookings = allAttendees.filter((a) => a.status === "cancelled" || a.status === "payment_failed");
   const { entries: waitlist, remove: removeFromWaitlist } = useClassWaitlist(cls?.id);
   const { push } = useDrawerStack();
 
@@ -540,7 +540,9 @@ function AttendeeRow({ attendee, onNameClick, onCheckIn }: {
   onCheckIn: () => void;
 }) {
   const checkedIn = !!attendee.checked_in_at;
-  const badge = attendee.membership_id
+  const badge = attendee.status === "payment_failed"
+    ? { label: "Failed", cls: "bg-destructive/10 text-destructive" }
+    : attendee.membership_id
     ? { label: "Membership", cls: "bg-muted text-muted-foreground" }
     : { label: "Paid", cls: "bg-green-500/10 text-green-700" };
 
