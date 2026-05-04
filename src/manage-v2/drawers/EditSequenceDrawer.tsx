@@ -762,26 +762,14 @@ const chipCancelButtonStyle: React.CSSProperties = {
   cursor: "pointer",
 };
 
-// ── Action button (filled red circle for save/add, ghost square for delete) ──
+// ── Action button (square with rounded corners, matches time input shape) ──
 function CircleSave({ onClick, ariaLabel }: { onClick: () => void; ariaLabel: string }) {
   return (
     <button
       type="button"
       onClick={onClick}
       aria-label={ariaLabel}
-      style={{
-        width: 26,
-        height: 26,
-        borderRadius: "50%",
-        border: 0,
-        background: "var(--action)",
-        color: "white",
-        cursor: "pointer",
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 0,
-      }}
+      style={squareButtonStyle("primary")}
     >
       <PlusIcon />
     </button>
@@ -794,37 +782,42 @@ function GhostTrash({ onClick, ariaLabel }: { onClick: () => void; ariaLabel: st
       type="button"
       onClick={onClick}
       aria-label={ariaLabel}
-      style={{
-        width: 26,
-        height: 26,
-        borderRadius: "50%",
-        border: "1px solid var(--line)",
-        background: "var(--surface)",
-        color: "var(--ink-muted)",
-        cursor: "pointer",
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 0,
-      }}
+      style={squareButtonStyle("ghost")}
     >
       <TrashIcon />
     </button>
   );
 }
 
+function squareButtonStyle(variant: "primary" | "ghost"): React.CSSProperties {
+  const filled = variant === "primary";
+  return {
+    width: 28,
+    height: 28,
+    borderRadius: "var(--r-input)",
+    border: filled ? 0 : "1px solid var(--line)",
+    background: filled ? "var(--action)" : "var(--surface)",
+    color: filled ? "white" : "var(--ink-soft)",
+    cursor: "pointer",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 0,
+  };
+}
+
 function PlusIcon() {
   return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.75" strokeLinecap="round">
       <path d="M12 5v14M5 12h14" />
     </svg>
   );
 }
 
 function TrashIcon() {
-  // Lucide-style trash can
+  // Lucide-style trash can — thicker stroke for clarity at 14px
   return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round">
       <path d="M3 6h18" />
       <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
       <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
