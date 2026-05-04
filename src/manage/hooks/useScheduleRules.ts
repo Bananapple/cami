@@ -124,10 +124,72 @@ export function useScheduleRules() {
     onSuccess: invalidate,
   });
 
+  // Single-time-slot insert. Each call creates one rule for one day at one time.
+  const addRule = useMutation({
+    mutationFn: async (input: {
+      template_id: string;
+      day_of_week: number;
+      start_time: string; // "HH:MM"
+      duration_minutes: number;
+      max_capacity: number;
+      price: number;
+      instructor_id: string | null;
+      location_id: string | null;
+    }) => {
+      if (!studioId) throw new Error("No studio");
+      const today = new Date().toISOString().slice(0, 10);
+      const { error } = await supabase.from("schedule_rules").insert({
+        studio_id: studioId,
+        template_id: input.template_id,
+        day_of_week: input.day_of_week,
+        start_time: input.start_time,
+        duration_minutes: input.duration_minutes,
+        max_capacity: input.max_capacity,
+        price: input.price,
+        instructor_id: input.instructor_id,
+        location_id: input.location_id,
+        effective_from: today,
+        is_active: true,
+      });
+      if (error) throw error;
+      await rematerialize();
+    },
+    onSuccess: invalidate,
+  });
+
+  // Cancel a single time slot. Soft-deletes the rule AND deletes any
+  // already-materialized future un-booked instances tied to it. Booked
+  // instances are kept so the manager can handle them manually.
+  const cancelRule = useMutation({
+    mutationFn: async (id: string) => {
+      const today = new Date().toISOString().slice(0, 10);
+      // 1. Deactivate
+      const { error: e1 } = await supabase
+        .from("schedule_rules")
+        .update({ is_active: false, effective_until: today })
+        .eq("id", id);
+      if (e1) throw e1;
+
+      // 2. Delete future un-booked instances for this rule
+      // We use booked_count as the proxy (matches the materializer's guard).
+      const { error: e2 } = await supabase
+        .from("class_instances")
+        .delete()
+        .eq("rule_id", id)
+        .gte("starts_at", new Date().toISOString())
+        .eq("status", "scheduled")
+        .eq("booked_count", 0);
+      if (e2) throw e2;
+    },
+    onSuccess: invalidate,
+  });
+
   return {
     rules: query.data ?? [],
     isLoading: query.isLoading,
     createRules,
     deactivateRule,
+    addRule,
+    cancelRule,
   };
 }
