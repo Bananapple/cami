@@ -7,12 +7,11 @@ import { StudioScreen } from "./screens/StudioScreen";
 import { ScheduleScreen } from "./screens/ScheduleScreen";
 import { HomeScreen } from "./screens/HomeScreen";
 import { ClientsScreen } from "./screens/ClientsScreen";
+import { TodayScreen } from "./screens/TodayScreen";
 import { useStudioContext } from "@/context/StudioContext";
 import { useAuth } from "@/hooks/useAuth";
 import { StaffGate } from "@/manage/components/StaffGate";
 
-// Stub screens — replaced as Phase 4 progresses
-const TodayStub = () => <p style={{ color: "var(--ink-muted)" }}>Today screen — TBD.</p>;
 
 export function ManageV2App() {
   const navigate = useNavigate();
@@ -57,7 +56,7 @@ export function ManageV2App() {
         <Routes>
           <Route index element={<Navigate to="home" replace />} />
           <Route path="home" element={<HomeScreen />} />
-          <Route path="today" element={<TodayStub />} />
+          <Route path="today" element={<TodayScreen />} />
           <Route path="schedule" element={<ScheduleScreen />} />
           <Route path="clients" element={<ClientsScreen />} />
           <Route path="studio" element={<StudioScreen />} />

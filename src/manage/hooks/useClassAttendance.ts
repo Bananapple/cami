@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
 export type Attendee = {
@@ -15,7 +15,9 @@ export const attendanceQueryKey = (classInstanceId: string | undefined) =>
   ["manage", "class", classInstanceId, "attendance"] as const;
 
 export function useClassAttendance(classInstanceId: string | undefined) {
-  return useQuery({
+  const qc = useQueryClient();
+
+  const query = useQuery({
     queryKey: attendanceQueryKey(classInstanceId),
     enabled: !!classInstanceId,
     queryFn: async (): Promise<Attendee[]> => {
@@ -41,4 +43,22 @@ export function useClassAttendance(classInstanceId: string | undefined) {
       }));
     },
   });
+
+  const toggleCheckIn = useMutation({
+    mutationFn: async ({ booking_id, currently_checked_in }: { booking_id: string; currently_checked_in: boolean }) => {
+      const value = currently_checked_in ? null : new Date().toISOString();
+      const { error } = await supabase
+        .from("bookings")
+        .update({ checked_in_at: value })
+        .eq("id", booking_id);
+      if (error) throw error;
+    },
+    // Invalidate attendance for this class + the schedule (so booked/attended counts refresh)
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: attendanceQueryKey(classInstanceId) });
+      qc.invalidateQueries({ queryKey: ["manage", "schedule"] });
+    },
+  });
+
+  return { ...query, toggleCheckIn };
 }
