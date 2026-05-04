@@ -71,6 +71,12 @@
 }
 .sm-app * { box-sizing: border-box; }
 .sm-app button { font-family: inherit; }
+/* Override global DM Serif Display on h1-h6 from index.css base layer.
+   v2 spec: Inter only across /manage. Drawer title is the only lightly
+   styled heading and stays Inter as well. */
+.sm-app h1, .sm-app h2, .sm-app h3, .sm-app h4, .sm-app h5, .sm-app h6 {
+  font-family: 'Inter', system-ui, sans-serif;
+}
 
 /* —— Layout ————————————————————————————————— */
 .sm-shell {

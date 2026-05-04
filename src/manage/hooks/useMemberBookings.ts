@@ -6,6 +6,7 @@ export type MemberBooking = {
   status: string;
   starts_at: string;
   class_name: string;
+  class_level: string | null;
   location_timezone: string | null;
   booked_at: string | null;
   cancelled_at: string | null;
@@ -28,7 +29,7 @@ export function useMemberBookings(userId: string | undefined) {
           id, status, booked_at, cancelled_at, checked_in_at, payment_id, membership_id,
           class_instances (
             starts_at,
-            class_templates ( name ),
+            class_templates ( name, level ),
             locations ( timezone )
           ),
           payments ( status, amount, refunded_amount )
@@ -45,6 +46,7 @@ export function useMemberBookings(userId: string | undefined) {
         status: b.status,
         starts_at: b.class_instances?.starts_at ?? "",
         class_name: b.class_instances?.class_templates?.name ?? "Class",
+        class_level: b.class_instances?.class_templates?.level ?? null,
         location_timezone: b.class_instances?.locations?.timezone ?? null,
         booked_at: b.booked_at ?? null,
         cancelled_at: b.cancelled_at ?? null,

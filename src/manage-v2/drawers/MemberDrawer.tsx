@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Drawer, DrawerSection, EditLink } from "../components/Drawer";
+import { Drawer, DrawerSection } from "../components/Drawer";
 import { Button } from "../components/Button";
 import { StateBadge, CategoryChip, Count } from "../components/Badge";
 import { Stat, StatGrid } from "../components/Stat";
@@ -31,21 +31,14 @@ export function MemberDrawerV2({
   const { data: bookings = [] } = useMemberBookings(userId ?? undefined);
   const { data: notifications = [] } = useNotificationLog(userId ?? undefined);
 
-  // Year-to-date stats
   const ytdStats = useMemo(() => computeYtdStats(bookings), [bookings]);
-
-  // Recent activity — last 4 confirmed bookings (any time)
   const recentActivity = useMemo(
-    () =>
-      bookings
-        .filter((b) => b.status === "confirmed")
-        .slice(0, 4),
+    () => bookings.filter((b) => b.status === "confirmed").slice(0, 4),
     [bookings]
   );
 
   if (!userId) return null;
 
-  // Plan health for the header badge
   const planHealth = member
     ? getPlanHealth({
         membership_id: member.membership?.id ?? null,
@@ -99,10 +92,9 @@ export function MemberDrawerV2({
     >
       {!member && <p style={{ padding: "16px 20px", color: "var(--ink-muted)", fontSize: 13 }}>Loading…</p>}
 
-      {/* ── Overview ── */}
       {member && tab === "overview" && (
         <>
-          <DrawerSection title="Stats · This year" borderless>
+          <DrawerSection title="Stats · This year">
             <StatGrid>
               <Stat label="Booked" value={ytdStats.booked} />
               <Stat label="Attended" value={ytdStats.attended} />
@@ -111,47 +103,21 @@ export function MemberDrawerV2({
             </StatGrid>
           </DrawerSection>
 
-          {/* Member insights — placeholder, server-side computation pending */}
-          <DrawerSection title="Member insights" borderless>
+          <DrawerSection title="Member insights">
             <p style={{ margin: 0, color: "var(--ink-muted)", fontSize: 13, fontStyle: "italic" }}>
               Coming soon — booking frequency timeline and most-booked class.
             </p>
           </DrawerSection>
 
-          <DrawerSection title="Recent activity" borderless>
+          <DrawerSection title="Recent activity">
             {recentActivity.length === 0 ? (
               <EmptyState title="No bookings yet" hint="Once they book a class, it'll show up here." />
             ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-                {recentActivity.map((b) => {
-                  const tz = b.location_timezone ?? studioTz;
-                  return (
-                    <Row
-                      key={b.id}
-                      lead={
-                        <span
-                          style={{
-                            fontFamily: "'JetBrains Mono', monospace",
-                            fontSize: 11,
-                            color: "var(--ink-soft)",
-                            fontVariantNumeric: "tabular-nums",
-                          }}
-                        >
-                          {formatDate(b.starts_at, tz, { day: "numeric", month: "short" })}
-                        </span>
-                      }
-                      title={b.class_name}
-                      meta={formatTime(b.starts_at, tz)}
-                      trail={<BookingPaymentBadge b={b} />}
-                      static
-                    />
-                  );
-                })}
-              </div>
+              <ActivityList bookings={recentActivity} tz={studioTz} />
             )}
           </DrawerSection>
 
-          <DrawerSection title="Member information" borderless action={<EditLink onClick={() => alert("TODO: edit member info")}>Edit</EditLink>}>
+          <DrawerSection title="Member information">
             <KV label="Email" value={member.email ?? "—"} />
             <KV label="Phone" value={member.phone_number ?? "—"} />
             <KV label="Level" value={member.level ?? "—"} />
@@ -164,11 +130,7 @@ export function MemberDrawerV2({
                   : "—"
               }
             />
-            <KV
-              label="Source"
-              value="—"
-              hint="Source attribution coming soon"
-            />
+            <KV label="Source" value="—" hint="Source attribution coming soon" />
             <KV
               label="Referral"
               value={
@@ -181,47 +143,18 @@ export function MemberDrawerV2({
         </>
       )}
 
-      {/* ── Activity ── */}
       {member && tab === "activity" && (
         <DrawerSection title={`Activity · ${bookings.length}`} flush>
-          {bookings.length === 0 && (
+          {bookings.length === 0 ? (
             <EmptyState title="No bookings yet" hint="Once they book a class, it'll show up here." />
+          ) : (
+            <ActivityList bookings={bookings} tz={studioTz} />
           )}
-          {bookings.map((b) => {
-            const tz = b.location_timezone ?? studioTz;
-            const isCancelled = b.status === "cancelled";
-            return (
-              <Row
-                key={b.id}
-                lead={
-                  <span
-                    style={{
-                      fontFamily: "'JetBrains Mono', monospace",
-                      fontSize: 11,
-                      color: "var(--ink-soft)",
-                      fontVariantNumeric: "tabular-nums",
-                    }}
-                  >
-                    {formatDate(b.starts_at, tz, { day: "numeric", month: "short" })}
-                  </span>
-                }
-                title={
-                  <span style={isCancelled ? { color: "var(--ink-muted)", textDecoration: "line-through" } : undefined}>
-                    {b.class_name}
-                  </span>
-                }
-                meta={formatTime(b.starts_at, tz)}
-                trail={<BookingPaymentBadge b={b} />}
-                static
-              />
-            );
-          })}
         </DrawerSection>
       )}
 
-      {/* ── Billing ── */}
       {member && tab === "billing" && (
-        <DrawerSection title="Billing" borderless>
+        <DrawerSection title="Billing">
           {!member.membership ? (
             <EmptyState title="No payment activity" hint="Subscriptions and payments will appear here." />
           ) : (
@@ -238,7 +171,6 @@ export function MemberDrawerV2({
         </DrawerSection>
       )}
 
-      {/* ── Notes (emails) ── */}
       {member && tab === "notes" && (
         <DrawerSection title={`Emails sent · ${notifications.length}`} flush>
           {notifications.length === 0 && <EmptyState title="No emails sent yet" />}
@@ -266,7 +198,40 @@ export function MemberDrawerV2({
   );
 }
 
-// ── Year-to-date stats from member bookings ────────────────────────
+// ── Activity list (shared by Overview "Recent activity" + Activity tab) ──
+// Title: class name + level chip
+// Meta: "Sun 4 May · 11:30"
+// Trail: status badge (Booked/Attended/No-show/Refunded/etc.)
+function ActivityList({ bookings, tz }: { bookings: MemberBooking[]; tz: string }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column" }}>
+      {bookings.map((b) => {
+        const localTz = b.location_timezone ?? tz;
+        const isCancelled = b.status === "cancelled";
+        const dateStr = formatDate(b.starts_at, localTz, { weekday: "short", day: "numeric", month: "short" });
+        const timeStr = formatTime(b.starts_at, localTz);
+        return (
+          <Row
+            key={b.id}
+            title={
+              <>
+                <span style={isCancelled ? { color: "var(--ink-muted)", textDecoration: "line-through" } : undefined}>
+                  {b.class_name}
+                </span>
+                {b.class_level && <CategoryChip>{b.class_level}</CategoryChip>}
+              </>
+            }
+            meta={`${dateStr} · ${timeStr}`}
+            trail={<BookingStatusBadge b={b} />}
+            static
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+// ── Year-to-date stats ─────────────────────────────────────────────
 function computeYtdStats(bookings: MemberBooking[]) {
   const yearStart = new Date(new Date().getFullYear(), 0, 1).getTime();
   const now = Date.now();
@@ -289,10 +254,7 @@ function computeYtdStats(bookings: MemberBooking[]) {
       }
     }
 
-    // Spend: count any payment that ran (succeeded or refunded) — net of refund
-    if (b.payment_status === "succeeded" && b.payment_amount) {
-      spend += b.payment_amount - (b.payment_refunded ?? 0);
-    } else if (b.payment_status === "partially_refunded" && b.payment_amount) {
+    if ((b.payment_status === "succeeded" || b.payment_status === "partially_refunded") && b.payment_amount) {
       spend += b.payment_amount - (b.payment_refunded ?? 0);
     }
   }
@@ -300,18 +262,19 @@ function computeYtdStats(bookings: MemberBooking[]) {
   return { booked, attended, noShows, spend };
 }
 
-// ── Booking payment badge (shared logic with Activity tab) ─────────
-function BookingPaymentBadge({ b }: { b: MemberBooking }) {
+// ── BookingStatusBadge ─────────────────────────────────────────────
+// Single source of truth for the trailing badge across Activity views.
+function BookingStatusBadge({ b }: { b: MemberBooking }) {
   const WINDOW_MS = 24 * 60 * 60 * 1000;
+  const isPast = b.starts_at && new Date(b.starts_at).getTime() < Date.now();
 
   if (b.status === "confirmed") {
-    return b.membership_id ? (
-      <StateBadge tone="neutral">Membership</StateBadge>
-    ) : (
-      <StateBadge tone="good">Paid</StateBadge>
-    );
+    if (b.checked_in_at) return <StateBadge tone="good">Attended</StateBadge>;
+    if (isPast) return <StateBadge tone="warn">No-show</StateBadge>;
+    return <StateBadge tone="good">Booked</StateBadge>;
   }
 
+  // Cancelled
   if (b.membership_id) {
     const within =
       b.cancelled_at &&
@@ -332,7 +295,7 @@ function BookingPaymentBadge({ b }: { b: MemberBooking }) {
   return <StateBadge tone="neutral">No refund</StateBadge>;
 }
 
-// ── KV (label/value pair, supports a hint) ─────────────────────────
+// ── KV (label / value pair, optional hint) ─────────────────────────
 function KV({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
     <div style={{ padding: "6px 0", fontSize: 13 }}>
