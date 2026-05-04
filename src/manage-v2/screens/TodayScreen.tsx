@@ -53,7 +53,7 @@ export function TodayScreen() {
             : `${todayLabel} · ${todayClasses.length} class${todayClasses.length === 1 ? "" : "es"}`
         }
         actions={
-          <Button variant="ghost" onClick={() => navigate("/_v2/schedule")}>
+          <Button variant="ghost" onClick={() => navigate("/manage/schedule")}>
             View schedule
           </Button>
         }
@@ -231,7 +231,7 @@ function ClassAttendees({ cls }: { cls: ScheduleClass }) {
         <Button variant="ghost" size="sm" onClick={() => alert("TODO: walk-in flow")}>
           Add walk-in
         </Button>
-        <Button variant="ghost" size="sm" onClick={() => navigate(`/_v2/schedule?class=${cls.id}`)}>
+        <Button variant="ghost" size="sm" onClick={() => navigate(`/manage/schedule?class=${cls.id}`)}>
           Class details
         </Button>
       </div>

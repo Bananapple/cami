@@ -36,10 +36,10 @@ export function ManageV2App() {
 
   // Minimal command items for now — Phase 4.5 will wire real members + classes
   const commandItems: CommandItem[] = [
-    { id: "home", group: "Navigation", label: "Home", onSelect: () => navigate("/_v2/home") },
-    { id: "schedule", group: "Navigation", label: "Schedule", onSelect: () => navigate("/_v2/schedule") },
-    { id: "clients", group: "Navigation", label: "Clients", onSelect: () => navigate("/_v2/clients") },
-    { id: "studio", group: "Navigation", label: "Studio settings", onSelect: () => navigate("/_v2/studio") },
+    { id: "home", group: "Navigation", label: "Home", onSelect: () => navigate("/manage/home") },
+    { id: "schedule", group: "Navigation", label: "Schedule", onSelect: () => navigate("/manage/schedule") },
+    { id: "clients", group: "Navigation", label: "Clients", onSelect: () => navigate("/manage/clients") },
+    { id: "studio", group: "Navigation", label: "Studio settings", onSelect: () => navigate("/manage/studio") },
     { id: "signout", group: "Account", label: "Sign out", onSelect: () => signOut() },
   ];
 
@@ -47,7 +47,7 @@ export function ManageV2App() {
     <StaffGate>
       <Shell
         active={active}
-        onNavigate={(id) => navigate("/_v2/" + id)}
+        onNavigate={(id) => navigate("/manage/" + id)}
         brandName={brandName}
         userInitials={userInitials}
         userName={userName}

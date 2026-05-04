@@ -443,6 +443,32 @@
   display: flex; flex-direction: column;
   box-shadow: -1px 0 0 rgba(0,0,0,0.02);
 }
+
+/* Mobile: drawer becomes a bottom sheet — full width, top-anchored
+   close to the top of the viewport so the action bar at the bottom
+   is reachable with a thumb. */
+@media (max-width: 640px) {
+  .sm-drawer-scrim {
+    position: fixed;
+  }
+  .sm-drawer {
+    position: fixed;
+    top: auto;
+    left: 0; right: 0; bottom: 0;
+    width: 100%;
+    max-height: 92vh;
+    border-left: 0;
+    border-top: 1px solid var(--line);
+    border-radius: var(--r-large) var(--r-large) 0 0;
+    box-shadow: 0 -8px 24px rgba(20,18,16,0.10);
+  }
+  .sm-drawer-head { padding: 14px 16px; }
+  .sm-drawer-section { padding: 14px 16px; }
+  .sm-drawer-actions { padding: 12px 16px; padding-bottom: max(12px, env(safe-area-inset-bottom)); }
+
+  /* The page content under the drawer should not double-scroll */
+  body { overscroll-behavior: contain; }
+}
 .sm-drawer-head {
   padding: 16px 20px;
   border-bottom: 1px solid var(--line-soft);

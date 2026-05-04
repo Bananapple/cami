@@ -70,10 +70,13 @@ const App = () => (
           <Route path="/journal" element={<Insights />} />
           <Route path="/joinnow" element={<JoinNow />} />
           <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/manage/*" element={<ManageApp />} />
+          {/* v2 is now the default at /manage/* */}
+          <Route path="/manage/*" element={<ManageV2App />} />
+          {/* Legacy /manage available for rollback */}
+          <Route path="/manage-legacy/*" element={<ManageApp />} />
+          {/* Dev / design references */}
           <Route path="/_v2/primitives" element={<PrimitivesPreview />} />
           <Route path="/_v2/shell" element={<ShellPreview />} />
-          <Route path="/_v2/*" element={<ManageV2App />} />
           <Route path="/insights/:slug" element={<ArticleDetail />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
