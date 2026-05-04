@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { PageHeader } from "../shell/PageHeader";
 import { Button } from "../components/Button";
 import { Row, RowList } from "../components/Row";
@@ -8,14 +8,17 @@ import { EmptyState } from "../components/EmptyState";
 import { useSchedule, type ScheduleClass } from "@/manage/hooks/useSchedule";
 import { useStudioContext } from "@/context/StudioContext";
 import { formatDate, formatTime } from "@/lib/timezone";
+import { ClassDrawerV2 } from "../drawers/ClassDrawer";
 
 export function ScheduleScreen() {
   const studioCtx = useStudioContext();
   const studioTz = studioCtx?.studio?.timezone ?? "Europe/Oslo";
   const { classes, isLoading } = useSchedule(4);
+  const [activeClassId, setActiveClassId] = useState<string | null>(null);
 
   const grouped = useMemo(() => groupByDay(classes ?? [], studioTz), [classes, studioTz]);
   const totalCount = classes?.length ?? 0;
+  const activeClass = activeClassId ? classes?.find((c) => c.id === activeClassId) ?? null : null;
 
   return (
     <>
@@ -43,11 +46,23 @@ export function ScheduleScreen() {
         <DayGroup key={key} label={label} isToday={isToday} count={items.length}>
           <RowList>
             {items.map((c) => (
-              <ClassRow key={c.id} c={c} tz={c.location_timezone ?? studioTz} />
+              <ClassRow
+                key={c.id}
+                c={c}
+                tz={c.location_timezone ?? studioTz}
+                selected={activeClassId === c.id}
+                onClick={() => setActiveClassId(c.id)}
+              />
             ))}
           </RowList>
         </DayGroup>
       ))}
+
+      <ClassDrawerV2
+        cls={activeClass}
+        open={!!activeClass}
+        onClose={() => setActiveClassId(null)}
+      />
     </>
   );
 }
@@ -81,7 +96,17 @@ function DayGroup({
 }
 
 // ── Row for a single class instance ────────────────────────────────
-function ClassRow({ c, tz }: { c: ScheduleClass; tz: string }) {
+function ClassRow({
+  c,
+  tz,
+  selected,
+  onClick,
+}: {
+  c: ScheduleClass;
+  tz: string;
+  selected: boolean;
+  onClick: () => void;
+}) {
   const fillRatio = c.max_capacity > 0 ? c.booked_count / c.max_capacity : 0;
   const isFull = c.booked_count >= c.max_capacity;
   const isCancelled = c.status === "cancelled";
@@ -122,7 +147,8 @@ function ClassRow({ c, tz }: { c: ScheduleClass; tz: string }) {
           />
         </>
       }
-      onSelect={() => alert("TODO: open ClassDrawer")}
+      selected={selected}
+      onSelect={onClick}
     />
   );
 }
