@@ -19,6 +19,7 @@ import NotFound from "./pages/NotFound";
 import { ManageApp } from "./manage/ManageApp";
 import { PrimitivesPreview } from "./manage-v2/_dev/PrimitivesPreview";
 import { ShellPreview } from "./manage-v2/_dev/ShellPreview";
+import { ManageV2App } from "./manage-v2/ManageV2App";
 
 const queryClient = new QueryClient();
 
@@ -72,6 +73,7 @@ const App = () => (
           <Route path="/manage/*" element={<ManageApp />} />
           <Route path="/_v2/primitives" element={<PrimitivesPreview />} />
           <Route path="/_v2/shell" element={<ShellPreview />} />
+          <Route path="/_v2/*" element={<ManageV2App />} />
           <Route path="/insights/:slug" element={<ArticleDetail />} />
           <Route path="*" element={<NotFound />} />
         </Routes>

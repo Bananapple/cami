@@ -2,6 +2,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useStudioContext } from "@/context/StudioContext";
 
+export type InstructorStatus = "active" | "on_leave" | "inactive";
+
 export type ManagedInstructor = {
   id: string;
   display_name: string;
@@ -10,6 +12,7 @@ export type ManagedInstructor = {
   bio: string | null;
   image_url: string | null;
   is_active: boolean;
+  status: InstructorStatus;
 };
 
 export function useManageInstructors() {
@@ -24,7 +27,7 @@ export function useManageInstructors() {
     queryFn: async (): Promise<ManagedInstructor[]> => {
       const { data, error } = await supabase
         .from("instructors")
-        .select("id, display_name, initials, specialty, bio, image_url, is_active")
+        .select("id, display_name, initials, specialty, bio, image_url, is_active, status")
         .eq("studio_id", studioId!)
         .order("display_name");
       if (error) throw error;
