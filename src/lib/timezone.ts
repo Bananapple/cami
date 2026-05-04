@@ -1,7 +1,12 @@
 const FALLBACK_TZ = "Europe/Oslo";
+const DEFAULT_LOCALE = "en-GB";
 
-export function formatTime(date: string | Date, timezone: string = FALLBACK_TZ): string {
-  return new Date(date).toLocaleTimeString("nb-NO", {
+export function formatTime(
+  date: string | Date,
+  timezone: string = FALLBACK_TZ,
+  locale: string = DEFAULT_LOCALE
+): string {
+  return new Date(date).toLocaleTimeString(locale, {
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
@@ -12,9 +17,10 @@ export function formatTime(date: string | Date, timezone: string = FALLBACK_TZ):
 export function formatDate(
   date: string | Date,
   timezone: string = FALLBACK_TZ,
-  options?: Intl.DateTimeFormatOptions
+  options?: Intl.DateTimeFormatOptions,
+  locale: string = DEFAULT_LOCALE
 ): string {
-  return new Date(date).toLocaleDateString("nb-NO", {
+  return new Date(date).toLocaleDateString(locale, {
     timeZone: timezone,
     ...options,
   });
@@ -23,9 +29,10 @@ export function formatDate(
 export function formatDateTime(
   date: string | Date,
   timezone: string = FALLBACK_TZ,
-  options?: Intl.DateTimeFormatOptions
+  options?: Intl.DateTimeFormatOptions,
+  locale: string = DEFAULT_LOCALE
 ): string {
-  return new Date(date).toLocaleString("nb-NO", {
+  return new Date(date).toLocaleString(locale, {
     timeZone: timezone,
     ...options,
   });

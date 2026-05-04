@@ -104,15 +104,22 @@ export function DrawerSection({
   action,
   children,
   flush,
+  borderless,
 }: {
   title?: string;
   action?: ReactNode;
   children: ReactNode;
   /** Remove default padding (for embedded RowLists that span edge-to-edge) */
   flush?: boolean;
+  /** Suppress the bottom divider — use vertical whitespace instead */
+  borderless?: boolean;
 }) {
+  const sectionStyle: React.CSSProperties = {};
+  if (flush) sectionStyle.padding = 0;
+  if (borderless) sectionStyle.borderBottom = "none";
+
   return (
-    <section className="sm-drawer-section" style={flush ? { padding: 0 } : undefined}>
+    <section className="sm-drawer-section" style={sectionStyle}>
       {title && (
         <h4
           style={
@@ -133,7 +140,7 @@ export function DrawerSection({
                   zIndex: 2,
                   margin: "-16px -20px 10px",
                   padding: "16px 20px 10px",
-                  borderBottom: "1px solid var(--line-soft)",
+                  borderBottom: borderless ? "none" : "1px solid var(--line-soft)",
                 }
           }
         >

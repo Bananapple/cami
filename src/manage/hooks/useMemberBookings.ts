@@ -9,6 +9,7 @@ export type MemberBooking = {
   location_timezone: string | null;
   booked_at: string | null;
   cancelled_at: string | null;
+  checked_in_at: string | null;
   payment_id: string | null;
   membership_id: string | null;
   payment_status: string | null;
@@ -24,7 +25,7 @@ export function useMemberBookings(userId: string | undefined) {
       const { data, error } = await supabase
         .from("bookings")
         .select(`
-          id, status, booked_at, cancelled_at, payment_id, membership_id,
+          id, status, booked_at, cancelled_at, checked_in_at, payment_id, membership_id,
           class_instances (
             starts_at,
             class_templates ( name ),
@@ -35,7 +36,7 @@ export function useMemberBookings(userId: string | undefined) {
         .eq("user_id", userId)
         .in("status", ["confirmed", "cancelled"])
         .order("booked_at", { ascending: false })
-        .limit(30);
+        .limit(200);
 
       if (error) throw error;
 
@@ -47,6 +48,7 @@ export function useMemberBookings(userId: string | undefined) {
         location_timezone: b.class_instances?.locations?.timezone ?? null,
         booked_at: b.booked_at ?? null,
         cancelled_at: b.cancelled_at ?? null,
+        checked_in_at: b.checked_in_at ?? null,
         payment_id: b.payment_id ?? null,
         membership_id: b.membership_id ?? null,
         payment_status: b.payments?.status ?? null,
