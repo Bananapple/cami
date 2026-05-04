@@ -49,6 +49,7 @@ export function StudioView() {
     error: codesError,
     createCode,
     toggleActive: toggleCode,
+    updateCode,
   } = useManageDiscountCodes();
 
   const { studio, save: saveStudio } = useManageStudio();
@@ -61,6 +62,47 @@ export function StudioView() {
 
   const [addCodeOpen, setAddCodeOpen] = useState(false);
   const [newCode, setNewCode] = useState({ ...EMPTY_CODE });
+  const [editingCode, setEditingCode] = useState<DiscountCode | null>(null);
+  const [editCodeDraft, setEditCodeDraft] = useState<Omit<typeof EMPTY_CODE, "code"> & { valid_until_select: string }>({
+    description: "",
+    discount_type: "percent" as const,
+    discount_value: 10,
+    currency: null,
+    valid_until: null,
+    max_redemptions: null,
+    valid_until_select: "never",
+  });
+
+  const handleOpenEditCode = (code: DiscountCode) => {
+    setEditingCode(code);
+    setEditCodeDraft({
+      description: code.description ?? "",
+      discount_type: code.discount_type,
+      discount_value: code.discount_value,
+      currency: code.currency,
+      valid_until: code.valid_until,
+      max_redemptions: code.max_redemptions,
+      valid_until_select: code.valid_until ? "custom" : "never",
+    });
+  };
+
+  const handleSaveEditCode = async () => {
+    if (!editingCode) return;
+    try {
+      await updateCode.mutateAsync({
+        id: editingCode.id,
+        description: editCodeDraft.description || null,
+        discount_type: editCodeDraft.discount_type,
+        discount_value: Number(editCodeDraft.discount_value),
+        max_redemptions: editCodeDraft.max_redemptions ? Number(editCodeDraft.max_redemptions) : null,
+        valid_until: editCodeDraft.valid_until,
+      });
+      setEditingCode(null);
+      toast.success("Discount code updated.");
+    } catch (err: any) {
+      toast.error(err.message ?? "Failed to update code.");
+    }
+  };
 
   const handleCreateCode = async () => {
     if (!newCode.code.trim()) { toast.error("Code is required."); return; }
@@ -582,6 +624,7 @@ export function StudioView() {
               <DiscountCodeRow
                 key={code.id}
                 code={code}
+                onEdit={() => handleOpenEditCode(code)}
                 onToggle={() =>
                   toggleCode.mutate(
                     { id: code.id, is_active: !code.is_active },
@@ -590,6 +633,114 @@ export function StudioView() {
                 }
               />
             ))}
+          </div>
+        )}
+
+        {/* Edit code sheet */}
+        {editingCode && (
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40" onClick={() => setEditingCode(null)}>
+            <div className="bg-background rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md p-6 space-y-4 shadow-xl" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider font-sans">Edit code</p>
+                  <p className="text-lg font-mono tracking-widest mt-0.5">{editingCode.code}</p>
+                </div>
+                <button onClick={() => setEditingCode(null)} className="text-muted-foreground hover:text-foreground transition-colors">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="col-span-2 space-y-1">
+                  <label className="text-xs font-sans text-muted-foreground">Description</label>
+                  <input
+                    type="text"
+                    value={editCodeDraft.description ?? ""}
+                    onChange={(e) => setEditCodeDraft((d) => ({ ...d, description: e.target.value }))}
+                    placeholder="Summer promo"
+                    className="w-full px-3 py-2 text-sm bg-background border border-border rounded-md"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-sans text-muted-foreground">Type</label>
+                  <select
+                    value={editCodeDraft.discount_type}
+                    onChange={(e) => setEditCodeDraft((d) => ({ ...d, discount_type: e.target.value as any }))}
+                    className="w-full px-3 py-2 text-sm bg-background border border-border rounded-md"
+                  >
+                    <option value="percent">% off</option>
+                    <option value="fixed_off">Fixed (NOK)</option>
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-sans text-muted-foreground">
+                    {editCodeDraft.discount_type === "percent" ? "Percent" : "Amount (NOK)"}
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max={editCodeDraft.discount_type === "percent" ? "99" : undefined}
+                    value={editCodeDraft.discount_value}
+                    onChange={(e) => setEditCodeDraft((d) => ({ ...d, discount_value: Number(e.target.value) }))}
+                    className="w-full px-3 py-2 text-sm bg-background border border-border rounded-md"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-sans text-muted-foreground">Max uses</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={editCodeDraft.max_redemptions ?? ""}
+                    onChange={(e) => setEditCodeDraft((d) => ({ ...d, max_redemptions: e.target.value ? Number(e.target.value) : null }))}
+                    placeholder="Unlimited"
+                    className="w-full px-3 py-2 text-sm bg-background border border-border rounded-md"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-sans text-muted-foreground">Expires</label>
+                  <select
+                    value={editCodeDraft.valid_until_select}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (v === "never") {
+                        setEditCodeDraft((d) => ({ ...d, valid_until: null, valid_until_select: "never" }));
+                      } else {
+                        const months = Number(v);
+                        const d = new Date();
+                        d.setMonth(d.getMonth() + months);
+                        setEditCodeDraft((prev) => ({ ...prev, valid_until: d.toISOString(), valid_until_select: v }));
+                      }
+                    }}
+                    className="w-full px-3 py-2 text-sm bg-background border border-border rounded-md"
+                  >
+                    <option value="never">Never</option>
+                    <option value="1">1 month</option>
+                    <option value="3">3 months</option>
+                    <option value="6">6 months</option>
+                    <option value="12">1 year</option>
+                    {editCodeDraft.valid_until_select === "custom" && (
+                      <option value="custom">
+                        Custom ({new Date(editCodeDraft.valid_until!).toLocaleDateString("nb-NO")})
+                      </option>
+                    )}
+                  </select>
+                </div>
+              </div>
+              <div className="flex gap-2 pt-1">
+                <button
+                  onClick={() => setEditingCode(null)}
+                  className="flex-1 py-2 text-sm font-sans border border-border rounded-md hover:bg-muted/50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveEditCode}
+                  disabled={updateCode.isPending}
+                  className="flex-1 py-2 text-sm font-sans bg-primary text-primary-foreground rounded-md hover:bg-primary/80 disabled:opacity-50 transition-colors"
+                >
+                  {updateCode.isPending ? "Saving…" : "Save changes"}
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </section>
@@ -748,7 +899,7 @@ function TemplateEditRow({
   );
 }
 
-function DiscountCodeRow({ code, onToggle }: { code: DiscountCode; onToggle: () => void }) {
+function DiscountCodeRow({ code, onEdit, onToggle }: { code: DiscountCode; onEdit: () => void; onToggle: () => void }) {
   const discountLabel =
     code.discount_type === "percent"
       ? `${code.discount_value}% off`
@@ -780,6 +931,12 @@ function DiscountCodeRow({ code, onToggle }: { code: DiscountCode; onToggle: () 
           {code.description}
         </p>
       )}
+      <button
+        onClick={onEdit}
+        className="text-xs px-2.5 py-1 rounded-full font-sans transition-colors shrink-0 bg-muted text-muted-foreground hover:bg-muted/80"
+      >
+        Edit
+      </button>
       <button
         onClick={onToggle}
         className={`text-xs px-2.5 py-1 rounded-full font-sans transition-colors shrink-0 ${

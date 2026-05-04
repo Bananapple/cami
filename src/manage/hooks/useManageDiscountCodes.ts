@@ -64,5 +64,13 @@ export function useManageDiscountCodes() {
     onSuccess: invalidate,
   });
 
-  return { ...query, createCode, toggleActive };
+  const updateCode = useMutation({
+    mutationFn: async ({ id, ...values }: Partial<NewDiscountCode> & { id: string }) => {
+      const { error } = await supabase.from("discount_codes").update(values).eq("id", id);
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: invalidate,
+  });
+
+  return { ...query, createCode, toggleActive, updateCode };
 }

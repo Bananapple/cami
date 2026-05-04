@@ -54,6 +54,8 @@ Deno.serve(async (req) => {
       .eq("is_active", true)
       .maybeSingle();
 
+    let reason: string | undefined;
+
     if (promo) {
       const now = new Date();
       const withinWindow =
@@ -77,6 +79,12 @@ Deno.serve(async (req) => {
         }
         discountMinor = Math.min(discountMinor, originalMinor);
         valid = true;
+      } else if (!withinWindow) {
+        reason = "expired";
+      } else if (!withinLimit) {
+        reason = "maxed";
+      } else {
+        reason = "already_used";
       }
     }
 
@@ -123,6 +131,7 @@ Deno.serve(async (req) => {
     return json({
       valid,
       label,
+      reason: valid ? undefined : (reason ?? "not_found"),
       original_price_minor: originalMinor,
       discount_minor: discountMinor,
       discounted_price_minor: originalMinor - discountMinor,

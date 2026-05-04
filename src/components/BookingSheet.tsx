@@ -139,7 +139,16 @@ const BookingSheet = ({ isOpen, onClose, templateId }: BookingSheetProps) => {
         headers: session ? { Authorization: `Bearer ${session.access_token}` } : {},
       });
       if (error || !data) { setPromoError("Could not validate code."); return; }
-      if (!data.valid) { setPromoError("Invalid or expired code."); return; }
+      if (!data.valid) {
+        const reasonMessages: Record<string, string> = {
+          expired: "This code has expired.",
+          maxed: "This code is no longer available.",
+          already_used: "You've already used this code.",
+          not_found: "Invalid code.",
+        };
+        setPromoError(reasonMessages[data.reason] ?? "Invalid or expired code.");
+        return;
+      }
       setPromoResult({
         discountMinor: data.discount_minor,
         discountedPriceMinor: data.discounted_price_minor,
