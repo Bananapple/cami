@@ -72,11 +72,20 @@
 .sm-app * { box-sizing: border-box; }
 .sm-app button { font-family: inherit; }
 /* Override global DM Serif Display on h1-h6 from index.css base layer.
-   v2 spec: Inter only across /manage. Drawer title is the only lightly
-   styled heading and stays Inter as well. */
+   Most v2 headings (eyebrows, day-headers, section labels) use Inter.
+   The two exceptions are page titles and drawer titles — they keep
+   DM Serif as the editorial accent. */
 .sm-app h1, .sm-app h2, .sm-app h3, .sm-app h4, .sm-app h5, .sm-app h6 {
   font-family: 'Inter', system-ui, sans-serif;
 }
+.sm-app .sm-pagehead h1,
+.sm-app .sm-greeting h1,
+.sm-app .sm-drawer-head h3 {
+  font-family: 'DM Serif Display', Georgia, serif;
+  font-weight: 400;
+  letter-spacing: -0.005em;
+}
+.sm-app .sm-drawer-head h3 { font-size: 22px; }
 
 /* —— Layout ————————————————————————————————— */
 .sm-shell {

@@ -11,6 +11,7 @@ import { useNotificationLog, templateLabel } from "@/manage/hooks/useNotificatio
 import { useStudioContext } from "@/context/StudioContext";
 import { formatDate, formatTime } from "@/lib/timezone";
 import { getPlanHealth } from "../lib/planHealth";
+import { bookingBadge } from "../lib/bookingStatus";
 
 type Tab = "overview" | "activity" | "billing" | "notes";
 
@@ -263,36 +264,10 @@ function computeYtdStats(bookings: MemberBooking[]) {
 }
 
 // ── BookingStatusBadge ─────────────────────────────────────────────
-// Single source of truth for the trailing badge across Activity views.
+// Thin wrapper over the central bookingBadge helper (lib/bookingStatus).
 function BookingStatusBadge({ b }: { b: MemberBooking }) {
-  const WINDOW_MS = 24 * 60 * 60 * 1000;
-  const isPast = b.starts_at && new Date(b.starts_at).getTime() < Date.now();
-
-  if (b.status === "confirmed") {
-    if (b.checked_in_at) return <StateBadge tone="good">Attended</StateBadge>;
-    if (isPast) return <StateBadge tone="warn">No-show</StateBadge>;
-    return <StateBadge tone="good">Booked</StateBadge>;
-  }
-
-  // Cancelled
-  if (b.membership_id) {
-    const within =
-      b.cancelled_at &&
-      b.starts_at &&
-      new Date(b.starts_at).getTime() - new Date(b.cancelled_at).getTime() > WINDOW_MS;
-    return <StateBadge tone="neutral">{within ? "Credit returned" : "No credit"}</StateBadge>;
-  }
-
-  if (!b.payment_id) return <StateBadge tone="neutral">No payment</StateBadge>;
-  if (b.payment_status === "refunded") return <StateBadge tone="info">Refunded</StateBadge>;
-  if (b.payment_status === "partially_refunded") return <StateBadge tone="warn">Partial refund</StateBadge>;
-
-  const within =
-    b.cancelled_at &&
-    b.starts_at &&
-    new Date(b.starts_at).getTime() - new Date(b.cancelled_at).getTime() > WINDOW_MS;
-  if (within) return <StateBadge tone="bad">Refund failed</StateBadge>;
-  return <StateBadge tone="neutral">No refund</StateBadge>;
+  const cfg = bookingBadge(b);
+  return <StateBadge tone={cfg.tone}>{cfg.label}</StateBadge>;
 }
 
 // ── KV (label / value pair, optional hint) ─────────────────────────
