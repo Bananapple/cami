@@ -159,10 +159,11 @@ const Dashboard = () => {
                     const ci = booking.class_instances;
                     const locationTz = ci?.locations?.timezone ?? null;
                     const tz = locationTz ?? studioTz;
+                    const isRefundPending = booking.status === "cancelled" && booking.payments?.status === "succeeded";
                     return (
                     <div
                       key={booking.id}
-                      className="flex items-center gap-4 p-4 rounded-lg border border-border"
+                      className={`flex items-center gap-4 p-4 rounded-lg border ${isRefundPending ? "border-muted bg-muted/20 opacity-70" : "border-border"}`}
                     >
                       <div className="text-center min-w-[50px]">
                         <p className="text-xs font-sans font-medium uppercase text-muted-foreground">
@@ -176,22 +177,30 @@ const Dashboard = () => {
                         <p className="text-sm font-serif text-foreground">
                           {ci?.class_templates?.name ?? "Class"}
                         </p>
-                        <p className="text-xs text-muted-foreground font-sans">
-                          {ci?.starts_at ? formatTime(ci.starts_at, tz) : ""}
-                          {ci?.class_templates?.default_duration_minutes ? ` · ${ci.class_templates.default_duration_minutes} min` : ""}
-                        </p>
+                        {isRefundPending ? (
+                          <p className="text-xs text-muted-foreground font-sans">
+                            Cancelled · Refund of kr {booking.payments?.amount} being processed
+                          </p>
+                        ) : (
+                          <p className="text-xs text-muted-foreground font-sans">
+                            {ci?.starts_at ? formatTime(ci.starts_at, tz) : ""}
+                            {ci?.class_templates?.default_duration_minutes ? ` · ${ci.class_templates.default_duration_minutes} min` : ""}
+                          </p>
+                        )}
                       </div>
-                      <button
-                        onClick={() => setCancelTarget({
-                          id: booking.id,
-                          startsAt: ci?.starts_at ?? "",
-                          hasMembership: !!booking.membership_id,
-                        })}
-                        className="p-2 text-muted-foreground hover:text-destructive transition-colors"
-                        aria-label="Cancel booking"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
+                      {!isRefundPending && (
+                        <button
+                          onClick={() => setCancelTarget({
+                            id: booking.id,
+                            startsAt: ci?.starts_at ?? "",
+                            hasMembership: !!booking.membership_id,
+                          })}
+                          className="p-2 text-muted-foreground hover:text-destructive transition-colors"
+                          aria-label="Cancel booking"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      )}
                     </div>
                   );
                   })}

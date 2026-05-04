@@ -10,7 +10,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { ChevronDown, ChevronRight, Copy, Check } from "lucide-react";
+import { Copy, Check, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { useMember, type MemberMembership } from "../hooks/useMember";
 import { useMemberBookings, useManagerCancelBooking } from "../hooks/useMemberBookings";
@@ -124,6 +124,47 @@ function SellPackageSection({ userId }: { userId: string }) {
   );
 }
 
+import type { MemberBooking } from "../hooks/useMemberBookings";
+
+function getBookingPaymentLabel(b: MemberBooking): { text: string; cls: string; warn: boolean } {
+  const WINDOW_MS = 24 * 60 * 60 * 1000;
+
+  if (b.status === "confirmed") {
+    if (b.membership_id) return { text: "Membership", cls: "bg-muted text-muted-foreground", warn: false };
+    return { text: "Paid", cls: "bg-green-500/10 text-green-700", warn: false };
+  }
+
+  // Cancelled
+  if (b.membership_id) {
+    const withinWindow = b.cancelled_at && b.starts_at &&
+      (new Date(b.starts_at).getTime() - new Date(b.cancelled_at).getTime()) > WINDOW_MS;
+    return withinWindow
+      ? { text: "Credit returned", cls: "bg-muted text-muted-foreground", warn: false }
+      : { text: "No credit · after window", cls: "bg-muted text-muted-foreground", warn: false };
+  }
+
+  if (!b.payment_id) return { text: "No payment", cls: "bg-muted text-muted-foreground", warn: false };
+
+  if (b.payment_status === "refunded") {
+    return { text: "Refunded", cls: "bg-blue-500/10 text-blue-700", warn: false };
+  }
+
+  if (b.payment_status === "partially_refunded") {
+    return { text: "Partial refund", cls: "bg-amber-500/10 text-amber-700", warn: true };
+  }
+
+  // Payment succeeded but not refunded — was it within the window?
+  const withinWindow = b.cancelled_at && b.starts_at &&
+    (new Date(b.starts_at).getTime() - new Date(b.cancelled_at).getTime()) > WINDOW_MS;
+
+  if (withinWindow) {
+    // Should have been refunded but wasn't
+    return { text: "Refund failed", cls: "bg-destructive/10 text-destructive", warn: true };
+  }
+
+  return { text: "No refund · after window", cls: "bg-muted text-muted-foreground", warn: false };
+}
+
 export function MemberDrawer({
   userId,
   open,
@@ -140,18 +181,11 @@ export function MemberDrawer({
   const studioCtx = useStudioContext();
   const studioTz = studioCtx?.studio?.timezone ?? "Europe/Oslo";
 
-  const [historyOpen, setHistoryOpen] = useState(false);
+  const [memberTab, setMemberTab] = useState<"history" | "emails">("history");
   const [confirmBookingId, setConfirmBookingId] = useState<string | null>(null);
 
   const now = new Date();
-  const upcomingBookings = allBookings.filter(
-    (b) => b.status === "confirmed" && new Date(b.starts_at) > now
-  );
-  const pastBookings = allBookings.filter(
-    (b) => b.status === "cancelled" || new Date(b.starts_at) <= now
-  );
-
-  const confirmBooking = upcomingBookings.find((b) => b.id === confirmBookingId);
+  const confirmBooking = allBookings.find((b) => b.id === confirmBookingId);
 
   // Compute smart audience segment for this member
   const lastConfirmedPast = allBookings
@@ -271,89 +305,77 @@ export function MemberDrawer({
               {/* Membership */}
               <MembershipSection membership={member.membership} />
 
-              {/* Upcoming bookings */}
+              {/* History + Emails tabs */}
               <section className="pt-4 border-t border-border space-y-3">
-                <h3 className="text-xs uppercase tracking-wider text-muted-foreground">
-                  Upcoming Bookings
-                </h3>
-
-                {bookingsLoading && <p className="text-sm text-muted-foreground">Loading...</p>}
-
-                {!bookingsLoading && upcomingBookings.length === 0 && (
-                  <p className="text-sm text-muted-foreground">No upcoming bookings.</p>
-                )}
-
-                {upcomingBookings.map((booking) => {
-                  const tz = booking.location_timezone ?? studioTz;
-                  return (
-                    <div
-                      key={booking.id}
-                      className="flex items-center justify-between gap-3 p-3 rounded-lg border border-border"
+                {/* Pill tabs */}
+                <div className="flex gap-1 bg-muted/40 rounded-full p-1 w-fit">
+                  {(["history", "emails"] as const).map((tab) => (
+                    <button
+                      key={tab}
+                      onClick={() => setMemberTab(tab)}
+                      className={`text-xs px-4 py-1.5 rounded-full font-sans transition-colors capitalize ${
+                        memberTab === tab
+                          ? "bg-background shadow-sm text-foreground"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
                     >
-                      <div className="min-w-0">
-                        <p className="text-sm font-serif truncate">{booking.class_name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {formatDate(booking.starts_at, tz, { weekday: "short", day: "numeric", month: "short" })}
-                          {" · "}
-                          {formatTime(booking.starts_at, tz)}
-                        </p>
-                      </div>
-                      <button
-                        onClick={() => setConfirmBookingId(booking.id)}
-                        disabled={cancelBooking.isPending}
-                        className="text-xs px-3 py-1.5 border border-destructive/40 text-destructive rounded-md hover:bg-destructive/10 transition-colors shrink-0"
-                      >
-                        Cancel & Refund
-                      </button>
-                    </div>
-                  );
-                })}
-              </section>
+                      {tab === "history" ? `History (${allBookings.length})` : `Emails (${notifications.length})`}
+                    </button>
+                  ))}
+                </div>
 
-              {/* Past bookings (collapsible) */}
-              {!bookingsLoading && pastBookings.length > 0 && (
-                <section className="pt-2 space-y-2">
-                  <button
-                    onClick={() => setHistoryOpen((v) => !v)}
-                    className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    {historyOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-                    History ({pastBookings.length})
-                  </button>
-
-                  {historyOpen && (
-                    <div className="space-y-1.5">
-                      {pastBookings.map((booking) => {
-                        const tz = booking.location_timezone ?? studioTz;
-                        const isCancelled = booking.status === "cancelled";
-                        return (
-                          <div key={booking.id} className="flex items-center gap-3 p-2.5 rounded-lg bg-muted/30">
-                            <div className="flex-1 min-w-0">
-                              <p className={`text-sm truncate ${isCancelled ? "text-muted-foreground line-through" : ""}`}>
+                {/* History tab */}
+                {memberTab === "history" && (
+                  <div className="space-y-1.5">
+                    {bookingsLoading && <p className="text-sm text-muted-foreground">Loading...</p>}
+                    {!bookingsLoading && allBookings.length === 0 && (
+                      <p className="text-sm text-muted-foreground">No bookings yet.</p>
+                    )}
+                    {allBookings.map((booking) => {
+                      const tz = booking.location_timezone ?? studioTz;
+                      const isUpcoming = booking.status === "confirmed" && new Date(booking.starts_at) > now;
+                      const label = getBookingPaymentLabel(booking);
+                      return (
+                        <div key={booking.id} className="flex items-center gap-3 p-2.5 rounded-lg bg-muted/30">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <p className={`text-sm truncate ${booking.status === "cancelled" ? "text-muted-foreground line-through" : ""}`}>
                                 {booking.class_name}
                               </p>
-                              <p className="text-xs text-muted-foreground">
-                                {formatDate(booking.starts_at, tz, { weekday: "short", day: "numeric", month: "short" })}
-                                {" · "}
-                                {formatTime(booking.starts_at, tz)}
-                              </p>
+                              {label.warn && <AlertTriangle className="w-3 h-3 text-amber-500 shrink-0" />}
                             </div>
-                            {isCancelled && (
-                              <span className="text-xs text-muted-foreground shrink-0">Cancelled</span>
+                            <p className="text-xs text-muted-foreground">
+                              {formatDate(booking.starts_at, tz, { weekday: "short", day: "numeric", month: "short" })}
+                              {" · "}
+                              {formatTime(booking.starts_at, tz)}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className={`text-xs px-2 py-0.5 rounded-full font-sans ${label.cls}`}>
+                              {label.text}
+                            </span>
+                            {isUpcoming && (
+                              <button
+                                onClick={() => setConfirmBookingId(booking.id)}
+                                disabled={cancelBooking.isPending}
+                                className="text-xs px-2.5 py-1 border border-destructive/40 text-destructive rounded-md hover:bg-destructive/10 transition-colors"
+                              >
+                                Cancel
+                              </button>
                             )}
                           </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </section>
-              )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
 
-              {/* Email log */}
-              {notifications.length > 0 && (
-                <section className="pt-4 border-t border-border space-y-2">
-                  <h3 className="text-xs uppercase tracking-wider text-muted-foreground">Emails sent</h3>
+                {/* Emails tab */}
+                {memberTab === "emails" && (
                   <div className="space-y-1">
+                    {notifications.length === 0 && (
+                      <p className="text-sm text-muted-foreground">No emails sent yet.</p>
+                    )}
                     {notifications.map((n) => (
                       <div key={n.id} className="flex items-center justify-between gap-2 py-1">
                         <p className="text-sm">{templateLabel(n.template)}</p>
@@ -365,8 +387,8 @@ export function MemberDrawer({
                       </div>
                     ))}
                   </div>
-                </section>
-              )}
+                )}
+              </section>
 
               {/* Sell package */}
               <SellPackageSection userId={userId} />

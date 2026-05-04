@@ -18,16 +18,26 @@ export function useBookings() {
           id, status, cancelled_at, payment_id, membership_id, class_instance_id,
           class_instances ( id, starts_at, template_id,
             class_templates ( name, default_duration_minutes )
-          )
+          ),
+          payments ( status, amount )
         `)
         .eq("user_id", user!.id)
         .eq("studio_id", studioId!)
-        .eq("status", "confirmed");
+        .in("status", ["confirmed", "cancelled"]);
       if (error) throw error;
+
+      const now = new Date();
       return (data ?? [])
         .filter((b: any) => {
           const startsAt = b.class_instances?.starts_at;
-          return startsAt && new Date(startsAt) > new Date();
+          if (!startsAt) return false;
+          if (b.status === "confirmed") return new Date(startsAt) > now;
+          // Show cancelled bookings where a payment refund is still pending
+          if (b.status === "cancelled" && b.payment_id) {
+            const ps = b.payments?.status;
+            return ps === "succeeded" && new Date(startsAt) > new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          }
+          return false;
         })
         .sort((a: any, b: any) =>
           new Date(a.class_instances?.starts_at).getTime() - new Date(b.class_instances?.starts_at).getTime()

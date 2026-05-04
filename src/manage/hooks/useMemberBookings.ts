@@ -9,6 +9,11 @@ export type MemberBooking = {
   location_timezone: string | null;
   booked_at: string | null;
   cancelled_at: string | null;
+  payment_id: string | null;
+  membership_id: string | null;
+  payment_status: string | null;
+  payment_amount: number | null;
+  payment_refunded: number | null;
 };
 
 export function useMemberBookings(userId: string | undefined) {
@@ -19,12 +24,13 @@ export function useMemberBookings(userId: string | undefined) {
       const { data, error } = await supabase
         .from("bookings")
         .select(`
-          id, status, booked_at, cancelled_at,
+          id, status, booked_at, cancelled_at, payment_id, membership_id,
           class_instances (
             starts_at,
             class_templates ( name ),
             locations ( timezone )
-          )
+          ),
+          payments ( status, amount, refunded_amount )
         `)
         .eq("user_id", userId)
         .in("status", ["confirmed", "cancelled"])
@@ -41,6 +47,11 @@ export function useMemberBookings(userId: string | undefined) {
         location_timezone: b.class_instances?.locations?.timezone ?? null,
         booked_at: b.booked_at ?? null,
         cancelled_at: b.cancelled_at ?? null,
+        payment_id: b.payment_id ?? null,
+        membership_id: b.membership_id ?? null,
+        payment_status: b.payments?.status ?? null,
+        payment_amount: b.payments?.amount ?? null,
+        payment_refunded: b.payments?.refunded_amount ?? null,
       }));
     },
   });
