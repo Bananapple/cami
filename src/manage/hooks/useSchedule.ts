@@ -13,6 +13,8 @@ export type ScheduleClass = {
   price: number;
   notes: string | null;
   class_name: string;
+  /** Template-derived level for the v2 CategoryChip (DATA-1) */
+  level: string | null;
   template_id: string;
   instructor_id: string | null;
   instructor_name: string;
@@ -53,7 +55,7 @@ export function useSchedule(weeksAhead = 4) {
         .select(`
           id, rule_id, starts_at, ends_at, status, max_capacity, booked_count, price, notes,
           template_id, instructor_id, location_id,
-          class_templates ( name ),
+          class_templates ( name, level ),
           instructors ( display_name ),
           locations ( name, timezone )
         `)
@@ -74,6 +76,7 @@ export function useSchedule(weeksAhead = 4) {
         price: r.price,
         notes: r.notes ?? null,
         class_name: r.class_templates?.name ?? "Class",
+        level: r.class_templates?.level ?? null,
         template_id: r.template_id,
         instructor_id: r.instructor_id ?? null,
         instructor_name: r.instructors?.display_name ?? "—",

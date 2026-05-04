@@ -4,6 +4,7 @@ import { Shell } from "./shell/Shell";
 import type { NavId } from "./shell/NavRail";
 import type { CommandItem } from "./components/CommandPalette";
 import { StudioScreen } from "./screens/StudioScreen";
+import { ScheduleScreen } from "./screens/ScheduleScreen";
 import { useStudioContext } from "@/context/StudioContext";
 import { useAuth } from "@/hooks/useAuth";
 import { StaffGate } from "@/manage/components/StaffGate";
@@ -11,7 +12,6 @@ import { StaffGate } from "@/manage/components/StaffGate";
 // Stub screens — replaced as Phase 4 progresses
 const HomeStub = () => <p style={{ color: "var(--ink-muted)" }}>Home screen — coming next.</p>;
 const TodayStub = () => <p style={{ color: "var(--ink-muted)" }}>Today screen — TBD.</p>;
-const ScheduleStub = () => <p style={{ color: "var(--ink-muted)" }}>Schedule screen — Phase 4.3.</p>;
 const ClientsStub = () => <p style={{ color: "var(--ink-muted)" }}>Clients screen — Phase 4.5.</p>;
 
 export function ManageV2App() {
@@ -58,7 +58,7 @@ export function ManageV2App() {
           <Route index element={<Navigate to="home" replace />} />
           <Route path="home" element={<HomeStub />} />
           <Route path="today" element={<TodayStub />} />
-          <Route path="schedule" element={<ScheduleStub />} />
+          <Route path="schedule" element={<ScheduleScreen />} />
           <Route path="clients" element={<ClientsStub />} />
           <Route path="studio" element={<StudioScreen />} />
         </Routes>
