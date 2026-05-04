@@ -13,7 +13,7 @@ import {
 import { Copy, Check, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { useMember, type MemberMembership } from "../hooks/useMember";
-import { useMemberBookings, useManagerCancelBooking } from "../hooks/useMemberBookings";
+import { useMemberBookings, useManagerCancelBooking, type MemberBooking } from "../hooks/useMemberBookings";
 import { useStudioContext } from "@/context/StudioContext";
 import { useProducts } from "@/hooks/useProducts";
 import { formatTime, formatDate } from "@/lib/timezone";
@@ -123,8 +123,6 @@ function SellPackageSection({ userId }: { userId: string }) {
     </section>
   );
 }
-
-import type { MemberBooking } from "../hooks/useMemberBookings";
 
 function getBookingPaymentLabel(b: MemberBooking): { text: string; cls: string; warn: boolean } {
   const WINDOW_MS = 24 * 60 * 60 * 1000;
