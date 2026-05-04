@@ -6,6 +6,7 @@ import type { CommandItem } from "./components/CommandPalette";
 import { StudioScreen } from "./screens/StudioScreen";
 import { useStudioContext } from "@/context/StudioContext";
 import { useAuth } from "@/hooks/useAuth";
+import { StaffGate } from "@/manage/components/StaffGate";
 
 // Stub screens — replaced as Phase 4 progresses
 const HomeStub = () => <p style={{ color: "var(--ink-muted)" }}>Home screen — coming next.</p>;
@@ -44,22 +45,24 @@ export function ManageV2App() {
   ];
 
   return (
-    <Shell
-      active={active}
-      onNavigate={(id) => navigate("/_v2/" + id)}
-      brandName={brandName}
-      userInitials={userInitials}
-      userName={userName}
-      commandItems={commandItems}
-    >
-      <Routes>
-        <Route index element={<Navigate to="home" replace />} />
-        <Route path="home" element={<HomeStub />} />
-        <Route path="today" element={<TodayStub />} />
-        <Route path="schedule" element={<ScheduleStub />} />
-        <Route path="clients" element={<ClientsStub />} />
-        <Route path="studio" element={<StudioScreen />} />
-      </Routes>
-    </Shell>
+    <StaffGate>
+      <Shell
+        active={active}
+        onNavigate={(id) => navigate("/_v2/" + id)}
+        brandName={brandName}
+        userInitials={userInitials}
+        userName={userName}
+        commandItems={commandItems}
+      >
+        <Routes>
+          <Route index element={<Navigate to="home" replace />} />
+          <Route path="home" element={<HomeStub />} />
+          <Route path="today" element={<TodayStub />} />
+          <Route path="schedule" element={<ScheduleStub />} />
+          <Route path="clients" element={<ClientsStub />} />
+          <Route path="studio" element={<StudioScreen />} />
+        </Routes>
+      </Shell>
+    </StaffGate>
   );
 }
