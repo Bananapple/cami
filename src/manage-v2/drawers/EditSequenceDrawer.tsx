@@ -648,26 +648,20 @@ function TimeChip({
           autoFocus
           style={chipInputStyle}
         />
-        <CircleButton
-          variant="primary"
-          aria-label="Save"
+        <CircleSave
+          ariaLabel="Save"
           onClick={() => {
             if (time !== initialTime) onSave(time);
             setEditing(false);
           }}
-        >
-          <PlusIcon />
-        </CircleButton>
-        <CircleButton
-          variant="ghost"
-          aria-label="Delete"
+        />
+        <GhostTrash
+          ariaLabel="Delete"
           onClick={() => {
             onDelete();
             setEditing(false);
           }}
-        >
-          <TrashIcon />
-        </CircleButton>
+        />
         <button
           type="button"
           onClick={() => {
@@ -707,9 +701,7 @@ function NewTimeChip({
         autoFocus
         style={chipInputStyle}
       />
-      <CircleButton variant="primary" aria-label="Add" onClick={() => onSave(time)}>
-        <PlusIcon />
-      </CircleButton>
+      <CircleSave ariaLabel="Add" onClick={() => onSave(time)} />
       <button type="button" onClick={onCancel} style={chipCancelButtonStyle}>
         Cancel
       </button>
@@ -733,29 +725,30 @@ const chipCollapsedStyle: React.CSSProperties = {
   cursor: "pointer",
 };
 
+// Expanded state: NO outer border. The input + buttons + Cancel sit
+// inline with each other; the row's own background (var(--paper)) is
+// the visual container.
 const chipExpandedStyle: React.CSSProperties = {
   display: "inline-flex",
   alignItems: "center",
-  gap: 6,
-  background: "var(--surface)",
-  border: "1px solid var(--line)",
-  borderRadius: "var(--r-input)",
-  padding: "4px 6px 4px 6px",
-  height: 32,
+  gap: 8,
 };
 
 const chipInputStyle: React.CSSProperties = {
-  height: 24,
+  height: 28,
   border: "1px solid var(--line-soft)",
-  borderRadius: 4,
-  padding: "0 6px",
+  borderRadius: "var(--r-input)",
+  padding: "0 8px",
   fontSize: 12,
   fontFamily: "'JetBrains Mono', monospace",
   fontVariantNumeric: "tabular-nums",
   color: "var(--ink)",
   background: "var(--surface)",
   outline: "none",
-  width: 100,
+  width: 90,
+  // hide the browser's native time-picker indicator (the clock icon)
+  appearance: "none",
+  WebkitAppearance: "none",
 };
 
 const chipCancelButtonStyle: React.CSSProperties = {
@@ -769,30 +762,20 @@ const chipCancelButtonStyle: React.CSSProperties = {
   cursor: "pointer",
 };
 
-// ── CircleButton (small filled/ghost circular button for chip actions) ──
-function CircleButton({
-  children,
-  variant = "primary",
-  onClick,
-  ...rest
-}: {
-  children: React.ReactNode;
-  variant?: "primary" | "ghost";
-  onClick?: () => void;
-} & React.ButtonHTMLAttributes<HTMLButtonElement>) {
-  const filled = variant === "primary";
+// ── Action button (filled red circle for save/add, ghost square for delete) ──
+function CircleSave({ onClick, ariaLabel }: { onClick: () => void; ariaLabel: string }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      {...rest}
+      aria-label={ariaLabel}
       style={{
-        width: 22,
-        height: 22,
+        width: 26,
+        height: 26,
         borderRadius: "50%",
-        border: filled ? "1px solid var(--action)" : "1px solid var(--line)",
-        background: filled ? "var(--action)" : "var(--surface)",
-        color: filled ? "var(--action-on)" : "var(--ink-muted)",
+        border: 0,
+        background: "var(--action)",
+        color: "white",
         cursor: "pointer",
         display: "inline-flex",
         alignItems: "center",
@@ -800,23 +783,52 @@ function CircleButton({
         padding: 0,
       }}
     >
-      {children}
+      <PlusIcon />
+    </button>
+  );
+}
+
+function GhostTrash({ onClick, ariaLabel }: { onClick: () => void; ariaLabel: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={ariaLabel}
+      style={{
+        width: 26,
+        height: 26,
+        borderRadius: "50%",
+        border: "1px solid var(--line)",
+        background: "var(--surface)",
+        color: "var(--ink-muted)",
+        cursor: "pointer",
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 0,
+      }}
+    >
+      <TrashIcon />
     </button>
   );
 }
 
 function PlusIcon() {
   return (
-    <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-      <path d="M8 3v10M3 8h10" />
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+      <path d="M12 5v14M5 12h14" />
     </svg>
   );
 }
 
 function TrashIcon() {
+  // Lucide-style trash can
   return (
-    <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M3 4h10M6 4V3a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v1M5 4l1 9a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1l1-9" />
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 6h18" />
+      <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+      <path d="M10 11v6M14 11v6" />
     </svg>
   );
 }

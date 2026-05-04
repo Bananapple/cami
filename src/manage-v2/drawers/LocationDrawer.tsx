@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Drawer } from "../components/Drawer";
 import { Button } from "../components/Button";
+import { StateBadge } from "../components/Badge";
 import { Field, FieldRow, inputStyle } from "../components/Field";
 import { useManageLocations, type ManagedLocation } from "@/manage/hooks/useManageLocations";
 import { toast } from "sonner";
@@ -25,7 +26,7 @@ export function LocationDrawerV2({
   open: boolean;
   onClose: () => void;
 }) {
-  const { create, update } = useManageLocations();
+  const { create, update, toggleActive } = useManageLocations();
   const [draft, setDraft] = useState(EMPTY_DRAFT);
   const [pending, setPending] = useState(false);
 
@@ -76,17 +77,46 @@ export function LocationDrawerV2({
     }
   };
 
+  const isEditing = mode === "edit" && !!location;
+
   return (
     <Drawer
       open={open}
       onClose={onClose}
       title={mode === "create" ? "Add location" : location?.name ?? "Edit location"}
       subtitle={mode === "create" ? "New room or branch" : "Edit location details"}
+      headerMeta={
+        isEditing ? (
+          <StateBadge tone={location!.is_active ? "good" : "neutral"}>
+            {location!.is_active ? "Active" : "Inactive"}
+          </StateBadge>
+        ) : undefined
+      }
       actions={
         <>
+          {isEditing && (
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={() => {
+                toggleActive.mutate(
+                  { id: location!.id, is_active: !location!.is_active },
+                  {
+                    onSuccess: () => {
+                      toast.success(location!.is_active ? "Location deactivated" : "Location activated");
+                      onClose();
+                    },
+                  }
+                );
+              }}
+              style={{ marginRight: "auto" }}
+            >
+              {location!.is_active ? "Deactivate" : "Activate"}
+            </Button>
+          )}
           <Button variant="ghost" onClick={onClose}>Cancel</Button>
           <Button variant="primary" onClick={save} loading={pending}>
-            {mode === "create" ? "Create location" : "Save changes"}
+            {mode === "create" ? "Create location" : "Save"}
           </Button>
         </>
       }

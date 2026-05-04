@@ -1,11 +1,9 @@
 import { useEffect, useState } from "react";
 import { Drawer } from "../components/Drawer";
 import { Button } from "../components/Button";
+import { StateBadge } from "../components/Badge";
 import { Field, FieldRow, inputStyle } from "../components/Field";
 import { useManageInstructors, type ManagedInstructor, type InstructorStatus } from "@/manage/hooks/useManageInstructors";
-import { supabase } from "@/integrations/supabase/client";
-import { useQueryClient } from "@tanstack/react-query";
-import { useStudioContext } from "@/context/StudioContext";
 import { toast } from "sonner";
 
 type Mode = "create" | "edit";
@@ -30,10 +28,7 @@ export function InstructorDrawerV2({
   open: boolean;
   onClose: () => void;
 }) {
-  const studioCtx = useStudioContext();
-  const studioId = studioCtx?.studio?.id;
-  const qc = useQueryClient();
-  const { create, update } = useManageInstructors();
+  const { create, update, toggleActive } = useManageInstructors();
   const [draft, setDraft] = useState(EMPTY_DRAFT);
   const [pending, setPending] = useState(false);
 
@@ -96,17 +91,46 @@ export function InstructorDrawerV2({
     }
   };
 
+  const isEditing = mode === "edit" && !!instructor;
+  const headerBadge = (() => {
+    if (!isEditing) return undefined;
+    if (!instructor!.is_active) return <StateBadge tone="neutral">Inactive</StateBadge>;
+    if (instructor!.status === "on_leave") return <StateBadge tone="warn">On leave</StateBadge>;
+    return <StateBadge tone="good">Active</StateBadge>;
+  })();
+
   return (
     <Drawer
       open={open}
       onClose={onClose}
       title={mode === "create" ? "Add instructor" : instructor?.display_name ?? "Edit instructor"}
       subtitle={mode === "create" ? "New instructor for your studio" : "Edit instructor profile"}
+      headerMeta={headerBadge}
       actions={
         <>
+          {isEditing && (
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={() => {
+                toggleActive.mutate(
+                  { id: instructor!.id, is_active: !instructor!.is_active },
+                  {
+                    onSuccess: () => {
+                      toast.success(instructor!.is_active ? "Instructor deactivated" : "Instructor activated");
+                      onClose();
+                    },
+                  }
+                );
+              }}
+              style={{ marginRight: "auto" }}
+            >
+              {instructor!.is_active ? "Deactivate" : "Activate"}
+            </Button>
+          )}
           <Button variant="ghost" onClick={onClose}>Cancel</Button>
           <Button variant="primary" onClick={save} loading={pending}>
-            {mode === "create" ? "Create instructor" : "Save changes"}
+            {mode === "create" ? "Create instructor" : "Save"}
           </Button>
         </>
       }

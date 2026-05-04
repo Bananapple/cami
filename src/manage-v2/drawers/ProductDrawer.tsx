@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Drawer } from "../components/Drawer";
 import { Button } from "../components/Button";
+import { StateBadge } from "../components/Badge";
 import { Field, FieldRow, inputStyle } from "../components/Field";
 import { useManageProducts, type Product } from "@/manage/hooks/useManageProducts";
 import { useStudioContext } from "@/context/StudioContext";
@@ -38,7 +39,7 @@ export function ProductDrawerV2({
 }) {
   const studioCtx = useStudioContext();
   const currency = studioCtx?.studio?.currency ?? "NOK";
-  const { createProduct, updateProduct } = useManageProducts();
+  const { createProduct, updateProduct, toggleActive } = useManageProducts();
   const [draft, setDraft] = useState(EMPTY_DRAFT);
 
   // Reset draft on open / when switching products
@@ -73,17 +74,46 @@ export function ProductDrawerV2({
     }
   };
 
+  const isEditing = mode === "edit" && !!product;
+
   return (
     <Drawer
       open={open}
       onClose={onClose}
       title={mode === "create" ? "Add product" : product?.name ?? "Edit product"}
       subtitle={mode === "create" ? "New product for the catalog" : "Edit product details"}
+      headerMeta={
+        isEditing ? (
+          <StateBadge tone={product!.is_active ? "good" : "neutral"}>
+            {product!.is_active ? "Active" : "Inactive"}
+          </StateBadge>
+        ) : undefined
+      }
       actions={
         <>
+          {isEditing && (
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={() => {
+                toggleActive.mutate(
+                  { id: product!.id, is_active: !product!.is_active },
+                  {
+                    onSuccess: () => {
+                      toast.success(product!.is_active ? "Product deactivated" : "Product activated");
+                      onClose();
+                    },
+                  }
+                );
+              }}
+              style={{ marginRight: "auto" }}
+            >
+              {product!.is_active ? "Deactivate" : "Activate"}
+            </Button>
+          )}
           <Button variant="ghost" onClick={onClose}>Cancel</Button>
           <Button variant="primary" onClick={save} loading={isPending}>
-            {mode === "create" ? "Create product" : "Save changes"}
+            {mode === "create" ? "Create product" : "Save"}
           </Button>
         </>
       }
@@ -188,31 +218,6 @@ export function ProductDrawerV2({
             placeholder="Shown to members on /joinnow"
             style={{ ...inputStyle, height: "auto", padding: "8px 10px", resize: "vertical" }}
           />
-        </Field>
-
-        <Field
-          label="Active"
-          help="Inactive products are hidden from the public catalog but kept for reporting"
-        >
-          <label
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              padding: "6px 10px",
-              border: "1px solid var(--line)",
-              borderRadius: "var(--r-input)",
-              background: "var(--surface)",
-              cursor: "pointer",
-            }}
-          >
-            <input
-              type="checkbox"
-              checked={draft.is_active}
-              onChange={(e) => setDraft((d) => ({ ...d, is_active: e.target.checked }))}
-            />
-            <span style={{ fontSize: 13, color: "var(--ink)" }}>{draft.is_active ? "Active" : "Inactive"}</span>
-          </label>
         </Field>
       </div>
     </Drawer>

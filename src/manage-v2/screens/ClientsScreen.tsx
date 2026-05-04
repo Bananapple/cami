@@ -40,7 +40,6 @@ export function ClientsScreen() {
             ? "Loading…"
             : `${members.length} member${members.length === 1 ? "" : "s"} · ${newThisMonth} new this month`
         }
-        actions={<Button variant="ghost" onClick={() => setAddClientOpen(true)}>+ Add client</Button>}
       />
 
       {/* Segments */}
@@ -57,8 +56,16 @@ export function ClientsScreen() {
         ))}
       </div>
 
-      {/* Search */}
-      <div style={{ marginBottom: 16 }}>
+      {/* Search + Add client (right-aligned, matches Studio "+ Add product" pattern) */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+          marginBottom: 12,
+        }}
+      >
         <input
           type="text"
           value={search}
@@ -78,6 +85,13 @@ export function ClientsScreen() {
             outline: "none",
           }}
         />
+        <button
+          type="button"
+          onClick={() => setAddClientOpen(true)}
+          className="sm-btn sm ghost"
+        >
+          + Add client
+        </button>
       </div>
 
       <RowList>

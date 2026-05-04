@@ -87,6 +87,20 @@
 }
 .sm-app .sm-drawer-head h3 { font-size: 22px; }
 
+/* Hide the native time picker indicator (clock icon) on time inputs.
+   We always render our own inline picker affordance. */
+.sm-app input[type="time"]::-webkit-calendar-picker-indicator,
+.sm-app input[type="time"]::-webkit-clear-button,
+.sm-app input[type="time"]::-webkit-inner-spin-button {
+  display: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.sm-app input[type="time"] {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
 /* —— Layout ————————————————————————————————— */
 .sm-shell {
   display: grid;
