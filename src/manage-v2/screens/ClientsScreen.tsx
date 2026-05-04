@@ -7,6 +7,7 @@ import { EmptyState } from "../components/EmptyState";
 import { useClientsView, type SegmentKey, type MemberSummary } from "@/manage/hooks/useClientsView";
 import { getPlanHealth } from "../lib/planHealth";
 import { MemberDrawerV2 } from "../drawers/MemberDrawer";
+import { AddClientDrawer } from "../drawers/AddClientDrawer";
 
 export function ClientsScreen() {
   const {
@@ -22,6 +23,7 @@ export function ClientsScreen() {
   } = useClientsView();
 
   const [activeUserId, setActiveUserId] = useState<string | null>(null);
+  const [addClientOpen, setAddClientOpen] = useState(false);
   const newThisMonth = members.filter((m) => {
     const monthStart = new Date();
     monthStart.setDate(1);
@@ -38,7 +40,7 @@ export function ClientsScreen() {
             ? "Loading…"
             : `${members.length} member${members.length === 1 ? "" : "s"} · ${newThisMonth} new this month`
         }
-        actions={<Button variant="primary" onClick={() => alert("TODO: add client")}>+ Add client</Button>}
+        actions={<Button variant="primary" onClick={() => setAddClientOpen(true)}>+ Add client</Button>}
       />
 
       {/* Segments */}
@@ -103,6 +105,8 @@ export function ClientsScreen() {
         open={!!activeUserId}
         onClose={() => setActiveUserId(null)}
       />
+
+      <AddClientDrawer open={addClientOpen} onClose={() => setAddClientOpen(false)} />
     </>
   );
 }

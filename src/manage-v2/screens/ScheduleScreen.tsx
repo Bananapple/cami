@@ -10,6 +10,7 @@ import { useStudioContext } from "@/context/StudioContext";
 import { formatDate, formatTime } from "@/lib/timezone";
 import { ClassDrawerV2 } from "../drawers/ClassDrawer";
 import { MemberDrawerV2 } from "../drawers/MemberDrawer";
+import { AddOneOffClassDrawer } from "../drawers/AddOneOffClassDrawer";
 
 export function ScheduleScreen() {
   const studioCtx = useStudioContext();
@@ -17,6 +18,7 @@ export function ScheduleScreen() {
   const { classes, isLoading } = useSchedule(4);
   const [activeClassId, setActiveClassId] = useState<string | null>(null);
   const [activeMemberId, setActiveMemberId] = useState<string | null>(null);
+  const [addClassOpen, setAddClassOpen] = useState(false);
 
   const grouped = useMemo(() => groupByDay(classes ?? [], studioTz), [classes, studioTz]);
   const totalCount = classes?.length ?? 0;
@@ -29,8 +31,8 @@ export function ScheduleScreen() {
         subtitle={isLoading ? "Loading…" : `Next 4 weeks · ${totalCount} class${totalCount === 1 ? "" : "es"} scheduled`}
         actions={
           <>
-            <Button variant="secondary">Edit sequence</Button>
-            <Button variant="primary">+ Add one-off class</Button>
+            <Button variant="secondary" onClick={() => alert("TODO: Edit Sequence drawer")}>Edit sequence</Button>
+            <Button variant="primary" onClick={() => setAddClassOpen(true)}>+ Add one-off class</Button>
           </>
         }
       />
@@ -73,6 +75,8 @@ export function ScheduleScreen() {
         open={!!activeMemberId}
         onClose={() => setActiveMemberId(null)}
       />
+
+      <AddOneOffClassDrawer open={addClassOpen} onClose={() => setAddClassOpen(false)} />
     </>
   );
 }
