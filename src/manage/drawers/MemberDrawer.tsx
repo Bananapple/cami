@@ -10,7 +10,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Copy, Check, AlertTriangle } from "lucide-react";
+import { Copy, Check, AlertTriangle, ChevronDown, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { useMember, type MemberMembership } from "../hooks/useMember";
 import { useMemberBookings, useManagerCancelBooking, type MemberBooking } from "../hooks/useMemberBookings";
