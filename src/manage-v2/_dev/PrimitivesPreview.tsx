@@ -9,10 +9,26 @@ import { OverflowMenu } from "../components/OverflowMenu";
 import { EmptyState } from "../components/EmptyState";
 import { Stat, StatGrid } from "../components/Stat";
 import { Drawer, DrawerSection, EditLink } from "../components/Drawer";
+import { CommandPalette, useCommandPaletteShortcut, type CommandItem } from "../components/CommandPalette";
+
+const commandItems: CommandItem[] = [
+  { id: "m1", group: "Members", label: "Frida Kalo", meta: "frida@example.com · Active · 12 visits", lead: "FK", onSelect: () => alert("Open Frida Kalo") },
+  { id: "m2", group: "Members", label: "Nico Vibe", meta: "nico@example.com · Active · 47 visits", lead: "NV", onSelect: () => alert("Open Nico Vibe") },
+  { id: "m3", group: "Members", label: "Elena Sanchez", meta: "elena@example.com · 10-clip · 6 left", lead: "ES", onSelect: () => alert("Open Elena Sanchez") },
+  { id: "m4", group: "Members", label: "Marco Bellini", meta: "marco@example.com · Drop-in · first visit", lead: "MB", onSelect: () => alert("Open Marco Bellini") },
+  { id: "c1", group: "Classes", label: "Bootylicious", meta: "Sun 4 May · 11:30 · Brikela", lead: "B", onSelect: () => alert("Open Bootylicious") },
+  { id: "c2", group: "Classes", label: "Mysore", meta: "Sun 4 May · 09:00 · Mira Holm", lead: "M", onSelect: () => alert("Open Mysore") },
+  { id: "c3", group: "Classes", label: "Reformer Flow", meta: "Sun 4 May · 14:00 · Reformer", lead: "R", onSelect: () => alert("Open Reformer Flow") },
+  { id: "s1", group: "Settings", label: "Discount codes", meta: "Manage promo codes and referrals", onSelect: () => alert("Open discount codes") },
+  { id: "s2", group: "Settings", label: "Studio details", meta: "Branding, currency, timezone", onSelect: () => alert("Open studio details") },
+  { id: "s3", group: "Settings", label: "Products", meta: "Memberships and clip cards", onSelect: () => alert("Open products") },
+];
 
 export function PrimitivesPreview() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerTab, setDrawerTab] = useState("attending");
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  useCommandPaletteShortcut(setPaletteOpen);
 
   return (
     <div className="sm-app" style={{ minHeight: "100vh", padding: 48, position: "relative" }}>
@@ -187,6 +203,22 @@ export function PrimitivesPreview() {
             single body scroll, tab switch resets scroll, esc closes.
           </p>
         </Section>
+
+        <Section title="CommandPalette (⌘K)">
+          <Button variant="primary" onClick={() => setPaletteOpen(true)}>
+            Open command palette
+          </Button>
+          <p style={{ margin: 0, fontSize: 13, color: "var(--ink-muted)" }}>
+            Or hit <kbd style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, padding: "1px 5px", background: "var(--surface-2)", border: "1px solid var(--line-soft)", borderRadius: 3 }}>⌘K</kbd>.
+            Type "frida", "boot", or "discount" to filter. Arrows + enter to navigate.
+          </p>
+        </Section>
+
+        <CommandPalette
+          open={paletteOpen}
+          onClose={() => setPaletteOpen(false)}
+          items={commandItems}
+        />
 
         <Drawer
           open={drawerOpen}
