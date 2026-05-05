@@ -48,7 +48,7 @@ export function MemberDrawerV2({
       try {
         const body = await (error as any).context?.json?.();
         if (body?.error) detail = body.error;
-      } catch {}
+      } catch { /* ignore JSON parse error */ }
       console.error("send-member-message error:", error);
       throw new Error(detail);
     }
