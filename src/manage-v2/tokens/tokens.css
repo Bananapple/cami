@@ -714,11 +714,11 @@
 
 /* Greeting on Home */
 .sm-greeting h1 {
-  font-size: 28px;
+  font-size: var(--t-h1);
   font-weight: 600;
-  letter-spacing: -0.018em;
+  letter-spacing: -0.012em;
   margin: 0 0 4px;
-  line-height: 1.15;
+  line-height: 1.2;
 }
 .sm-greeting .sub {
   font-size: var(--t-small);
