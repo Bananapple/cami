@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { PageHeader } from "../shell/PageHeader";
+import { useStickyBar } from "../lib/useStickyBar";
 import { Button } from "../components/Button";
 import { Row, RowList } from "../components/Row";
 import { StateBadge, Count } from "../components/Badge";
@@ -30,17 +31,26 @@ export function ClientsScreen() {
     monthStart.setHours(0, 0, 0, 0);
     return new Date(m.joined_at) >= monthStart;
   }).length;
+  const headerRef = useRef<HTMLDivElement>(null);
+  const showSticky = useStickyBar(headerRef);
 
   return (
     <>
-      <PageHeader
-        title="Clients"
-        subtitle={
-          isLoading
-            ? "Loading…"
-            : `${members.length} member${members.length === 1 ? "" : "s"} · ${newThisMonth} new this month`
-        }
-      />
+      {/* Mobile sticky bar */}
+      <div className={"sm-sticky-bar" + (showSticky ? " visible" : "")}>
+        <span className="sm-sticky-bar-title">Clients</span>
+      </div>
+
+      <div ref={headerRef}>
+        <PageHeader
+          title="Clients"
+          subtitle={
+            isLoading
+              ? "Loading…"
+              : `${members.length} member${members.length === 1 ? "" : "s"} · ${newThisMonth} new this month`
+          }
+        />
+      </div>
 
       {/* Segments */}
       <div className="sm-segments">

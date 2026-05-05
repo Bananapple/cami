@@ -43,7 +43,6 @@ export function StudioScreen() {
       <PageHeader
         title="Studio"
         subtitle="Products, instructors, and locations"
-        actions={<Button variant="secondary">Studio settings</Button>}
       />
 
       {/* Products */}
