@@ -9,6 +9,9 @@ import { useClassAttendance } from "@/manage/hooks/useClassAttendance";
 import { useStudioContext } from "@/context/StudioContext";
 import { formatDate, formatTime } from "@/lib/timezone";
 import { bookingStatusBadge } from "../lib/bookingStatus";
+import { AddWalkInDrawer } from "../drawers/AddWalkInDrawer";
+import { ClassDrawerV2 } from "../drawers/ClassDrawer";
+import { MemberDrawerV2 } from "../drawers/MemberDrawer";
 
 export function TodayScreen() {
   const navigate = useNavigate();
@@ -36,10 +39,16 @@ export function TodayScreen() {
   }, [todayClasses]);
 
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [detailsClassId, setDetailsClassId] = useState<string | null>(null);
+  const [activeMemberId, setActiveMemberId] = useState<string | null>(null);
   // Set initial expansion to next-up once classes load
   useEffect(() => {
     if (expandedId === null && nextUpId) setExpandedId(nextUpId);
   }, [nextUpId, expandedId]);
+
+  const detailsClass = detailsClassId
+    ? todayClasses.find((c) => c.id === detailsClassId) ?? null
+    : null;
 
   const todayLabel = formatDate(new Date(), studioTz, { weekday: "long", day: "numeric", month: "long" });
 
@@ -80,9 +89,23 @@ export function TodayScreen() {
             expanded={expandedId === c.id}
             isNextUp={nextUpId === c.id}
             onToggle={() => setExpandedId((id) => (id === c.id ? null : c.id))}
+            onShowDetails={() => setDetailsClassId(c.id)}
           />
         ))}
       </div>
+
+      <ClassDrawerV2
+        cls={detailsClass}
+        open={!!detailsClass}
+        onClose={() => setDetailsClassId(null)}
+        onMemberClick={(uid) => setActiveMemberId(uid)}
+      />
+
+      <MemberDrawerV2
+        userId={activeMemberId}
+        open={!!activeMemberId}
+        onClose={() => setActiveMemberId(null)}
+      />
     </>
   );
 }
@@ -94,12 +117,14 @@ function ClassCard({
   expanded,
   isNextUp,
   onToggle,
+  onShowDetails,
 }: {
   cls: ScheduleClass;
   tz: string;
   expanded: boolean;
   isNextUp: boolean;
   onToggle: () => void;
+  onShowDetails: () => void;
 }) {
   const isPast = new Date(cls.ends_at).getTime() < Date.now();
 
@@ -118,6 +143,7 @@ function ClassCard({
         onClick={onToggle}
         style={{
           all: "unset",
+          boxSizing: "border-box",
           cursor: "pointer",
           width: "100%",
           display: "grid",
@@ -165,15 +191,15 @@ function ClassCard({
         <Count value={`${cls.booked_count} / ${cls.max_capacity}`} />
       </button>
 
-      {expanded && <ClassAttendees cls={cls} />}
+      {expanded && <ClassAttendees cls={cls} onShowDetails={onShowDetails} />}
     </div>
   );
 }
 
 // ── Attendees list (loaded lazily on expansion) ────────────────────
-function ClassAttendees({ cls }: { cls: ScheduleClass }) {
-  const navigate = useNavigate();
+function ClassAttendees({ cls, onShowDetails }: { cls: ScheduleClass; onShowDetails: () => void }) {
   const { data: all = [], toggleCheckIn } = useClassAttendance(cls.id);
+  const [walkInOpen, setWalkInOpen] = useState(false);
 
   // Show only attending (confirmed/pending), not cancelled/payment_failed
   const attendees = all.filter((a) => a.status === "confirmed" || a.status === "pending");
@@ -228,13 +254,20 @@ function ClassAttendees({ cls }: { cls: ScheduleClass }) {
           background: "var(--surface-2)",
         }}
       >
-        <Button variant="ghost" size="sm" onClick={() => alert("TODO: walk-in flow")}>
+        <Button variant="ghost" size="sm" onClick={() => setWalkInOpen(true)}>
           Add walk-in
         </Button>
-        <Button variant="ghost" size="sm" onClick={() => navigate(`/manage/schedule?class=${cls.id}`)}>
+        <Button variant="ghost" size="sm" onClick={onShowDetails}>
           Class details
         </Button>
       </div>
+
+      <AddWalkInDrawer
+        classInstanceId={cls.id}
+        className={cls.class_name}
+        open={walkInOpen}
+        onClose={() => setWalkInOpen(false)}
+      />
     </div>
   );
 }

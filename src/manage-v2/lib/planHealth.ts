@@ -10,7 +10,11 @@ const DAY_MS = 24 * 60 * 60 * 1000;
  * DATA-2: derive plan *health* (not plan name).
  * The trailing badge on a Clients row uses this.
  */
-export function getPlanHealth(m: Pick<MemberSummary, "membership_id" | "credits_remaining" | "valid_until">): PlanHealth {
+export function getPlanHealth(m: Pick<MemberSummary, "membership_id" | "credits_remaining" | "valid_until" | "status">): PlanHealth {
+  if (m.status === "on_leave") {
+    return { tone: "neutral", label: "On leave" };
+  }
+
   if (!m.membership_id) {
     return { tone: "neutral", label: "No plan" };
   }

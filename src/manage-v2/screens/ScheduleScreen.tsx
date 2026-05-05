@@ -11,6 +11,7 @@ import { formatDate, formatTime } from "@/lib/timezone";
 import { ClassDrawerV2 } from "../drawers/ClassDrawer";
 import { MemberDrawerV2 } from "../drawers/MemberDrawer";
 import { AddOneOffClassDrawer } from "../drawers/AddOneOffClassDrawer";
+import { EditClassDrawer } from "../drawers/EditClassDrawer";
 import { EditSequenceDrawer } from "../drawers/EditSequenceDrawer";
 
 export function ScheduleScreen() {
@@ -19,12 +20,14 @@ export function ScheduleScreen() {
   const { classes, isLoading } = useSchedule(4);
   const [activeClassId, setActiveClassId] = useState<string | null>(null);
   const [activeMemberId, setActiveMemberId] = useState<string | null>(null);
+  const [editClassId, setEditClassId] = useState<string | null>(null);
   const [addClassOpen, setAddClassOpen] = useState(false);
   const [editSequenceOpen, setEditSequenceOpen] = useState(false);
 
   const grouped = useMemo(() => groupByDay(classes ?? [], studioTz), [classes, studioTz]);
   const totalCount = classes?.length ?? 0;
   const activeClass = activeClassId ? classes?.find((c) => c.id === activeClassId) ?? null : null;
+  const editingClass = editClassId ? classes?.find((c) => c.id === editClassId) ?? null : null;
 
   return (
     <>
@@ -58,6 +61,7 @@ export function ScheduleScreen() {
                 tz={c.location_timezone ?? studioTz}
                 selected={activeClassId === c.id}
                 onClick={() => setActiveClassId(c.id)}
+                onEdit={() => setEditClassId(c.id)}
               />
             ))}
           </RowList>
@@ -69,6 +73,10 @@ export function ScheduleScreen() {
         open={!!activeClass}
         onClose={() => setActiveClassId(null)}
         onMemberClick={(uid) => setActiveMemberId(uid)}
+        onEditClass={(id) => {
+          setActiveClassId(null);
+          setEditClassId(id);
+        }}
       />
 
       {/* Nested member drawer (one nesting level allowed per spec) */}
@@ -79,6 +87,11 @@ export function ScheduleScreen() {
       />
 
       <AddOneOffClassDrawer open={addClassOpen} onClose={() => setAddClassOpen(false)} />
+      <EditClassDrawer
+        cls={editingClass}
+        open={!!editingClass}
+        onClose={() => setEditClassId(null)}
+      />
       <EditSequenceDrawer open={editSequenceOpen} onClose={() => setEditSequenceOpen(false)} />
     </>
   );
@@ -118,11 +131,13 @@ function ClassRow({
   tz,
   selected,
   onClick,
+  onEdit,
 }: {
   c: ScheduleClass;
   tz: string;
   selected: boolean;
   onClick: () => void;
+  onEdit: () => void;
 }) {
   const fillRatio = c.max_capacity > 0 ? c.booked_count / c.max_capacity : 0;
   const isFull = c.booked_count >= c.max_capacity;
@@ -157,10 +172,12 @@ function ClassRow({
           <OverflowMenu
             items={[
               { id: "edit", label: "Edit class", group: 1 },
-              { id: "sub", label: "Sub instructor", group: 1 },
-              { id: "cancel", label: "Cancel class", group: 3, danger: true, dialog: true },
+              { id: "open", label: "Sub instructor / Cancel…", group: 1 },
             ]}
-            onAction={(id) => alert("TODO: " + id)}
+            onAction={(id) => {
+              if (id === "edit") onEdit();
+              else onClick();
+            }}
           />
         </>
       }

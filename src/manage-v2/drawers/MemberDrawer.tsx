@@ -8,10 +8,16 @@ import { EmptyState } from "../components/EmptyState";
 import { useMember } from "@/manage/hooks/useMember";
 import { useMemberBookings, type MemberBooking } from "@/manage/hooks/useMemberBookings";
 import { useNotificationLog, templateLabel } from "@/manage/hooks/useNotificationLog";
+import { useSetMemberStatus } from "@/manage/hooks/useDeactivateMember";
+import { toast } from "sonner";
 import { useStudioContext } from "@/context/StudioContext";
 import { formatDate, formatTime } from "@/lib/timezone";
 import { getPlanHealth } from "../lib/planHealth";
 import { bookingBadge } from "../lib/bookingStatus";
+import { EditMemberDrawer } from "./EditMemberDrawer";
+import { ConfirmModal } from "../components/ConfirmModal";
+import { SendMessageModal } from "../components/SendMessageModal";
+import { supabase } from "@/integrations/supabase/client";
 
 type Tab = "overview" | "activity" | "billing" | "notes";
 
@@ -25,8 +31,30 @@ export function MemberDrawerV2({
   onClose: () => void;
 }) {
   const [tab, setTab] = useState<Tab>("overview");
+  const [editOpen, setEditOpen] = useState(false);
+  const [confirmDeactivate, setConfirmDeactivate] = useState(false);
+  const [msgOpen, setMsgOpen] = useState(false);
+  const setStatus = useSetMemberStatus();
   const studioCtx = useStudioContext();
   const studioTz = studioCtx?.studio?.timezone ?? "Europe/Oslo";
+  const studioId = studioCtx?.studio?.id ?? "";
+
+  async function handleSendMessage(subject: string, body: string) {
+    const { error } = await supabase.functions.invoke("send-member-message", {
+      body: { user_id: userId, studio_id: studioId, subject, body },
+    });
+    if (error) {
+      let detail = error.message ?? "Failed to send message";
+      try {
+        const body = await (error as any).context?.json?.();
+        if (body?.error) detail = body.error;
+      } catch {}
+      console.error("send-member-message error:", error);
+      throw new Error(detail);
+    }
+    toast.success("Message sent");
+    setMsgOpen(false);
+  }
   const currency = studioCtx?.studio?.currency ?? "NOK";
   const { data: member, isLoading } = useMember(userId ?? undefined);
   const { data: bookings = [] } = useMemberBookings(userId ?? undefined);
@@ -42,6 +70,7 @@ export function MemberDrawerV2({
 
   const planHealth = member
     ? getPlanHealth({
+        status: member.status,
         membership_id: member.membership?.id ?? null,
         credits_remaining: member.membership?.credits_remaining ?? null,
         valid_until: member.membership?.valid_until ?? null,
@@ -56,6 +85,7 @@ export function MemberDrawerV2({
     .toUpperCase();
 
   return (
+    <>
     <Drawer
       open={open}
       onClose={onClose}
@@ -82,11 +112,16 @@ export function MemberDrawerV2({
       actions={
         member && (
           <>
-            <Button variant="danger" style={{ marginRight: "auto" }} onClick={() => alert("TODO: deactivate flow")}>
-              Deactivate
+            <Button
+              variant={member.is_active ? "danger" : "secondary"}
+              style={{ marginRight: "auto" }}
+              disabled={setStatus.isPending}
+              onClick={() => setConfirmDeactivate(true)}
+            >
+              {setStatus.isPending ? "Saving…" : member.is_active ? "Deactivate" : "Reactivate"}
             </Button>
-            <Button variant="ghost" onClick={() => alert("TODO: send message")}>Send message</Button>
-            <Button variant="primary" onClick={() => alert("TODO: edit member")}>Edit member</Button>
+            <Button variant="ghost" onClick={() => setMsgOpen(true)}>Send message</Button>
+            <Button variant="primary" onClick={() => setEditOpen(true)}>Edit member</Button>
           </>
         )
       }
@@ -105,9 +140,7 @@ export function MemberDrawerV2({
           </DrawerSection>
 
           <DrawerSection title="Member insights">
-            <p style={{ margin: 0, color: "var(--ink-muted)", fontSize: 13, fontStyle: "italic" }}>
-              Coming soon — booking frequency timeline and most-booked class.
-            </p>
+            <MemberInsights bookings={bookings} />
           </DrawerSection>
 
           <DrawerSection title="Recent activity" flush>
@@ -131,7 +164,7 @@ export function MemberDrawerV2({
                   : "—"
               }
             />
-            <KV label="Source" value="—" hint="Source attribution coming soon" />
+            <KV label="Source" value={member.source ?? "—"} />
             <KV
               label="Referral"
               value={
@@ -196,6 +229,127 @@ export function MemberDrawerV2({
         </DrawerSection>
       )}
     </Drawer>
+
+    <EditMemberDrawer
+      member={member ?? null}
+      open={editOpen}
+      onClose={() => setEditOpen(false)}
+    />
+
+    <SendMessageModal
+      open={msgOpen}
+      memberName={member?.full_name ?? "Member"}
+      memberEmail={member?.email ?? ""}
+      onSend={handleSendMessage}
+      onClose={() => setMsgOpen(false)}
+    />
+
+    {member && (
+      <ConfirmModal
+        open={confirmDeactivate}
+        title={member.is_active ? `Deactivate ${member.full_name}?` : `Reactivate ${member.full_name}?`}
+        message={
+          member.is_active
+            ? "They won't be able to book classes. Existing bookings are kept."
+            : "They'll be able to book classes again."
+        }
+        confirmLabel={member.is_active ? "Deactivate" : "Reactivate"}
+        variant={member.is_active ? "danger" : "primary"}
+        loading={setStatus.isPending}
+        onCancel={() => setConfirmDeactivate(false)}
+        onConfirm={async () => {
+          const reactivating = !member.is_active;
+          try {
+            await setStatus.mutateAsync({
+              user_id: member.user_id,
+              status: reactivating ? "active" : "inactive",
+            });
+            toast.success(`${reactivating ? "Reactivated" : "Deactivated"} ${member.full_name}`);
+            setConfirmDeactivate(false);
+          } catch (e) {
+            toast.error(e instanceof Error ? e.message : "Failed to update member");
+          }
+        }}
+      />
+    )}
+    </>
+  );
+}
+
+// ── Member insights ────────────────────────────────────────────────────────
+
+function computeInsights(bookings: MemberBooking[]) {
+  const confirmed = bookings.filter((b) => b.status === "confirmed");
+
+  const freq: Record<string, number> = {};
+  for (const b of confirmed) {
+    if (b.class_name) freq[b.class_name] = (freq[b.class_name] ?? 0) + 1;
+  }
+  const topClass =
+    Object.keys(freq).length > 0
+      ? Object.keys(freq).reduce((a, b) => (freq[a] >= freq[b] ? a : b))
+      : null;
+
+  const now = new Date();
+  const dayOfWeek = now.getDay();
+  const daysToMon = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+  const thisMonday = new Date(now);
+  thisMonday.setHours(0, 0, 0, 0);
+  thisMonday.setDate(thisMonday.getDate() - daysToMon);
+
+  const weekCounts: number[] = Array(12).fill(0);
+  const weekStart0 = new Date(thisMonday);
+  weekStart0.setDate(weekStart0.getDate() - 12 * 7);
+
+  for (const b of confirmed) {
+    if (!b.starts_at) continue;
+    const t = new Date(b.starts_at).getTime();
+    const weekIndex = Math.floor((t - weekStart0.getTime()) / (7 * 24 * 60 * 60 * 1000));
+    if (weekIndex >= 0 && weekIndex < 12) weekCounts[weekIndex] += 1;
+  }
+
+  return { topClass, weekCounts };
+}
+
+function BookingSparkline({ weeks }: { weeks: number[] }) {
+  const maxCount = Math.max(...weeks, 1);
+  return (
+    <svg width="100%" height="32" viewBox="0 0 120 32" preserveAspectRatio="none" style={{ display: "block" }}>
+      {weeks.map((count, i) => {
+        const barHeight = count > 0 ? Math.max(2, Math.round((count / maxCount) * 24)) : 2;
+        return (
+          <rect
+            key={i}
+            x={i * 10 + 2}
+            y={32 - barHeight}
+            width={6}
+            height={barHeight}
+            rx={2}
+            fill={count > 0 ? "var(--action)" : "var(--line)"}
+          />
+        );
+      })}
+    </svg>
+  );
+}
+
+function MemberInsights({ bookings }: { bookings: MemberBooking[] }) {
+  const { topClass, weekCounts } = useMemo(() => computeInsights(bookings), [bookings]);
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <div>
+        <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--ink-muted)", fontWeight: 600, marginBottom: 4 }}>
+          Most-booked class
+        </div>
+        <div style={{ fontSize: 14, color: "var(--ink)" }}>{topClass ?? "—"}</div>
+      </div>
+      <div>
+        <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--ink-muted)", fontWeight: 600, marginBottom: 6 }}>
+          Bookings · last 12 weeks
+        </div>
+        <BookingSparkline weeks={weekCounts} />
+      </div>
+    </div>
   );
 }
 

@@ -4,11 +4,8 @@ import { Button } from "../components/Button";
 import { Field, FieldRow, inputStyle } from "../components/Field";
 import { useStudioContext } from "@/context/StudioContext";
 import { toast } from "sonner";
-import { Copy, Check } from "lucide-react";
-
-// MVP: collect prospect info + produce a copy-able sign-up link the
-// owner can paste into a chat/email. The actual email-an-invite plumbing
-// (invite-member Edge Function) is a follow-up — see task list.
+import { Copy, Check, Mail } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 const EMPTY_DRAFT = {
   full_name: "",
@@ -20,15 +17,20 @@ const EMPTY_DRAFT = {
 export function AddClientDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   const studioCtx = useStudioContext();
   const studioSlug = studioCtx?.studio?.slug;
+  const studioId = studioCtx?.studio?.id;
   const [draft, setDraft] = useState(EMPTY_DRAFT);
   const [link, setLink] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [inviteSending, setInviteSending] = useState(false);
+  const [inviteSent, setInviteSent] = useState(false);
 
   useEffect(() => {
     if (!open) {
       setDraft({ ...EMPTY_DRAFT });
       setLink(null);
       setCopied(false);
+      setInviteSending(false);
+      setInviteSent(false);
     }
   }, [open]);
 
@@ -41,12 +43,29 @@ export function AddClientDrawer({ open, onClose }: { open: boolean; onClose: () 
       toast.error("Email is required");
       return;
     }
-    // For now: produce a /joinnow link with the email prefilled. The user
-    // can paste this into Whatsapp/SMS/email manually. Once the
-    // invite-member Edge Function lands this becomes a single click.
     const base = window.location.origin;
     const url = `${base}/joinnow?email=${encodeURIComponent(draft.email.trim())}`;
     setLink(url);
+  };
+
+  const sendInvite = async () => {
+    if (!draft.email.trim() || !studioId) return;
+    setInviteSending(true);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const session = sessionData?.session;
+      const { error } = await supabase.functions.invoke("invite-member", {
+        body: { email: draft.email.trim(), full_name: draft.full_name.trim() || undefined, studio_id: studioId },
+        headers: session ? { Authorization: `Bearer ${session.access_token}` } : {},
+      });
+      if (error) throw error;
+      setInviteSent(true);
+      toast.success(`Invite sent to ${draft.email.trim()}`);
+    } catch (err: any) {
+      toast.error("Failed to send invite");
+    } finally {
+      setInviteSending(false);
+    }
   };
 
   const copy = async () => {
@@ -122,8 +141,7 @@ export function AddClientDrawer({ open, onClose }: { open: boolean; onClose: () 
             </Field>
 
             <p style={{ margin: 0, fontSize: 12, color: "var(--ink-muted)" }}>
-              We'll generate a sign-up link you can paste into a message. Auto-emailed invites
-              are coming soon.
+              Generate a sign-up link to share, or send a welcome email directly.
             </p>
           </>
         )}
@@ -167,6 +185,21 @@ export function AddClientDrawer({ open, onClose }: { open: boolean; onClose: () 
                 icon={copied ? <Check size={12} /> : <Copy size={12} />}
               >
                 {copied ? "Copied" : "Copy"}
+              </Button>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, paddingTop: 4, borderTop: "1px solid var(--line)" }}>
+              <p style={{ margin: 0, flex: 1, fontSize: 12, color: "var(--ink-muted)" }}>
+                Or send a welcome email directly to {draft.email}.
+              </p>
+              <Button
+                variant={inviteSent ? "ghost" : "secondary"}
+                size="sm"
+                loading={inviteSending}
+                disabled={inviteSent}
+                onClick={sendInvite}
+                icon={inviteSent ? <Check size={12} /> : <Mail size={12} />}
+              >
+                {inviteSent ? "Sent" : "Email invite"}
               </Button>
             </div>
           </div>

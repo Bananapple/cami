@@ -19,9 +19,12 @@ export type ManagerMember = {
   total_sessions: number;
   no_shows: number;
   joined_at: string | null;
+  is_active: boolean;
+  status: "active" | "on_leave" | "inactive";
   membership: MemberMembership | null;
   referrals_sent: number;
   referrals_converted: number;
+  source: string | null;
 };
 
 export function useMember(userId: string | undefined) {
@@ -49,8 +52,9 @@ export function useMember(userId: string | undefined) {
           .maybeSingle(),
         supabase
           .from("studio_members")
-          .select("level, total_sessions, joined_at")
+          .select("level, total_sessions, joined_at, is_active, status, source")
           .eq("user_id", userId)
+          .eq("studio_id", studioId)
           .maybeSingle(),
         supabase
           .from("memberships")
@@ -95,9 +99,12 @@ export function useMember(userId: string | undefined) {
         total_sessions: studioMember?.total_sessions ?? 0,
         no_shows: (noShowBookings ?? []).length,
         joined_at: (studioMember as any)?.joined_at ?? null,
+        is_active: (studioMember as any)?.is_active ?? true,
+        status: ((studioMember as any)?.status as "active" | "on_leave" | "inactive") ?? "active",
         membership,
         referrals_sent: (referrals ?? []).length,
         referrals_converted: (referrals ?? []).filter((r: any) => r.status === "completed").length,
+        source: (studioMember as any)?.source ?? null,
       };
     },
   });

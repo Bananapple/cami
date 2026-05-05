@@ -154,16 +154,38 @@ export function useSchedule(weeksAhead = 4) {
       id,
       max_capacity,
       instructor_id,
+      location_id,
+      price,
+      starts_at,
+      ends_at,
       notes,
     }: {
       id: string;
       max_capacity?: number;
       instructor_id?: string | null;
+      location_id?: string | null;
+      price?: number;
+      starts_at?: string;
+      ends_at?: string;
       notes?: string | null;
     }) => {
+      // Build patch with only defined keys so we don't null out unset fields
+      const patch: Record<string, unknown> = {};
+      if (max_capacity !== undefined) patch.max_capacity = max_capacity;
+      if (instructor_id !== undefined) patch.instructor_id = instructor_id;
+      if (location_id !== undefined) patch.location_id = location_id;
+      if (price !== undefined) patch.price = price;
+      if (notes !== undefined) patch.notes = notes;
+      if (starts_at !== undefined) {
+        patch.starts_at = starts_at;
+        if (ends_at !== undefined) {
+          patch.ends_at = ends_at;
+          patch.time_range = `[${starts_at},${ends_at})`;
+        }
+      }
       const { error } = await supabase
         .from("class_instances")
-        .update({ max_capacity, instructor_id, notes })
+        .update(patch)
         .eq("id", id);
       if (error) throw error;
     },

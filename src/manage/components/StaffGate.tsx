@@ -7,12 +7,8 @@ export function StaffGate({ children }: { children: ReactNode }) {
   const { isAuthenticated, loading: authLoading } = useAuth();
   const { data: isStaff, isLoading: staffLoading } = useIsStaff();
 
-  if (authLoading || (isAuthenticated && staffLoading)) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background text-muted-foreground">
-        <p className="text-sm font-serif">Checking access...</p>
-      </div>
-    );
+  if (authLoading || (isAuthenticated && (staffLoading || isStaff === undefined))) {
+    return null;
   }
 
   if (!isAuthenticated) {
