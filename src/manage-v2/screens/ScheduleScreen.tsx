@@ -4,7 +4,6 @@ import { PageHeader } from "../shell/PageHeader";
 import { Button } from "../components/Button";
 import { Row, RowList } from "../components/Row";
 import { StateBadge, CategoryChip, Count } from "../components/Badge";
-import { OverflowMenu } from "../components/OverflowMenu";
 import { EmptyState } from "../components/EmptyState";
 import { useSchedule, type ScheduleClass } from "@/manage/hooks/useSchedule";
 import { useStudioContext } from "@/context/StudioContext";
@@ -62,7 +61,6 @@ export function ScheduleScreen() {
                 tz={c.location_timezone ?? studioTz}
                 selected={activeClassId === c.id}
                 onClick={() => setActiveClassId(c.id)}
-                onEdit={() => setEditClassId(c.id)}
               />
             ))}
           </RowList>
@@ -132,13 +130,11 @@ function ClassRow({
   tz,
   selected,
   onClick,
-  onEdit,
 }: {
   c: ScheduleClass;
   tz: string;
   selected: boolean;
   onClick: () => void;
-  onEdit: () => void;
 }) {
   const isFull = c.booked_count >= c.max_capacity;
   const isCancelled = c.status === "cancelled";
@@ -169,16 +165,6 @@ function ClassRow({
             <StateBadge tone={tone}>{label}</StateBadge>
             <Count value={`${c.booked_count} / ${c.max_capacity}`} tone={isFull ? "warn" : "default"} />
           </div>
-          <OverflowMenu
-            items={[
-              { id: "edit", label: "Edit class", group: 1 },
-              { id: "open", label: "Sub instructor / Cancel…", group: 1 },
-            ]}
-            onAction={(id) => {
-              if (id === "edit") onEdit();
-              else onClick();
-            }}
-          />
         </>
       }
       selected={selected}
