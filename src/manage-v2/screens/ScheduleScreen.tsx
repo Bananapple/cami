@@ -1,7 +1,6 @@
-import { useMemo, useState, useRef } from "react";
+import { useMemo, useState } from "react";
 import { SlidersHorizontal } from "lucide-react";
 import { PageHeader } from "../shell/PageHeader";
-import { useStickyBar } from "../lib/useStickyBar";
 import { Button } from "../components/Button";
 import { Row, RowList } from "../components/Row";
 import { StateBadge, CategoryChip, Count } from "../components/Badge";
@@ -30,46 +29,19 @@ export function ScheduleScreen() {
   const totalCount = classes?.length ?? 0;
   const activeClass = activeClassId ? classes?.find((c) => c.id === activeClassId) ?? null : null;
   const editingClass = editClassId ? classes?.find((c) => c.id === editClassId) ?? null : null;
-  const headerRef = useRef<HTMLDivElement>(null);
-  const showSticky = useStickyBar(headerRef);
 
   return (
     <>
-      {/* Mobile sticky bar */}
-      <div className={"sm-sticky-bar" + (showSticky ? " visible" : "")}>
-        <div className="sm-sticky-tab">
-          <span className="sm-sticky-bar-title">Schedule</span>
-          <div className="sm-sticky-actions">
-            <button type="button" className="sm-sticky-icon-btn" onClick={() => setEditSequenceOpen(true)}>
-              <SlidersHorizontal size={13} />
-            </button>
-            <button type="button" className="sm-sticky-icon-btn action" onClick={() => setAddClassOpen(true)}>
-              +
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div ref={headerRef}>
-        <PageHeader
+      <PageHeader
           title="Schedule"
           subtitle={isLoading ? "Loading…" : `Next 4 weeks · ${totalCount} class${totalCount === 1 ? "" : "es"} scheduled`}
           actions={
             <>
-              {/* Desktop: text buttons */}
-              <Button variant="secondary" onClick={() => setEditSequenceOpen(true)} className="sm-hide-mobile">Edit sequence</Button>
-              <Button variant="primary" onClick={() => setAddClassOpen(true)} className="sm-hide-mobile">+ Add one-off class</Button>
-              {/* Mobile: compact icon buttons */}
-              <button type="button" className="sm-hdr-icon-btn sm-hide-desktop" onClick={() => setEditSequenceOpen(true)}>
-                <SlidersHorizontal size={15} />
-              </button>
-              <button type="button" className="sm-hdr-icon-btn sm-hdr-icon-btn--action sm-hide-desktop" onClick={() => setAddClassOpen(true)}>
-                +
-              </button>
+              <Button variant="secondary" onClick={() => setEditSequenceOpen(true)}>Edit sequence</Button>
+              <Button variant="primary" onClick={() => setAddClassOpen(true)}>+ Add one-off class</Button>
             </>
           }
         />
-      </div>
 
       {!isLoading && grouped.length === 0 && (
         <RowList>
@@ -193,8 +165,10 @@ function ClassRow({
       meta={`${c.instructor_name} · ${c.location_name} · ${durationMin} min`}
       trail={
         <>
-          <Count value={`${c.booked_count} / ${c.max_capacity}`} tone={isFull ? "warn" : "default"} />
-          <StateBadge tone={tone}>{label}</StateBadge>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 3 }}>
+            <StateBadge tone={tone}>{label}</StateBadge>
+            <Count value={`${c.booked_count} / ${c.max_capacity}`} tone={isFull ? "warn" : "default"} />
+          </div>
           <OverflowMenu
             items={[
               { id: "edit", label: "Edit class", group: 1 },

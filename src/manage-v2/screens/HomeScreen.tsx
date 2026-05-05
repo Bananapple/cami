@@ -1,5 +1,4 @@
-import { useState, useMemo, useRef } from "react";
-import { useStickyBar } from "../lib/useStickyBar";
+import { useState, useMemo } from "react";
 import { Kpi } from "../components/Kpi";
 import { StateBadge } from "../components/Badge";
 import { useHomeDashboard, type Period } from "@/manage/hooks/useHomeDashboard";
@@ -17,34 +16,10 @@ export function HomeScreen() {
   const currency = studioCtx?.studio?.currency ?? "NOK";
   const [period, setPeriod] = useState<Period>("week");
   const dash = useHomeDashboard(period);
-  const greetingRef = useRef<HTMLDivElement>(null);
-  const showSticky = useStickyBar(greetingRef);
 
   return (
     <>
-      {/* Mobile sticky bar — appears when greeting scrolls out of view */}
-      <div className={"sm-sticky-bar" + (showSticky ? " visible" : "")}>
-        <div className="sm-sticky-tab">
-          <span className="sm-sticky-bar-title">Home</span>
-        </div>
-        <div className="sm-sticky-period-tabs">
-          {(["week", "month", "year"] as Period[]).map((p, i) => (
-            <button
-              key={p}
-              type="button"
-              className={"sm-sticky-period-tab" + (period === p ? " on" : "")}
-              style={{ zIndex: period === p ? 5 : i + 1 }}
-              onClick={() => setPeriod(p)}
-            >
-              {p[0].toUpperCase()}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div ref={greetingRef}>
-        <Greeting period={period} setPeriod={setPeriod} periodStart={dash.periodStart} />
-      </div>
+      <Greeting period={period} setPeriod={setPeriod} periodStart={dash.periodStart} />
 
       <Kpis period={period} dash={dash} currency={currency} />
 
