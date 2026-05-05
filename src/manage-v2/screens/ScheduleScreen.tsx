@@ -168,8 +168,8 @@ function ClassRow({
       trail={
         <>
           <div className="sm-trail-stack">
-            <StateBadge tone={tone}>{label}</StateBadge>
             <Count value={`${c.booked_count} / ${c.max_capacity}`} tone={isFull ? "warn" : "default"} />
+            <StateBadge tone={tone}>{label}</StateBadge>
           </div>
         </>
       }

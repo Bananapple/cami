@@ -169,13 +169,13 @@ function ProductRow({
       meta={meta || "—"}
       trail={
         <div className="sm-trail-stack">
-          <StateBadge tone={product.is_active ? "good" : "neutral"}>
-            {product.is_active ? "Active" : "Inactive"}
-          </StateBadge>
           <span style={{ fontSize: 14, color: "var(--ink)", fontVariantNumeric: "tabular-nums" }}>
             {priceFormatted}
             {product.billing_interval === "month" ? <span style={{ color: "var(--ink-muted)" }}>/mo</span> : null}
           </span>
+          <StateBadge tone={product.is_active ? "good" : "neutral"}>
+            {product.is_active ? "Active" : "Inactive"}
+          </StateBadge>
         </div>
       }
       onSelect={onEdit}
