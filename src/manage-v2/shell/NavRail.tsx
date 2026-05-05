@@ -19,6 +19,8 @@ export function NavRail({
   userInitials,
   userName,
   onUserClick,
+  onSignOut,
+  hiddenIds = [],
   mobileOpen,
   onMobileClose,
 }: {
@@ -29,6 +31,8 @@ export function NavRail({
   userInitials: string;
   userName: string;
   onUserClick?: () => void;
+  onSignOut?: () => void;
+  hiddenIds?: NavId[];
   /** Mobile-only: rail is hidden by default; this opens an overlay */
   mobileOpen?: boolean;
   onMobileClose?: () => void;
@@ -58,7 +62,8 @@ export function NavRail({
                 top: 0,
                 left: 0,
                 bottom: 0,
-                width: 240,
+                width: "85vw",
+                maxWidth: 360,
                 zIndex: 31,
               }
             : undefined
@@ -69,7 +74,7 @@ export function NavRail({
           <b>{brandName}</b>
         </div>
         <nav className="sm-nav">
-          {ITEMS.map((it) => (
+          {ITEMS.filter((it) => !hiddenIds.includes(it.id)).map((it) => (
             <button
               key={it.id}
               type="button"
@@ -105,8 +110,26 @@ export function NavRail({
             }}
           >
             <div className="av">{userInitials}</div>
-            <span>{userName}</span>
+            <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{userName}</span>
           </button>
+          {onSignOut && (
+            <button
+              type="button"
+              onClick={onSignOut}
+              style={{
+                all: "unset",
+                cursor: "pointer",
+                fontSize: 11.5,
+                color: "var(--ink-muted)",
+                paddingTop: 6,
+                display: "block",
+                width: "100%",
+                paddingLeft: 36,
+              }}
+            >
+              Sign out
+            </button>
+          )}
         </div>
       </aside>
     </>

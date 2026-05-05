@@ -270,30 +270,26 @@ function BookingTrend({
           style={{
             display: "flex",
             gap: 6,
-            fontSize: 11,
+            fontSize: 10.5,
             color: "var(--ink-muted)",
-            marginTop: 6,
+            marginTop: 5,
             fontVariantNumeric: "tabular-nums",
           }}
         >
-          {spark.map((b, i) => {
-            const stride = spark.length >= 12 ? 3 : 2;
-            const isLast = i === last;
-            const showThis = i === 0 || isLast || i % stride === 0;
-            return (
-              <span
-                key={i}
-                style={{
-                  flex: 1,
-                  textAlign: i === 0 ? "left" : isLast ? "right" : "center",
-                  whiteSpace: "nowrap",
-                  overflow: "hidden",
-                }}
-              >
-                {showThis ? b.label : ""}
-              </span>
-            );
-          })}
+          {spark.map((b, i) => (
+            <span
+              key={i}
+              style={{
+                flex: 1,
+                textAlign: "center",
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "clip",
+              }}
+            >
+              {b.label}
+            </span>
+          ))}
         </div>
       </div>
     </section>
@@ -324,10 +320,24 @@ function Traffic({
   data: ReturnType<typeof useHomeDashboard>["analytics"];
   loading: boolean;
 }) {
-  // Pre-compute a normalized 30-day series with totals per day
+  // Pre-compute a full 30-day series, filling in 0 for days with no traffic
   const days = useMemo(() => {
-    if (!data?.dailyBreakdown?.length) return [];
-    return data.dailyBreakdown.map((d) => ({ date: d.date, total: d.count }));
+    const lookup = new Map<string, number>();
+    for (const d of data?.dailyBreakdown ?? []) lookup.set(d.date, d.count);
+
+    const result: { date: string; total: number; day: number; monthLabel: string }[] = [];
+    let prevMonth = "";
+    for (let ago = 29; ago >= 0; ago--) {
+      const d = new Date();
+      d.setDate(d.getDate() - ago);
+      d.setHours(0, 0, 0, 0);
+      const dateStr = d.toISOString().slice(0, 10);
+      const monthShort = d.toLocaleDateString("en-GB", { month: "short" });
+      const monthLabel = monthShort !== prevMonth ? monthShort : "";
+      prevMonth = monthShort;
+      result.push({ date: dateStr, total: lookup.get(dateStr) ?? 0, day: d.getDate(), monthLabel });
+    }
+    return result;
   }, [data]);
 
   const max = Math.max(...days.map((d) => d.total), 1);
@@ -426,18 +436,39 @@ function Traffic({
                   />
                 ))}
               </div>
+              {/* Day-number row: show every 5th bar to avoid crowding */}
               <div
                 style={{
                   display: "flex",
-                  justifyContent: "space-between",
-                  fontSize: 11,
+                  gap: 3,
+                  marginTop: 4,
+                  fontSize: 10,
                   color: "var(--ink-muted)",
-                  marginTop: 6,
                   fontVariantNumeric: "tabular-nums",
                 }}
               >
-                <span>30 days ago</span>
-                <span>Today</span>
+                {days.map((d, i) => (
+                  <div key={i} style={{ flex: 1, textAlign: "center", overflow: "hidden" }}>
+                    {d.day}
+                  </div>
+                ))}
+              </div>
+              {/* Month row: show month name once at the start of each new month */}
+              <div
+                style={{
+                  display: "flex",
+                  gap: 3,
+                  marginTop: 1,
+                  fontSize: 10,
+                  color: "var(--ink-soft)",
+                  fontVariantNumeric: "tabular-nums",
+                }}
+              >
+                {days.map((d, i) => (
+                  <div key={i} style={{ flex: 1, textAlign: "center", overflow: "hidden", fontWeight: d.monthLabel ? 500 : 400 }}>
+                    {d.monthLabel}
+                  </div>
+                ))}
               </div>
             </div>
           </>

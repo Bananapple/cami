@@ -9,6 +9,7 @@ import { useManageProducts, type Product } from "@/manage/hooks/useManageProduct
 import { useManageInstructors, type ManagedInstructor } from "@/manage/hooks/useManageInstructors";
 import { useManageLocations, type ManagedLocation } from "@/manage/hooks/useManageLocations";
 import { useStudioContext } from "@/context/StudioContext";
+import { useMyStudioRole } from "@/manage/hooks/useMyStudioRole";
 import { ProductDrawerV2 } from "../drawers/ProductDrawer";
 import { InstructorDrawerV2 } from "../drawers/InstructorDrawer";
 import { LocationDrawerV2 } from "../drawers/LocationDrawer";
@@ -26,6 +27,8 @@ type DrawerState<T> = { mode: "create" } | { mode: "edit"; entity: T } | null;
 export function StudioScreen() {
   const studioCtx = useStudioContext();
   const currency = studioCtx?.studio?.currency ?? "NOK";
+  const { data: myRole } = useMyStudioRole();
+  const isOwner = myRole === "owner";
 
   const { data: products = [], isLoading: pLoading, toggleActive: toggleProduct } = useManageProducts();
   const { instructors, isLoading: iLoading, toggleActive: toggleInstructor } = useManageInstructors();
@@ -44,56 +47,62 @@ export function StudioScreen() {
       />
 
       {/* Products */}
-      <SectionHead title="Products" cta="Add product" onClick={() => setProductDrawer({ mode: "create" })} />
-      <RowList>
-        {pLoading && <LoadingRow text="Loading products…" />}
-        {!pLoading && products.length === 0 && (
-          <EmptyState title="No products yet" hint="Add your first drop-in or clip card to start selling." />
-        )}
-        {products.map((p) => (
-          <ProductRow
-            key={p.id}
-            product={p}
-            currency={currency}
-            onEdit={() => setProductDrawer({ mode: "edit", entity: p })}
-            onToggle={() => toggleProduct.mutate({ id: p.id, is_active: !p.is_active })}
-          />
-        ))}
-      </RowList>
+      <section className="sm-section">
+        <SectionHead title="Products" cta="Add product" onClick={() => setProductDrawer({ mode: "create" })} />
+        <RowList>
+          {pLoading && <LoadingRow text="Loading products…" />}
+          {!pLoading && products.length === 0 && (
+            <EmptyState title="No products yet" hint="Add your first drop-in or clip card to start selling." />
+          )}
+          {products.map((p) => (
+            <ProductRow
+              key={p.id}
+              product={p}
+              currency={currency}
+              onEdit={() => setProductDrawer({ mode: "edit", entity: p })}
+              onToggle={() => toggleProduct.mutate({ id: p.id, is_active: !p.is_active })}
+            />
+          ))}
+        </RowList>
+      </section>
 
       {/* Instructors */}
-      <SectionHead title="Instructors" cta="Add instructor" onClick={() => setInstructorDrawer({ mode: "create" })} />
-      <RowList>
-        {iLoading && <LoadingRow text="Loading instructors…" />}
-        {!iLoading && instructors.length === 0 && (
-          <EmptyState title="No instructors yet" hint="Add your team to assign them to classes." />
-        )}
-        {instructors.map((i) => (
-          <InstructorRow
-            key={i.id}
-            instructor={i}
-            onEdit={() => setInstructorDrawer({ mode: "edit", entity: i })}
-            onToggle={() => toggleInstructor.mutate({ id: i.id, is_active: !i.is_active })}
-          />
-        ))}
-      </RowList>
+      <section className="sm-section">
+        <SectionHead title="Instructors" cta="Add instructor" onClick={() => setInstructorDrawer({ mode: "create" })} />
+        <RowList>
+          {iLoading && <LoadingRow text="Loading instructors…" />}
+          {!iLoading && instructors.length === 0 && (
+            <EmptyState title="No instructors yet" hint="Add your team to assign them to classes." />
+          )}
+          {instructors.map((i) => (
+            <InstructorRow
+              key={i.id}
+              instructor={i}
+              onEdit={() => setInstructorDrawer({ mode: "edit", entity: i })}
+              onToggle={() => toggleInstructor.mutate({ id: i.id, is_active: !i.is_active })}
+            />
+          ))}
+        </RowList>
+      </section>
 
       {/* Locations */}
-      <SectionHead title="Locations" cta="Add location" onClick={() => setLocationDrawer({ mode: "create" })} />
-      <RowList>
-        {lLoading && <LoadingRow text="Loading locations…" />}
-        {!lLoading && locations.length === 0 && (
-          <EmptyState title="No locations yet" hint="Add a room to schedule classes against it." />
-        )}
-        {locations.map((l) => (
-          <LocationRow
-            key={l.id}
-            location={l}
-            onEdit={() => setLocationDrawer({ mode: "edit", entity: l })}
-            onToggle={() => toggleLocation.mutate({ id: l.id, is_active: !l.is_active })}
-          />
-        ))}
-      </RowList>
+      <section className="sm-section">
+        <SectionHead title="Locations" cta="Add location" onClick={() => setLocationDrawer({ mode: "create" })} />
+        <RowList>
+          {lLoading && <LoadingRow text="Loading locations…" />}
+          {!lLoading && locations.length === 0 && (
+            <EmptyState title="No locations yet" hint="Add a room to schedule classes against it." />
+          )}
+          {locations.map((l) => (
+            <LocationRow
+              key={l.id}
+              location={l}
+              onEdit={() => setLocationDrawer({ mode: "edit", entity: l })}
+              onToggle={() => toggleLocation.mutate({ id: l.id, is_active: !l.is_active })}
+            />
+          ))}
+        </RowList>
+      </section>
 
       {/* Drawers */}
       <ProductDrawerV2
@@ -107,6 +116,7 @@ export function StudioScreen() {
         instructor={instructorDrawer?.mode === "edit" ? instructorDrawer.entity : null}
         open={!!instructorDrawer}
         onClose={() => setInstructorDrawer(null)}
+        isOwner={isOwner}
       />
       <LocationDrawerV2
         mode={locationDrawer?.mode ?? "create"}
@@ -121,7 +131,7 @@ export function StudioScreen() {
 // ── Section header ─────────────────────────────────────────────────
 function SectionHead({ title, cta, onClick }: { title: string; cta: string; onClick: () => void }) {
   return (
-    <div className="sm-section-head" style={{ marginTop: 32 }}>
+    <div className="sm-section-head">
       <h2>{title}</h2>
       <Button variant="ghost" size="sm" onClick={onClick}>+ {cta}</Button>
     </div>

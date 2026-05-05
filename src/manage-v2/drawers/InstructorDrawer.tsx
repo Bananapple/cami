@@ -4,17 +4,24 @@ import { Button } from "../components/Button";
 import { StateBadge } from "../components/Badge";
 import { Field, FieldRow, inputStyle } from "../components/Field";
 import { useManageInstructors, type ManagedInstructor, type InstructorStatus } from "@/manage/hooks/useManageInstructors";
+import { useStudioContext } from "@/context/StudioContext";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 type Mode = "create" | "edit";
 
 const EMPTY_DRAFT = {
-  display_name: "",
+  first_name: "",
+  last_name: "",
+  email: "",
+  phone: "",
   initials: "",
   specialty: "",
   bio: "",
   image_url: "",
   status: "active" as InstructorStatus,
+  platform_role: "associate" as "manager" | "associate",
+  send_invite: true,
 };
 
 export function InstructorDrawerV2({
@@ -22,26 +29,42 @@ export function InstructorDrawerV2({
   instructor,
   open,
   onClose,
+  isOwner = false,
 }: {
   mode: Mode;
   instructor?: ManagedInstructor | null;
   open: boolean;
   onClose: () => void;
+  isOwner?: boolean;
 }) {
   const { create, update, toggleActive } = useManageInstructors();
+  const studioCtx = useStudioContext();
+  const studioId = studioCtx?.studio?.id;
   const [draft, setDraft] = useState(EMPTY_DRAFT);
   const [pending, setPending] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     if (mode === "edit" && instructor) {
+      const storedLast = instructor.last_name ?? "";
+      const storedFirst = storedLast
+        ? instructor.display_name.replace(new RegExp("\\s+" + storedLast.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "$"), "").trim()
+        : instructor.display_name.includes(" ")
+        ? instructor.display_name.slice(0, instructor.display_name.lastIndexOf(" "))
+        : instructor.display_name;
+      const fallbackLast = storedLast || (instructor.display_name.includes(" ") ? instructor.display_name.slice(instructor.display_name.lastIndexOf(" ") + 1) : "");
       setDraft({
-        display_name: instructor.display_name,
+        first_name: storedFirst,
+        last_name: fallbackLast,
+        email: instructor.email ?? "",
+        phone: instructor.phone ?? "",
         initials: instructor.initials,
         specialty: instructor.specialty ?? "",
         bio: instructor.bio ?? "",
         image_url: instructor.image_url ?? "",
         status: instructor.status,
+        platform_role: instructor.platform_role ?? "associate",
+        send_invite: false,
       });
     } else {
       setDraft({ ...EMPTY_DRAFT });
@@ -49,37 +72,67 @@ export function InstructorDrawerV2({
   }, [open, mode, instructor]);
 
   const save = async () => {
-    if (!draft.display_name.trim()) {
-      toast.error("Name is required");
+    const firstName = draft.first_name.trim();
+    const lastName = draft.last_name.trim();
+    if (!firstName) {
+      toast.error("First name is required");
       return;
     }
     if (!draft.initials.trim()) {
       toast.error("Initials are required (2 characters)");
       return;
     }
+    const displayName = lastName ? `${firstName} ${lastName}` : firstName;
+    const initials = draft.initials.trim().toUpperCase().slice(0, 2);
+    const email = draft.email.trim() || null;
+    const phone = draft.phone.trim() || null;
+
     setPending(true);
     try {
       if (mode === "create") {
         await create.mutateAsync({
-          display_name: draft.display_name.trim(),
-          initials: draft.initials.trim().toUpperCase().slice(0, 2),
+          display_name: displayName,
+          last_name: lastName || null,
+          email,
+          phone,
+          initials,
           specialty: draft.specialty.trim() || null,
           bio: draft.bio.trim() || null,
           image_url: draft.image_url.trim() || null,
           status: draft.status,
+          platform_role: draft.platform_role,
         });
+
+        // Send platform invite if email is set and checkbox is checked
+        if (email && draft.send_invite && studioId) {
+          const { data: sessionData } = await supabase.auth.getSession();
+          const session = sessionData?.session;
+          const studioRole = draft.platform_role === "manager" ? "manager" : "instructor";
+          await supabase.functions.invoke("invite-member", {
+            body: {
+              email,
+              full_name: displayName,
+              studio_id: studioId,
+              role: studioRole,
+            },
+            headers: session ? { Authorization: `Bearer ${session.access_token}` } : {},
+          });
+        }
+
         toast.success("Instructor created");
       } else if (instructor) {
-        // status change needs the same update path; the hook's update mutation
-        // accepts a partial patch.
         await update.mutateAsync({
           id: instructor.id,
-          display_name: draft.display_name.trim(),
-          initials: draft.initials.trim().toUpperCase().slice(0, 2),
+          display_name: displayName,
+          last_name: lastName || null,
+          email,
+          phone,
+          initials,
           specialty: draft.specialty.trim() || null,
           bio: draft.bio.trim() || null,
           image_url: draft.image_url.trim() || null,
           status: draft.status,
+          platform_role: draft.platform_role,
         });
         toast.success("Instructor updated");
       }
@@ -130,35 +183,72 @@ export function InstructorDrawerV2({
           )}
           <Button variant="ghost" onClick={onClose}>Cancel</Button>
           <Button variant="primary" onClick={save} loading={pending}>
-            {mode === "create" ? "Create instructor" : "Save"}
+            {mode === "create" ? "Add instructor" : "Save"}
           </Button>
         </>
       }
     >
       <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 16 }}>
         <FieldRow>
-          <Field label="Display name">
+          <Field label="First name">
             <input
               type="text"
-              value={draft.display_name}
-              onChange={(e) => setDraft((d) => ({ ...d, display_name: e.target.value }))}
-              placeholder="Mira Holm"
+              value={draft.first_name}
+              onChange={(e) => setDraft((d) => ({ ...d, first_name: e.target.value }))}
+              placeholder="Mira"
               style={inputStyle}
             />
           </Field>
-          <Field label="Initials" help="Used in avatars (2 chars)">
+          <Field label="Last name">
             <input
               type="text"
-              maxLength={2}
-              value={draft.initials}
-              onChange={(e) =>
-                setDraft((d) => ({ ...d, initials: e.target.value.toUpperCase().slice(0, 2) }))
-              }
-              placeholder="MH"
+              value={draft.last_name}
+              onChange={(e) => setDraft((d) => ({ ...d, last_name: e.target.value }))}
+              placeholder="Holm"
               style={inputStyle}
             />
           </Field>
         </FieldRow>
+
+        <FieldRow>
+          <Field label="Email">
+            <input
+              type="email"
+              value={draft.email}
+              onChange={(e) => setDraft((d) => ({ ...d, email: e.target.value }))}
+              placeholder="mira@example.com"
+              style={inputStyle}
+            />
+          </Field>
+          <Field label="Phone">
+            <input
+              type="tel"
+              value={draft.phone}
+              onChange={(e) => setDraft((d) => ({ ...d, phone: e.target.value }))}
+              placeholder="+47 …"
+              style={inputStyle}
+            />
+          </Field>
+        </FieldRow>
+
+        <Field label="Initials" help="Used in class avatars (2 chars)">
+          <input
+            type="text"
+            maxLength={2}
+            value={draft.initials}
+            onChange={(e) =>
+              setDraft((d) => ({ ...d, initials: e.target.value.toUpperCase().slice(0, 2) }))
+            }
+            onFocus={(e) => {
+              if (!e.target.value && (draft.first_name || draft.last_name)) {
+                const auto = ((draft.first_name[0] ?? "") + (draft.last_name[0] ?? "")).toUpperCase();
+                setDraft((d) => ({ ...d, initials: auto }));
+              }
+            }}
+            placeholder="MH"
+            style={inputStyle}
+          />
+        </Field>
 
         <Field label="Specialty">
           <input
@@ -170,7 +260,7 @@ export function InstructorDrawerV2({
           />
         </Field>
 
-        <Field label="Bio" help="Optional, shown on the public /teachers page">
+        <Field label="Bio" help="Optional — shown on the public teachers page">
           <textarea
             rows={3}
             value={draft.bio}
@@ -190,7 +280,48 @@ export function InstructorDrawerV2({
           />
         </Field>
 
-        <Field label="Status" help='"On leave" hides them from substitute pickers but keeps history visible'>
+        <Field
+          label="Platform role"
+          help={
+            isOwner
+              ? "Manager sees all tabs. Associate sees Today and Schedule only."
+              : "Only the studio owner can change platform roles."
+          }
+        >
+          <select
+            value={draft.platform_role}
+            onChange={(e) => setDraft((d) => ({ ...d, platform_role: e.target.value as "manager" | "associate" }))}
+            disabled={!isOwner}
+            style={{ ...(inputStyle as React.CSSProperties), opacity: isOwner ? 1 : 0.6 }}
+          >
+            <option value="associate">Associate — Today &amp; Schedule only</option>
+            <option value="manager">Manager — full access</option>
+          </select>
+        </Field>
+
+        {/* Show invite checkbox only on create, only when email is filled */}
+        {mode === "create" && draft.email.trim() && (
+          <label
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              fontSize: 13,
+              color: "var(--ink-soft)",
+              cursor: "pointer",
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={draft.send_invite}
+              onChange={(e) => setDraft((d) => ({ ...d, send_invite: e.target.checked }))}
+              style={{ width: 14, height: 14, accentColor: "var(--action)", cursor: "pointer" }}
+            />
+            Send platform invite email
+          </label>
+        )}
+
+        <Field label="Status" help='"On leave" hides them from substitute pickers but keeps history intact'>
           <select
             value={draft.status}
             onChange={(e) => setDraft((d) => ({ ...d, status: e.target.value as InstructorStatus }))}
