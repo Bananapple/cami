@@ -2,7 +2,7 @@
 -- don't permanently hold class capacity.
 --
 -- Background:
---   create-checkout creates bookings(status='pending') + payments(status='pending')
+--   create-checkout creates bookings(status='pending') + payments(status='requires_action')
 --   before redirecting to Stripe. The capacity check counts pending+confirmed.
 --   If the user abandons (closes tab, network drop, expired card), the rows
 --   never resolve — capacity is held forever.
@@ -36,17 +36,17 @@ BEGIN
      WHERE b.payment_id = p.id
        AND b.status = 'pending'
        AND b.booked_at < now() - INTERVAL '30 minutes'
-       AND p.status = 'pending'
+       AND p.status = 'requires_action'
     RETURNING b.id
   )
   SELECT COUNT(*) INTO _count FROM cancelled;
 
-  -- Mark the matched payments as cancelled too. We use the same time window
-  -- so we don't accidentally cancel a payment for a product purchase that's
-  -- still inside its grace period.
+  -- Mark all stale requires_action payments as cancelled. Catches both class
+  -- booking payments (whose bookings were just cancelled above) and product
+  -- purchase payments (subscriptions, clip cards) where the buyer abandoned.
   UPDATE payments p
      SET status = 'cancelled'
-   WHERE p.status = 'pending'
+   WHERE p.status = 'requires_action'
      AND p.created_at < now() - INTERVAL '30 minutes';
 
   RETURN _count;
