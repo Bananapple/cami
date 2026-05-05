@@ -37,14 +37,16 @@ export function ScheduleScreen() {
     <>
       {/* Mobile sticky bar */}
       <div className={"sm-sticky-bar" + (showSticky ? " visible" : "")}>
-        <span className="sm-sticky-bar-title">Schedule</span>
-        <div className="sm-sticky-actions">
-          <button type="button" className="sm-sticky-icon-btn" onClick={() => setEditSequenceOpen(true)}>
-            <SlidersHorizontal size={14} />
-          </button>
-          <button type="button" className="sm-sticky-icon-btn action" onClick={() => setAddClassOpen(true)}>
-            +
-          </button>
+        <div className="sm-sticky-tab">
+          <span className="sm-sticky-bar-title">Schedule</span>
+          <div className="sm-sticky-actions">
+            <button type="button" className="sm-sticky-icon-btn" onClick={() => setEditSequenceOpen(true)}>
+              <SlidersHorizontal size={13} />
+            </button>
+            <button type="button" className="sm-sticky-icon-btn action" onClick={() => setAddClassOpen(true)}>
+              +
+            </button>
+          </div>
         </div>
       </div>
 

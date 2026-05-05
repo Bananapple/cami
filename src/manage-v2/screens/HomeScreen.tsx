@@ -24,13 +24,16 @@ export function HomeScreen() {
     <>
       {/* Mobile sticky bar — appears when greeting scrolls out of view */}
       <div className={"sm-sticky-bar" + (showSticky ? " visible" : "")}>
-        <span className="sm-sticky-bar-title">Home</span>
-        <div className="sm-sticky-periods">
-          {(["week", "month", "year"] as Period[]).map((p) => (
+        <div className="sm-sticky-tab">
+          <span className="sm-sticky-bar-title">Home</span>
+        </div>
+        <div className="sm-sticky-period-tabs">
+          {(["week", "month", "year"] as Period[]).map((p, i) => (
             <button
               key={p}
               type="button"
-              className={"sm-sticky-period-btn" + (period === p ? " on" : "")}
+              className={"sm-sticky-period-tab" + (period === p ? " on" : "")}
+              style={{ zIndex: period === p ? 5 : i + 1 }}
               onClick={() => setPeriod(p)}
             >
               {p[0].toUpperCase()}

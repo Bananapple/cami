@@ -286,77 +286,102 @@
 @media (min-width: 641px)  { .sm-hide-desktop { display: none !important; } }
 
 /* —— Mobile sticky scroll bar ———————————————— */
-/* Hangs from the top like a browser tab flipped upside down.
-   Same background as the page (cream), rounded lip at the bottom. */
+/* Each screen title (and W/M/Y) is its own folder tab that hangs from
+   the top of the screen. The outer bar is full-width cream so the page
+   background shows uniformly behind the tabs. Border goes on left,
+   bottom, and right; rounded bottom corners create the downward lip.  */
 .sm-sticky-bar { display: none; }
 
 @media (max-width: 640px) {
+  /* Full-width cream container that slides in/out from the top */
   .sm-sticky-bar {
     display: flex;
     position: fixed;
     top: 0; left: 0; right: 0;
     z-index: 22;
-    height: 48px;
     background: var(--bg);
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 14px 0 58px; /* 58px clears fixed burger */
-    border-radius: 0 0 14px 14px;
-    border: 1px solid var(--line);
-    border-top: none;
-    box-shadow: 0 4px 12px rgba(20, 18, 16, 0.09);
+    align-items: flex-start;
+    justify-content: center;
+    pointer-events: none;
     transform: translateY(-100%);
     transition: transform 160ms cubic-bezier(0.2, 0, 0, 1);
-    pointer-events: none;
   }
   .sm-sticky-bar.visible {
     transform: translateY(0);
     pointer-events: auto;
   }
-  .sm-sticky-bar-title {
-    font-size: 14px;
-    font-weight: 600;
-    letter-spacing: -0.01em;
-    color: var(--ink);
+
+  /* ── Individual folder tab shape ─────────────────────────────── */
+  .sm-sticky-tab {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 20px 13px;
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-top: none;
+    border-radius: 0 0 14px 14px;
+    box-shadow: 0 5px 16px rgba(20, 18, 16, 0.09);
+    position: relative;
   }
 
-  /* Compact W / M / Y segmented control — light bg, dark active */
-  .sm-sticky-periods { display: flex; }
-  .sm-sticky-period-btn {
-    width: 28px; height: 26px;
-    border: 1px solid var(--line);
+  /* Title uses the same DM Serif Display as the page header h1 */
+  .sm-sticky-bar-title {
+    font-family: 'DM Serif Display', Georgia, serif;
+    font-size: 17px;
+    font-weight: 400;
+    letter-spacing: -0.005em;
+    color: var(--ink);
+    white-space: nowrap;
+  }
+
+  /* ── W / M / Y — each its own folder tab, slightly overlapping ── */
+  .sm-sticky-period-tabs {
+    display: flex;
+    align-items: flex-start;
+    margin-left: -1px; /* share the title tab's right border */
+  }
+  .sm-sticky-period-tab {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    padding: 8px 0 13px;
     background: var(--surface);
-    color: var(--ink-soft);
-    font-size: 10px;
+    border: 1px solid var(--line);
+    border-top: none;
+    border-radius: 0 0 11px 11px;
+    font-size: 11px;
     font-weight: 700;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.07em;
+    color: var(--ink-muted);
     cursor: pointer;
     position: relative;
-    margin-left: -1px; /* collapse borders so they share one line */
-    transition: background 100ms, color 100ms;
+    box-shadow: 2px 4px 8px rgba(20, 18, 16, 0.06);
   }
-  .sm-sticky-period-btn:first-child { border-radius: 5px 0 0 5px; margin-left: 0; }
-  .sm-sticky-period-btn:last-child  { border-radius: 0 5px 5px 0; }
-  .sm-sticky-period-btn.on {
-    background: var(--ink);
-    border-color: var(--ink);
-    color: var(--bg);
-    z-index: 1;
+  /* Tabs share a single 1px border line between them */
+  .sm-sticky-period-tab + .sm-sticky-period-tab { margin-left: -1px; }
+  /* Active tab: brighter, elevated, on top */
+  .sm-sticky-period-tab.on {
+    background: var(--bg);
+    color: var(--ink);
+    font-weight: 800;
+    box-shadow: 2px 5px 14px rgba(20, 18, 16, 0.12);
+    /* z-index is set inline so the active tab always sits above siblings */
   }
 
-  /* Icon action buttons inside the sticky bar */
-  .sm-sticky-actions { display: flex; gap: 6px; align-items: center; }
+  /* ── Icon buttons inside the sticky tab (Schedule) ──────────── */
+  .sm-sticky-actions { display: flex; gap: 5px; align-items: center; }
   .sm-sticky-icon-btn {
-    width: 30px; height: 26px;
+    width: 26px; height: 22px;
     border: 1px solid var(--line);
     border-radius: 6px;
     background: var(--surface);
     color: var(--ink-soft);
     cursor: pointer;
     display: flex; align-items: center; justify-content: center;
-    font-size: 14px; font-weight: 700; line-height: 1;
-    padding: 0;
-    transition: background 100ms;
+    font-size: 13px; font-weight: 700;
+    padding: 0; line-height: 1;
   }
   .sm-sticky-icon-btn.action {
     background: var(--action);
@@ -364,7 +389,7 @@
     color: var(--action-on);
   }
 
-  /* Compact icon buttons inside the page header on mobile */
+  /* ── Compact icon buttons in the PageHeader on mobile ────────── */
   .sm-hdr-icon-btn {
     width: 34px; height: 32px;
     border: 1px solid var(--line);

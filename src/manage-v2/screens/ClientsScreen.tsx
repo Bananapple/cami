@@ -38,7 +38,9 @@ export function ClientsScreen() {
     <>
       {/* Mobile sticky bar */}
       <div className={"sm-sticky-bar" + (showSticky ? " visible" : "")}>
-        <span className="sm-sticky-bar-title">Clients</span>
+        <div className="sm-sticky-tab">
+          <span className="sm-sticky-bar-title">Clients</span>
+        </div>
       </div>
 
       <div ref={headerRef}>
