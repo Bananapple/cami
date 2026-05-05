@@ -1,7 +1,3 @@
-// Requires v2 migration (supabase/migrations-v2/) to be applied before the
-// studios and studio_members tables exist. Pre-migration, context is null and
-// legacy useStudioConfig() continues to serve existing components unchanged.
-
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -23,6 +19,23 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const slug = resolveSlug();
   const queryClient = useQueryClient();
   const [userId, setUserId] = useState<string | null>(null);
+  const [studio, setStudio] = useState<Studio | null>(null);
+
+  // Fetch studio by slug — anon. Uses useEffect+useState (not useQuery) for
+  // the same reason useProducts does: TanStack Query v5 fails to notify
+  // subscribers for anon queries, so the data arrives but no consumer ever
+  // re-renders.
+  useEffect(() => {
+    (supabase as any)
+      .from("studios")
+      .select("*")
+      .eq("slug", slug)
+      .eq("is_active", true)
+      .single()
+      .then(({ data, error }: { data: Studio | null; error: unknown }) => {
+        setStudio(error ? null : data);
+      });
+  }, [slug]);
 
   // Track auth state to drive the membership query
   useEffect(() => {
@@ -35,24 +48,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     });
     return () => subscription.unsubscribe();
   }, [queryClient]);
-
-  // Fetch studio by slug — public, no auth required.
-  // Uses `as any` because 'studios' is a v2 table not yet in the auto-generated types.
-  const { data: studio } = useQuery<Studio | null>({
-    queryKey: ["studio", slug],
-    queryFn: async () => {
-      const { data, error } = await (supabase as any)
-        .from("studios")
-        .select("*")
-        .eq("slug", slug)
-        .eq("is_active", true)
-        .single();
-      if (error) return null; // gracefully handle pre-migration (table doesn't exist yet)
-      return data as Studio;
-    },
-    staleTime: 5 * 60 * 1000,
-    retry: false,
-  });
 
   // Fetch the current user's studio membership — only when authenticated and studio is loaded.
   const { data: membership } = useQuery<StudioMember | null>({

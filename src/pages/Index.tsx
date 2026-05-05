@@ -8,31 +8,31 @@ import BookingSheet from "@/components/BookingSheet";
 
 const classes = [
   {
-    img: "/images/classes/Mysore.png",
+    img: "/images/classes/Mysore.avif",
     name: "Ashtanga Mysore",
     desc: "Self-paced practice with individual guidance from the teacher.",
     level: "All levels",
   },
   {
-    img: "/images/classes/Ashtanga-clean.png",
+    img: "/images/classes/Ashtanga-clean.avif",
     name: "Pilates",
     desc: "Full-body movement focusing on core strength and control.",
     level: "All levels",
   },
   {
-    img: "/images/classes/Yinyoga.png",
+    img: "/images/classes/Yinyoga.avif",
     name: "Yin Yoga",
     desc: "Slow, meditative practice with longer-held poses for deep release.",
     level: "All levels",
   },
   {
-    img: "/images/classes/mamma.png",
+    img: "/images/classes/mamma.avif",
     name: "Mama & Baby Pilates",
     desc: "Gentle postpartum movement for new mothers and their infants.",
     level: "All levels",
   },
   {
-    img: "/images/classes/Ashtanga.png",
+    img: "/images/classes/Ashtanga.avif",
     name: "Ashtanga Full Led",
     desc: "Teacher-led Primary Series using the traditional Sanskrit count.",
     level: "Intermediate",

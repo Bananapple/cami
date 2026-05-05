@@ -42,6 +42,7 @@ export function useClassInstances() {
     // Include studioId + date range in the key so the cache invalidates at midnight
     // and when the studio context changes.
     queryKey: ["class_instances", studioId, fromISO, toISO],
+    enabled: !!studioId,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("class_instances")

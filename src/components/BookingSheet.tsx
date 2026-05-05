@@ -11,7 +11,6 @@ import AuthForm from "@/components/booking/AuthForm";
 import ProfileForm from "@/components/booking/ProfileForm";
 import { supabase } from "@/integrations/supabase/client";
 import { posthog } from "@/integrations/posthog";
-import { useStudioConfig } from "@/hooks/useStudioConfig";
 import { useStudioContext } from "@/context/StudioContext";
 import { useMembership } from "@/hooks/useMembership";
 import { useProducts } from "@/hooks/useProducts";
@@ -48,8 +47,9 @@ const BookingSheet = ({ isOpen, onClose, templateId }: BookingSheetProps) => {
     ? allSessions.filter((s) => s.template_id === templateId)
     : allSessions;
   const { isAuthenticated } = useAuth();
-  const { studioName, location } = useStudioConfig();
   const studioCtx = useStudioContext();
+  const studioName = studioCtx?.studio?.name ?? "Studio";
+  const location = studioCtx?.studio?.address ?? "";
   const studioTz = studioCtx?.studio?.timezone ?? "Europe/Oslo";
   const { membership } = useMembership();
   const { waitlist, join: joinWaitlist } = useWaitlist();
