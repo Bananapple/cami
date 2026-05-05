@@ -36,8 +36,14 @@ export function ScheduleScreen() {
           subtitle={isLoading ? "Loading…" : `Next 4 weeks · ${totalCount} class${totalCount === 1 ? "" : "es"} scheduled`}
           actions={
             <>
-              <Button variant="secondary" onClick={() => setEditSequenceOpen(true)}>Edit sequence</Button>
-              <Button variant="primary" onClick={() => setAddClassOpen(true)}>+ Add one-off class</Button>
+              <Button variant="secondary" onClick={() => setEditSequenceOpen(true)} className="sm-hide-mobile">Edit sequence</Button>
+              <Button variant="primary" onClick={() => setAddClassOpen(true)} className="sm-hide-mobile">+ Add one-off class</Button>
+              <button type="button" className="sm-hdr-icon-btn sm-hide-desktop" onClick={() => setEditSequenceOpen(true)}>
+                <SlidersHorizontal size={15} />
+              </button>
+              <button type="button" className="sm-hdr-icon-btn sm-hdr-icon-btn--action sm-hide-desktop" onClick={() => setAddClassOpen(true)}>
+                +
+              </button>
             </>
           }
         />
@@ -161,7 +167,7 @@ function ClassRow({
       meta={`${c.instructor_name} · ${c.location_name} · ${durationMin} min`}
       trail={
         <>
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 3 }}>
+          <div className="sm-trail-stack">
             <StateBadge tone={tone}>{label}</StateBadge>
             <Count value={`${c.booked_count} / ${c.max_capacity}`} tone={isFull ? "warn" : "default"} />
           </div>
