@@ -114,7 +114,13 @@ Deno.serve(async (req) => {
         .select("id, credits_remaining, valid_until")
         .eq("user_id", user.id)
         .eq("studio_id", studioId)
-        .eq("status", "active");
+        .eq("status", "active")
+        // Subscriptions (NULL credits = unlimited) before clip cards.
+        // Reason: clip cards are stored value, subscriptions are active plans —
+        // burn the active plan, preserve stored value.
+        // Within same type, expire-soonest first so urgent credits get used first.
+        .order("credits_remaining", { ascending: true, nullsFirst: true })
+        .order("valid_until", { ascending: true, nullsFirst: false });
 
       const activeMembership = (memberships ?? []).find((m) => {
         const notExpired = !m.valid_until || m.valid_until >= today;

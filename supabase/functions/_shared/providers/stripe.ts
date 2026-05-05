@@ -58,6 +58,10 @@ export class StripeProvider implements PaymentProviderAdapter {
       payment_method_types: ["card"],
       mode: isSubscription ? "subscription" : "payment",
       billing_address_collection: "auto",
+      // Expire payment sessions after 30 min so abandoned checkouts can't
+      // pay later and conflict with the stale-pending-booking sweeper.
+      // Stripe enforces min 30 min, max 24h. Subscription mode rejects expires_at.
+      ...(isSubscription ? {} : { expires_at: Math.floor(Date.now() / 1000) + 30 * 60 }),
       ...(customerId
         ? { customer: customerId }
         : params.customer_email
