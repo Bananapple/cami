@@ -3,7 +3,6 @@ import { PageHeader } from "../shell/PageHeader";
 import { Button } from "../components/Button";
 import { Row, RowList } from "../components/Row";
 import { StateBadge, CategoryChip, Count } from "../components/Badge";
-import { OverflowMenu } from "../components/OverflowMenu";
 import { EmptyState } from "../components/EmptyState";
 import { useManageProducts, type Product } from "@/manage/hooks/useManageProducts";
 import { useManageInstructors, type ManagedInstructor } from "@/manage/hooks/useManageInstructors";
@@ -59,7 +58,6 @@ export function StudioScreen() {
               product={p}
               currency={currency}
               onEdit={() => setProductDrawer({ mode: "edit", entity: p })}
-              onToggle={() => toggleProduct.mutate({ id: p.id, is_active: !p.is_active })}
             />
           ))}
         </RowList>
@@ -78,7 +76,6 @@ export function StudioScreen() {
               key={i.id}
               instructor={i}
               onEdit={() => setInstructorDrawer({ mode: "edit", entity: i })}
-              onToggle={() => toggleInstructor.mutate({ id: i.id, is_active: !i.is_active })}
             />
           ))}
         </RowList>
@@ -97,7 +94,6 @@ export function StudioScreen() {
               key={l.id}
               location={l}
               onEdit={() => setLocationDrawer({ mode: "edit", entity: l })}
-              onToggle={() => toggleLocation.mutate({ id: l.id, is_active: !l.is_active })}
             />
           ))}
         </RowList>
@@ -151,12 +147,10 @@ function ProductRow({
   product,
   currency,
   onEdit,
-  onToggle,
 }: {
   product: Product;
   currency: string;
   onEdit: () => void;
-  onToggle: () => void;
 }) {
   const priceFormatted = `${currency} ${(product.price_minor / 100).toLocaleString("nb-NO")}`;
   const meta = [
@@ -174,29 +168,15 @@ function ProductRow({
       titleSuffix={<CategoryChip>{TYPE_LABEL[product.type] ?? product.type}</CategoryChip>}
       meta={meta || "—"}
       trail={
-        <>
+        <div className="sm-trail-stack">
+          <StateBadge tone={product.is_active ? "good" : "neutral"}>
+            {product.is_active ? "Active" : "Inactive"}
+          </StateBadge>
           <span style={{ fontSize: 14, color: "var(--ink)", fontVariantNumeric: "tabular-nums" }}>
             {priceFormatted}
             {product.billing_interval === "month" ? <span style={{ color: "var(--ink-muted)" }}>/mo</span> : null}
           </span>
-          <StateBadge tone={product.is_active ? "good" : "neutral"}>
-            {product.is_active ? "Active" : "Inactive"}
-          </StateBadge>
-          <OverflowMenu
-            items={[
-              { id: "edit", label: "Edit", group: 1 },
-              {
-                id: "toggle",
-                label: product.is_active ? "Deactivate" : "Activate",
-                group: 2,
-              },
-            ]}
-            onAction={(id) => {
-              if (id === "toggle") onToggle();
-              else if (id === "edit") onEdit();
-            }}
-          />
-        </>
+        </div>
       }
       onSelect={onEdit}
     />
@@ -229,11 +209,9 @@ function ProductGlyph({ type }: { type: string }) {
 function InstructorRow({
   instructor,
   onEdit,
-  onToggle,
 }: {
   instructor: ManagedInstructor;
   onEdit: () => void;
-  onToggle: () => void;
 }) {
   const statusBadge = (() => {
     if (!instructor.is_active) return <StateBadge tone="neutral">Inactive</StateBadge>;
@@ -264,21 +242,7 @@ function InstructorRow({
       }
       title={instructor.display_name}
       meta={instructor.specialty ?? "—"}
-      trail={
-        <>
-          {statusBadge}
-          <OverflowMenu
-            items={[
-              { id: "edit", label: "Edit", group: 1 },
-              { id: "toggle", label: instructor.is_active ? "Deactivate" : "Activate", group: 2 },
-            ]}
-            onAction={(id) => {
-              if (id === "toggle") onToggle();
-              else if (id === "edit") onEdit();
-            }}
-          />
-        </>
-      }
+      trail={statusBadge}
       onSelect={onEdit}
     />
   );
@@ -288,11 +252,9 @@ function InstructorRow({
 function LocationRow({
   location,
   onEdit,
-  onToggle,
 }: {
   location: ManagedLocation;
   onEdit: () => void;
-  onToggle: () => void;
 }) {
   return (
     <Row
@@ -322,16 +284,6 @@ function LocationRow({
           <StateBadge tone={location.is_active ? "good" : "neutral"}>
             {location.is_active ? "Active" : "Inactive"}
           </StateBadge>
-          <OverflowMenu
-            items={[
-              { id: "edit", label: "Edit", group: 1 },
-              { id: "toggle", label: location.is_active ? "Deactivate" : "Activate", group: 2 },
-            ]}
-            onAction={(id) => {
-              if (id === "toggle") onToggle();
-              else if (id === "edit") onEdit();
-            }}
-          />
         </>
       }
       onSelect={onEdit}
