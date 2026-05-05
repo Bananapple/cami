@@ -42,7 +42,7 @@ export function ScheduleScreen() {
           <button type="button" className="sm-sticky-icon-btn" onClick={() => setEditSequenceOpen(true)}>
             <SlidersHorizontal size={14} />
           </button>
-          <button type="button" className="sm-sticky-icon-btn" onClick={() => setAddClassOpen(true)}>
+          <button type="button" className="sm-sticky-icon-btn action" onClick={() => setAddClassOpen(true)}>
             +
           </button>
         </div>
@@ -61,7 +61,7 @@ export function ScheduleScreen() {
               <button type="button" className="sm-hdr-icon-btn sm-hide-desktop" onClick={() => setEditSequenceOpen(true)}>
                 <SlidersHorizontal size={15} />
               </button>
-              <button type="button" className="sm-hdr-icon-btn sm-hdr-icon-btn--primary sm-hide-desktop" onClick={() => setAddClassOpen(true)}>
+              <button type="button" className="sm-hdr-icon-btn sm-hdr-icon-btn--action sm-hide-desktop" onClick={() => setAddClassOpen(true)}>
                 +
               </button>
             </>
@@ -166,7 +166,6 @@ function ClassRow({
   onClick: () => void;
   onEdit: () => void;
 }) {
-  const fillRatio = c.max_capacity > 0 ? c.booked_count / c.max_capacity : 0;
   const isFull = c.booked_count >= c.max_capacity;
   const isCancelled = c.status === "cancelled";
 
@@ -174,8 +173,6 @@ function ClassRow({
   const { tone, label } = (() => {
     if (isCancelled) return { tone: "bad" as const, label: "Cancelled" };
     if (isFull) return { tone: "warn" as const, label: "Full" };
-    if (fillRatio < 0.3 && c.max_capacity > 0)
-      return { tone: "warn" as const, label: `Low — ${c.booked_count}/${c.max_capacity}` };
     return { tone: "good" as const, label: "Confirmed" };
   })();
 
