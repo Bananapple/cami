@@ -35,7 +35,7 @@ BEGIN
       FROM payments p
      WHERE b.payment_id = p.id
        AND b.status = 'pending'
-       AND b.created_at < now() - INTERVAL '30 minutes'
+       AND b.booked_at < now() - INTERVAL '30 minutes'
        AND p.status = 'pending'
     RETURNING b.id
   )
