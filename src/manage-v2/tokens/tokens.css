@@ -293,13 +293,13 @@
 .sm-sticky-bar { display: none; }
 
 @media (max-width: 640px) {
-  /* Full-width cream container that slides in/out from the top */
+  /* Full-width transparent wrapper — page content shows through the sides */
   .sm-sticky-bar {
     display: flex;
     position: fixed;
     top: 0; left: 0; right: 0;
     z-index: 22;
-    background: var(--bg);
+    background: transparent;
     align-items: flex-start;
     justify-content: center;
     pointer-events: none;
@@ -316,13 +316,36 @@
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 8px 20px 13px;
+    padding: 7px 14px 12px;
     background: var(--bg);
     border: 1px solid var(--line);
     border-top: none;
     border-radius: 0 0 14px 14px;
     box-shadow: 0 5px 16px rgba(20, 18, 16, 0.09);
     position: relative;
+  }
+
+  /* Left concave shoulder — quarter-circle arc between page edge and tab */
+  .sm-sticky-tab::before {
+    content: '';
+    position: absolute;
+    top: 0; left: -14px;
+    width: 14px; height: 14px;
+    background: var(--bg);
+    border-bottom-right-radius: 14px;
+    border-bottom: 1px solid var(--line);
+    border-right: 1px solid var(--line);
+  }
+  /* Right concave shoulder — only on solo tabs (Schedule / Clients) */
+  .sm-sticky-tab:only-child::after {
+    content: '';
+    position: absolute;
+    top: 0; right: -14px;
+    width: 14px; height: 14px;
+    background: var(--bg);
+    border-bottom-left-radius: 14px;
+    border-bottom: 1px solid var(--line);
+    border-left: 1px solid var(--line);
   }
 
   /* Title uses the same DM Serif Display as the page header h1 */
@@ -346,7 +369,7 @@
     align-items: center;
     justify-content: center;
     width: 36px;
-    padding: 8px 0 13px;
+    padding: 7px 0 12px;
     background: var(--surface);
     border: 1px solid var(--line);
     border-top: none;
@@ -361,11 +384,11 @@
   }
   /* Tabs share a single 1px border line between them */
   .sm-sticky-period-tab + .sm-sticky-period-tab { margin-left: -1px; }
-  /* Active tab: brighter, elevated, on top */
+  /* Active tab: dark fill matching the desktop sm-segment.on style */
   .sm-sticky-period-tab.on {
-    background: var(--bg);
-    color: var(--ink);
-    font-weight: 800;
+    background: var(--ink);
+    border-color: var(--ink);
+    color: var(--bg);
     box-shadow: 2px 5px 14px rgba(20, 18, 16, 0.12);
     /* z-index is set inline so the active tab always sits above siblings */
   }
