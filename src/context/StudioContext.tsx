@@ -26,6 +26,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   // subscribers for anon queries, so the data arrives but no consumer ever
   // re-renders.
   useEffect(() => {
+    let cancelled = false;
     (supabase as any)
       .from("studios")
       .select("*")
@@ -33,8 +34,9 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       .eq("is_active", true)
       .single()
       .then(({ data, error }: { data: Studio | null; error: unknown }) => {
-        setStudio(error ? null : data);
+        if (!cancelled) setStudio(error ? null : data);
       });
+    return () => { cancelled = true; };
   }, [slug]);
 
   // Track auth state to drive the membership query
