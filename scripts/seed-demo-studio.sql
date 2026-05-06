@@ -84,8 +84,8 @@ BEGIN
     (sid, tmpl5, loc_id, inst1, 6, '11:00', 90, 300, 16, CURRENT_DATE),
     (sid, tmpl4, loc_id, inst3, 6, '14:00', 60, 200, 10, CURRENT_DATE);
 
-  -- Materialize 14-day class instances
-  PERFORM materialize_class_instances(sid, CURRENT_DATE, CURRENT_DATE + 14);
+  -- Materialize class instances: 30 days back (for booking history) + 14 days forward
+  PERFORM materialize_class_instances(sid, CURRENT_DATE - 30, CURRENT_DATE + 14);
 
   -- Products
   INSERT INTO products (studio_id, type, name, price_minor, currency, credits, validity_days, billing_interval, display_order, tag)
