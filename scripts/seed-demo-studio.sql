@@ -130,9 +130,10 @@ BEGIN
     (u5, 'authenticated', 'authenticated', 'ingrid.berg@demo.brie',    now()-'14d'::interval,  now()-'14d'::interval,  now(), '{"full_name":"Ingrid Berg"}'),
     (u6, 'authenticated', 'authenticated', 'nora.dahl@demo.brie',      now()-'5d'::interval,   now()-'5d'::interval,   now(), '{"full_name":"Nora Dahl"}'),
     (u7, 'authenticated', 'authenticated', 'lars.eriksen@demo.brie',   now()-'150d'::interval, now()-'150d'::interval, now(), '{"full_name":"Lars Eriksen"}'),
-    (u8, 'authenticated', 'authenticated', 'maja.nygard@demo.brie',    now()-'60d'::interval,  now()-'60d'::interval,  now(), '{"full_name":"Maja Nygård"}');
+    (u8, 'authenticated', 'authenticated', 'maja.nygard@demo.brie',    now()-'60d'::interval,  now()-'60d'::interval,  now(), '{"full_name":"Maja Nygård"}')
+  ON CONFLICT (id) DO NOTHING;
 
-  -- Profiles
+  -- Profiles (trigger may have already created rows from auth.users insert)
   INSERT INTO profiles (id, email, full_name)
   VALUES
     (u1, 'emma.larsen@demo.brie',    'Emma Larsen'),
@@ -142,7 +143,10 @@ BEGIN
     (u5, 'ingrid.berg@demo.brie',    'Ingrid Berg'),
     (u6, 'nora.dahl@demo.brie',      'Nora Dahl'),
     (u7, 'lars.eriksen@demo.brie',   'Lars Eriksen'),
-    (u8, 'maja.nygard@demo.brie',    'Maja Nygård');
+    (u8, 'maja.nygard@demo.brie',    'Maja Nygård')
+  ON CONFLICT (id) DO UPDATE SET
+    email     = EXCLUDED.email,
+    full_name = EXCLUDED.full_name;
 
   -- Studio members
   INSERT INTO studio_members (studio_id, user_id, role, total_sessions, level, joined_at, status)
