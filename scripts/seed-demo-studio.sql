@@ -64,25 +64,26 @@ BEGIN
   VALUES (sid, 'Ashtanga Full Led',    'All levels',   90, 300, 16, inst1) RETURNING id INTO tmpl5;
 
   -- Schedule rules (day_of_week: 0=Sun, 1=Mon, … 6=Sat)
+  -- effective_from 30 days back so past instances can be materialized for demo history
   INSERT INTO schedule_rules
     (studio_id, template_id, location_id, instructor_id, day_of_week, start_time, duration_minutes, price, max_capacity, effective_from)
   VALUES
     -- Monday
-    (sid, tmpl1, loc_id, inst1, 1, '09:00', 60, 250, 18, CURRENT_DATE),
-    (sid, tmpl3, loc_id, inst2, 1, '18:00', 75, 250, 20, CURRENT_DATE),
+    (sid, tmpl1, loc_id, inst1, 1, '09:00', 60, 250, 18, CURRENT_DATE - 30),
+    (sid, tmpl3, loc_id, inst2, 1, '18:00', 75, 250, 20, CURRENT_DATE - 30),
     -- Tuesday
-    (sid, tmpl2, loc_id, inst1, 2, '07:00', 90, 300, 12, CURRENT_DATE),
-    (sid, tmpl1, loc_id, inst1, 2, '11:00', 60, 250, 18, CURRENT_DATE),
+    (sid, tmpl2, loc_id, inst1, 2, '07:00', 90, 300, 12, CURRENT_DATE - 30),
+    (sid, tmpl1, loc_id, inst1, 2, '11:00', 60, 250, 18, CURRENT_DATE - 30),
     -- Wednesday
-    (sid, tmpl4, loc_id, inst3, 3, '10:00', 60, 200, 10, CURRENT_DATE),
-    (sid, tmpl3, loc_id, inst2, 3, '18:00', 75, 250, 20, CURRENT_DATE),
+    (sid, tmpl4, loc_id, inst3, 3, '10:00', 60, 200, 10, CURRENT_DATE - 30),
+    (sid, tmpl3, loc_id, inst2, 3, '18:00', 75, 250, 20, CURRENT_DATE - 30),
     -- Thursday
-    (sid, tmpl2, loc_id, inst1, 4, '07:00', 90, 300, 12, CURRENT_DATE),
-    (sid, tmpl1, loc_id, inst1, 4, '09:00', 60, 250, 18, CURRENT_DATE),
-    (sid, tmpl5, loc_id, inst1, 4, '16:30', 90, 300, 16, CURRENT_DATE),
+    (sid, tmpl2, loc_id, inst1, 4, '07:00', 90, 300, 12, CURRENT_DATE - 30),
+    (sid, tmpl1, loc_id, inst1, 4, '09:00', 60, 250, 18, CURRENT_DATE - 30),
+    (sid, tmpl5, loc_id, inst1, 4, '16:30', 90, 300, 16, CURRENT_DATE - 30),
     -- Saturday
-    (sid, tmpl5, loc_id, inst1, 6, '11:00', 90, 300, 16, CURRENT_DATE),
-    (sid, tmpl4, loc_id, inst3, 6, '14:00', 60, 200, 10, CURRENT_DATE);
+    (sid, tmpl5, loc_id, inst1, 6, '11:00', 90, 300, 16, CURRENT_DATE - 30),
+    (sid, tmpl4, loc_id, inst3, 6, '14:00', 60, 200, 10, CURRENT_DATE - 30);
 
   -- Materialize class instances: 30 days back (for booking history) + 14 days forward
   PERFORM materialize_class_instances(sid, CURRENT_DATE - 30, CURRENT_DATE + 14);
