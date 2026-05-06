@@ -52,9 +52,11 @@ export function ClientsView() {
     members,
     segments,
     segmentCounts,
-    activeSegment,
-    setActiveSegment,
+    filter,
+    setLifecycle,
   } = useClientsView();
+  const activeSegment = filter.lifecycle;
+  const setActiveSegment = setLifecycle;
 
   const { push } = useDrawerStack();
 

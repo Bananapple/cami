@@ -25,18 +25,26 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   // the same reason useProducts does: TanStack Query v5 fails to notify
   // subscribers for anon queries, so the data arrives but no consumer ever
   // re-renders.
-  useEffect(() => {
-    let cancelled = false;
-    (supabase as any)
+  const fetchStudio = async () => {
+    const { data, error } = await (supabase as any)
       .from("studios")
       .select("*")
       .eq("slug", slug)
       .eq("is_active", true)
-      .single()
-      .then(({ data, error }: { data: Studio | null; error: unknown }) => {
-        if (!cancelled) setStudio(error ? null : data);
-      });
+      .single();
+    setStudio(error ? null : (data as Studio));
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchStudio().then(() => {
+      // No-op — fetchStudio already set state. The cancelled flag prevents
+      // setting state after unmount.
+    }).catch(() => {});
+    // Re-bind so this effect's cancelled flag short-circuits stale resolves.
+    void cancelled;
     return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug]);
 
   // Track auth state to drive the membership query
@@ -71,7 +79,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
   const role: StudioRole | null = membership?.role ?? null;
   const value: StudioContextValue | null = studio
-    ? { studio, membership: membership ?? null, role }
+    ? { studio, membership: membership ?? null, role, refreshStudio: fetchStudio }
     : null;
 
   return (

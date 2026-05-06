@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { SectionEyebrow } from "./SectionEyebrow";
 
 // ── CommandPalette ─────────────────────────────────────────────────
 // ⌘K-triggered search overlay. Surface treatment matches v2:
@@ -206,18 +207,7 @@ export function CommandPalette({
           )}
           {grouped.map(([group, groupItems]) => (
             <div key={group} style={{ padding: "6px 0" }}>
-              <div
-                style={{
-                  padding: "6px 16px 4px",
-                  fontSize: 11,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.12em",
-                  color: "var(--ink-muted)",
-                  fontWeight: 600,
-                }}
-              >
-                {group}
-              </div>
+              <SectionEyebrow style={{ padding: "6px 16px 4px" }}>{group}</SectionEyebrow>
               {groupItems.map((item) => {
                 runningIndex += 1;
                 const isActive = runningIndex === activeIndex;

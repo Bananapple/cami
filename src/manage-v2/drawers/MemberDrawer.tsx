@@ -9,6 +9,13 @@ import { useMember } from "@/manage/hooks/useMember";
 import { useMemberBookings, type MemberBooking } from "@/manage/hooks/useMemberBookings";
 import { useNotificationLog, templateLabel } from "@/manage/hooks/useNotificationLog";
 import { useSetMemberStatus } from "@/manage/hooks/useDeactivateMember";
+import {
+  useClientsView,
+  frequencyTier,
+  PLAN_LABELS,
+  TIME_LABELS,
+  FREQUENCY_LABELS,
+} from "@/manage/hooks/useClientsView";
 import { toast } from "sonner";
 import { useStudioContext } from "@/context/StudioContext";
 import { formatDate, formatTime } from "@/lib/timezone";
@@ -17,6 +24,7 @@ import { bookingBadge } from "../lib/bookingStatus";
 import { EditMemberDrawer } from "./EditMemberDrawer";
 import { ConfirmModal } from "../components/ConfirmModal";
 import { SendMessageModal } from "../components/SendMessageModal";
+import { SectionEyebrow } from "../components/SectionEyebrow";
 import { supabase } from "@/integrations/supabase/client";
 
 type Tab = "overview" | "activity" | "billing" | "notes";
@@ -64,6 +72,14 @@ export function MemberDrawerV2({
   const recentActivity = useMemo(
     () => bookings.filter((b) => b.status === "confirmed").slice(0, 4),
     [bookings]
+  );
+
+  // Audience-model summary row (member_activity_summary view, post-0024).
+  // Reuses the cached useClientsView query — no extra fetch.
+  const { members: allMembers, config: segmentConfig } = useClientsView();
+  const summary = useMemo(
+    () => (userId ? allMembers.find((m) => m.user_id === userId) ?? null : null),
+    [userId, allMembers],
   );
 
   if (!userId) return null;
@@ -139,6 +155,8 @@ export function MemberDrawerV2({
             </StatGrid>
           </DrawerSection>
 
+          {summary && <ProfileSection summary={summary} config={segmentConfig} />}
+
           <DrawerSection title="Member insights">
             <MemberInsights bookings={bookings} />
           </DrawerSection>
@@ -164,7 +182,6 @@ export function MemberDrawerV2({
                   : "—"
               }
             />
-            <KV label="Source" value={member.source ?? "—"} />
             <KV
               label="Referral"
               value={
@@ -333,20 +350,93 @@ function BookingSparkline({ weeks }: { weeks: number[] }) {
   );
 }
 
+// ── Profile section (post-0024 audience model) ─────────────────────
+// Renders the derived dimensions from member_activity_summary: plan tier,
+// frequency tier, source, time affinity, top class. Surfaces inline alerts
+// for credits-expiring-soon and subscription-renewing-soon.
+
+function ProfileSection({
+  summary,
+  config,
+}: {
+  summary: import("@/manage/hooks/useClientsView").MemberSummary;
+  config: import("@/types/database").SegmentConfig;
+}) {
+  const tier = frequencyTier(summary, config);
+  const planLabel = summary.plan_type ? PLAN_LABELS[summary.plan_type] ?? summary.plan_type : "No plan";
+  const tierLabel = tier === "none" ? "Inactive" : FREQUENCY_LABELS[tier];
+  const sourceLabel = summary.source
+    ? summary.source.replace(/[_-]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+    : "—";
+  const timeLabel = summary.top_time_bucket ? TIME_LABELS[summary.top_time_bucket] ?? summary.top_time_bucket : "—";
+  const topClass = summary.top_template_name ?? "—";
+
+  return (
+    <DrawerSection title="Profile">
+      {(summary.credits_expiring_soon || summary.sub_renewing_soon) && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 12 }}>
+          {summary.credits_expiring_soon && (
+            <RiskAlert
+              label="Credits expiring soon"
+              detail={
+                summary.credits_remaining != null && summary.valid_until
+                  ? `${summary.credits_remaining} credit${summary.credits_remaining === 1 ? "" : "s"} expire on ${formatShortDate(summary.valid_until)}`
+                  : "Clip card expires soon"
+              }
+            />
+          )}
+          {summary.sub_renewing_soon && (
+            <RiskAlert
+              label="Subscription renewing soon"
+              detail={summary.valid_until ? `Renews on ${formatShortDate(summary.valid_until)}` : "Renews within 30 days"}
+            />
+          )}
+        </div>
+      )}
+      <KV label="Plan" value={planLabel} />
+      <KV label="Frequency" value={tierLabel} hint={`${summary.bookings_last_30d} booking${summary.bookings_last_30d === 1 ? "" : "s"} · last 30 days`} />
+      <KV label="Source" value={sourceLabel} />
+      <KV label="Time affinity" value={timeLabel} />
+      <KV label="Top class" value={topClass} />
+    </DrawerSection>
+  );
+}
+
+function RiskAlert({ label, detail }: { label: string; detail: string }) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 2,
+        padding: "8px 12px",
+        background: "var(--warn-soft, var(--surface-2))",
+        border: "1px solid var(--line)",
+        borderRadius: "var(--r-input)",
+        fontSize: 12.5,
+      }}
+    >
+      <span style={{ color: "var(--ink)", fontWeight: 500 }}>{label}</span>
+      <span style={{ color: "var(--ink-muted)" }}>{detail}</span>
+    </div>
+  );
+}
+
+function formatShortDate(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleDateString("en-US", { day: "numeric", month: "short" });
+}
+
 function MemberInsights({ bookings }: { bookings: MemberBooking[] }) {
   const { topClass, weekCounts } = useMemo(() => computeInsights(bookings), [bookings]);
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <div>
-        <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--ink-muted)", fontWeight: 600, marginBottom: 4 }}>
-          Most-booked class
-        </div>
+        <SectionEyebrow style={{ marginBottom: 4 }}>Most-booked class</SectionEyebrow>
         <div style={{ fontSize: 14, color: "var(--ink)" }}>{topClass ?? "—"}</div>
       </div>
       <div>
-        <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--ink-muted)", fontWeight: 600, marginBottom: 6 }}>
-          Bookings · last 12 weeks
-        </div>
+        <SectionEyebrow style={{ marginBottom: 6 }}>Bookings · last 12 weeks</SectionEyebrow>
         <BookingSparkline weeks={weekCounts} />
       </div>
     </div>

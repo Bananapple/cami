@@ -63,6 +63,27 @@ export type PaymentStatus =
 // ------------------------------
 // Core tenancy
 // ------------------------------
+// Per-studio audience segmentation thresholds. Lifecycle + frequency cutoffs
+// are tunable via SegmentConfigDrawer on the Clients page; time-of-day buckets
+// remain hardcoded.
+export interface SegmentConfig {
+  lifecycle: {
+    newDays: number;
+    regularDays: number;
+    lapsingFromDays: number;
+    lapsingToDays: number;
+    lapsingMinSessions: number;
+    inactiveDays: number;
+    inactiveMinSessions: number;
+    oneTimerCooldownDays: number;
+  };
+  frequency: {
+    casualMin: number;   // bookings/30d ≥ casualMin → at least 'casual'
+    regularMin: number;  // bookings/30d ≥ regularMin → at least 'regular'
+    devoteeMin: number;  // bookings/30d ≥ devoteeMin → 'devotee'
+  };
+}
+
 export interface Studio {
   id: UUID;
   slug: string;                               // subdomain routing key (e.g. "yogabrie")
@@ -77,6 +98,7 @@ export interface Studio {
   waitlist_offer_window_minutes: number;
   referral_enabled: boolean;
   referral_discount_percent: number;
+  segment_config: SegmentConfig;
   // Payment provider linkage lives on StudioPaymentProvider rows, not here
   is_active: boolean;
   created_at: ISODateTime;
@@ -338,11 +360,14 @@ export interface WaitlistEntry {
 // Client-side context
 // ------------------------------
 
-// Resolved once on app load from the URL (subdomain or path slug)
+// Resolved once on app load from the URL (subdomain or path slug). Mutations
+// that change the studios row (e.g. SegmentConfigDrawer) call refreshStudio()
+// to re-fetch and re-publish to all consumers.
 export interface StudioContextValue {
   studio: Studio;
   membership: StudioMember | null;            // null if user is not (yet) a member
   role: StudioRole | null;
+  refreshStudio: () => Promise<void>;
 }
 
 // Runtime assertion helper used throughout hooks
