@@ -2,16 +2,17 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useStudioContext } from "@/context/StudioContext";
 
-export type Period = "week" | "month" | "year";
+export type Period = "day" | "week" | "month" | "year";
 
 export type AnalyticsData = {
   visitors: number | null;
   avgPerDay: number | null;
   dailyBreakdown: { date: string; count: number }[];
   dailyConversions: { date: string; count: number }[];
+  dailyBySource: { date: string; source: string; count: number }[];
   conversions: number | null;
   conversionRate: number | null;
-  sources: { name: string; visits: number; pct: number }[];
+  sources: { name: string; visits: number; pct: number; convRate: number }[];
   noData: boolean;
 };
 
@@ -35,7 +36,13 @@ function getPeriodBounds(period: Period): {
   let priorFullStart: Date;
   let priorFullEnd: Date;
 
-  if (period === "week") {
+  if (period === "day") {
+    periodStart = new Date(now);
+    periodStart.setHours(0, 0, 0, 0);
+    priorFullEnd = new Date(periodStart);
+    priorFullStart = new Date(priorFullEnd);
+    priorFullStart.setDate(priorFullStart.getDate() - 1);
+  } else if (period === "week") {
     // Monday of current week
     const day = now.getDay(); // 0=Sun
     const diff = (day + 6) % 7;
@@ -68,8 +75,20 @@ function getSparkPeriods(period: Period): { start: Date; end: Date; label: strin
   const now = new Date();
   const periods: { start: Date; end: Date; label: string }[] = [];
 
-  for (let i = 11; i >= 0; i--) {
-    if (period === "week") {
+  const barCount = period === "year" ? 5 : 30;
+  for (let i = barCount - 1; i >= 0; i--) {
+    if (period === "day") {
+      const d = new Date(now);
+      d.setDate(d.getDate() - i);
+      d.setHours(0, 0, 0, 0);
+      const end = new Date(d);
+      end.setDate(end.getDate() + 1);
+      periods.push({
+        start: d,
+        end,
+        label: d.toLocaleDateString("en-GB", { day: "numeric", month: "short" }),
+      });
+    } else if (period === "week") {
       const day = now.getDay();
       const diff = (day + 6) % 7;
       const weekStart = new Date(now);
@@ -196,7 +215,8 @@ export function useHomeDashboard(period: Period) {
           .eq("studio_id", studioId)
           .gte("joined_at", ps).lt("joined_at", pe),
         supabase.from("memberships").select("id", { count: "exact", head: true })
-          .eq("studio_id", studioId).eq("status", "cancelled"),
+          .eq("studio_id", studioId).eq("status", "cancelled")
+          .gte("cancelled_at", ps).lt("cancelled_at", pe),
       ]);
       const added = newRows.count ?? 0;
       const churned = churnRows.count ?? 0;
@@ -303,8 +323,9 @@ export function useHomeDashboard(period: Period) {
 
   // --- Traffic (PostHog via Edge Function) ---
   const analyticsQuery = useQuery({
-    queryKey: ["home", "analytics", studioId],
+    queryKey: ["home", "analytics", studioId, period],
     enabled: !!studioId && isStaff,
+    staleTime: 1000 * 60 * 5,
     queryFn: async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("No session");
@@ -316,7 +337,7 @@ export function useHomeDashboard(period: Period) {
           "Authorization": `Bearer ${session.access_token}`,
           "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
         },
-        body: JSON.stringify({ studio_id: studioId }),
+        body: JSON.stringify({ studio_id: studioId, period }),
       });
       if (!res.ok) throw new Error(`get-analytics ${res.status}`);
       return res.json() as Promise<AnalyticsData>;

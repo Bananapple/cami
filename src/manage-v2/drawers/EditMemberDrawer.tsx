@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Drawer } from "../components/Drawer";
-import { Button } from "../components/Button";
+import { DrawerBody } from "../components/DrawerBody";
+import { DrawerFooter } from "../components/DrawerFooter";
 import { Field, FieldRow, inputStyle } from "../components/Field";
 import { useUpdateMember } from "@/manage/hooks/useUpdateMember";
 import type { ManagerMember } from "@/manage/hooks/useMember";
@@ -56,13 +57,16 @@ export function EditMemberDrawer({
       title={`Edit · ${member.full_name}`}
       subtitle="Email isn't editable — it's the member's sign-in identity."
       actions={
-        <>
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button variant="primary" onClick={save} loading={update.isPending}>Save</Button>
-        </>
+        <DrawerFooter
+          isEditing
+          onCancel={onClose}
+          onSave={save}
+          loading={update.isPending}
+          saveLabel="Save"
+        />
       }
     >
-      <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 16 }}>
+      <DrawerBody>
         <FieldRow>
           <Field label="Full name">
             <input
@@ -103,7 +107,7 @@ export function EditMemberDrawer({
             <option value="advanced">Advanced</option>
           </select>
         </Field>
-      </div>
+      </DrawerBody>
     </Drawer>
   );
 }

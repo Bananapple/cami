@@ -1,17 +1,24 @@
 import { useState } from "react";
 import { PageHeader } from "../shell/PageHeader";
+import { SectionHead } from "../shell/SectionHead";
 import { Button } from "../components/Button";
 import { Row, RowList } from "../components/Row";
 import { StateBadge, CategoryChip, Count } from "../components/Badge";
 import { EmptyState } from "../components/EmptyState";
+import { AvatarCircle } from "../components/AvatarCircle";
+import { LoadingPlaceholder } from "../components/LoadingPlaceholder";
 import { useManageProducts, type Product } from "@/manage/hooks/useManageProducts";
 import { useManageInstructors, type ManagedInstructor } from "@/manage/hooks/useManageInstructors";
 import { useManageLocations, type ManagedLocation } from "@/manage/hooks/useManageLocations";
+import { useManageDiscountCodes, type DiscountCode } from "@/manage/hooks/useManageDiscountCodes";
+import { useManageStudio } from "@/manage/hooks/useManageStudio";
 import { useStudioContext } from "@/context/StudioContext";
 import { useMyStudioRole } from "@/manage/hooks/useMyStudioRole";
 import { ProductDrawerV2 } from "../drawers/ProductDrawer";
 import { InstructorDrawerV2 } from "../drawers/InstructorDrawer";
 import { LocationDrawerV2 } from "../drawers/LocationDrawer";
+import { DiscountCodeDrawer } from "../drawers/DiscountCodeDrawer";
+import { toast } from "sonner";
 
 const TYPE_LABEL: Record<string, string> = {
   drop_in: "Drop-in",
@@ -32,10 +39,38 @@ export function StudioScreen() {
   const { data: products = [], isLoading: pLoading, toggleActive: toggleProduct } = useManageProducts();
   const { instructors, isLoading: iLoading, toggleActive: toggleInstructor } = useManageInstructors();
   const { locations, isLoading: lLoading, toggleActive: toggleLocation } = useManageLocations();
+  const { data: discountCodes = [], isLoading: dcLoading } = useManageDiscountCodes();
+  const { studio, save: saveStudio } = useManageStudio();
 
   const [productDrawer, setProductDrawer] = useState<DrawerState<Product>>(null);
   const [instructorDrawer, setInstructorDrawer] = useState<DrawerState<ManagedInstructor>>(null);
   const [locationDrawer, setLocationDrawer] = useState<DrawerState<ManagedLocation>>(null);
+  const [codeDrawer, setCodeDrawer] = useState<{ mode: "create" } | { mode: "edit"; code: DiscountCode } | null>(null);
+
+  const referralEnabled = (studio as any)?.referral_enabled ?? false;
+  const referralPct = (studio as any)?.referral_discount_percent ?? 10;
+  const [localPct, setLocalPct] = useState<string | null>(null);
+  const displayPct = localPct ?? String(referralPct);
+
+  const handleReferralToggle = async () => {
+    try {
+      await saveStudio.mutateAsync({ referral_enabled: !referralEnabled });
+    } catch {
+      toast.error("Failed to update referral setting.");
+    }
+  };
+
+  const handlePctSave = async () => {
+    const val = Number(displayPct);
+    if (!val || val < 1 || val > 99) { toast.error("Enter a value between 1–99."); return; }
+    try {
+      await saveStudio.mutateAsync({ referral_discount_percent: val });
+      setLocalPct(null);
+      toast.success("Referral discount updated.");
+    } catch {
+      toast.error("Failed to update.");
+    }
+  };
 
   return (
     <>
@@ -48,7 +83,7 @@ export function StudioScreen() {
       <section className="sm-section">
         <SectionHead title="Products" cta="Add product" onClick={() => setProductDrawer({ mode: "create" })} />
         <RowList>
-          {pLoading && <LoadingRow text="Loading products…" />}
+          {pLoading && <LoadingPlaceholder text="Loading products…" />}
           {!pLoading && products.length === 0 && (
             <EmptyState title="No products yet" hint="Add your first drop-in or clip card to start selling." />
           )}
@@ -67,7 +102,7 @@ export function StudioScreen() {
       <section className="sm-section">
         <SectionHead title="Instructors" cta="Add instructor" onClick={() => setInstructorDrawer({ mode: "create" })} />
         <RowList>
-          {iLoading && <LoadingRow text="Loading instructors…" />}
+          {iLoading && <LoadingPlaceholder text="Loading instructors…" />}
           {!iLoading && instructors.length === 0 && (
             <EmptyState title="No instructors yet" hint="Add your team to assign them to classes." />
           )}
@@ -85,7 +120,7 @@ export function StudioScreen() {
       <section className="sm-section">
         <SectionHead title="Locations" cta="Add location" onClick={() => setLocationDrawer({ mode: "create" })} />
         <RowList>
-          {lLoading && <LoadingRow text="Loading locations…" />}
+          {lLoading && <LoadingPlaceholder text="Loading locations…" />}
           {!lLoading && locations.length === 0 && (
             <EmptyState title="No locations yet" hint="Add a room to schedule classes against it." />
           )}
@@ -94,6 +129,64 @@ export function StudioScreen() {
               key={l.id}
               location={l}
               onEdit={() => setLocationDrawer({ mode: "edit", entity: l })}
+            />
+          ))}
+        </RowList>
+      </section>
+
+      {/* Referral Program */}
+      <section className="sm-section">
+        <SectionHead title="Referral program" />
+        <div className="sm-setting-card">
+          <div className="sm-setting-row">
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>Enable referral program</div>
+              <div style={{ fontSize: 12, color: "var(--ink-muted)", marginTop: 2 }}>Members get a personal link to share with friends</div>
+            </div>
+            <button
+              type="button"
+              className={`sm-toggle${referralEnabled ? " on" : ""}`}
+              onClick={handleReferralToggle}
+              aria-label="Toggle referral program"
+            />
+          </div>
+          <div className="sm-setting-row">
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>First-timer discount</div>
+              <div style={{ fontSize: 12, color: "var(--ink-muted)", marginTop: 2 }}>Applied automatically when a referred new member checks out</div>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <input
+                type="number"
+                min="1"
+                max="99"
+                value={displayPct}
+                onChange={(e) => setLocalPct(e.target.value)}
+                style={{ width: 56, padding: "4px 8px", border: "1px solid var(--line)", borderRadius: 6, fontSize: 14, textAlign: "right", background: "var(--surface)", color: "var(--ink)" }}
+              />
+              <span style={{ fontSize: 13, color: "var(--ink-muted)" }}>%</span>
+              {localPct !== null && (
+                <Button variant="primary" size="sm" onClick={handlePctSave}>Save</Button>
+              )}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Discount Codes */}
+      <section className="sm-section">
+        <SectionHead title="Discount codes" cta="Add code" onClick={() => setCodeDrawer({ mode: "create" })} />
+        <RowList>
+          {dcLoading && <LoadingPlaceholder text="Loading discount codes…" />}
+          {!dcLoading && discountCodes.length === 0 && (
+            <EmptyState title="No discount codes yet" hint="Create a code to offer a discount at checkout." />
+          )}
+          {discountCodes.map((dc) => (
+            <DiscountCodeRow
+              key={dc.id}
+              code={dc}
+              currency={currency}
+              onEdit={() => setCodeDrawer({ mode: "edit", code: dc })}
             />
           ))}
         </RowList>
@@ -119,26 +212,13 @@ export function StudioScreen() {
         open={!!locationDrawer}
         onClose={() => setLocationDrawer(null)}
       />
+      <DiscountCodeDrawer
+        mode={codeDrawer?.mode ?? "create"}
+        code={codeDrawer?.mode === "edit" ? codeDrawer.code : null}
+        open={!!codeDrawer}
+        onClose={() => setCodeDrawer(null)}
+      />
     </>
-  );
-}
-
-// ── Section header ─────────────────────────────────────────────────
-function SectionHead({ title, cta, onClick }: { title: string; cta: string; onClick: () => void }) {
-  return (
-    <div className="sm-section-head">
-      <h2>{title}</h2>
-      <Button variant="ghost" size="sm" onClick={onClick}>+ {cta}</Button>
-    </div>
-  );
-}
-
-// ── Loading row placeholder ─────────────────────────────────────────
-function LoadingRow({ text }: { text: string }) {
-  return (
-    <div style={{ padding: "16px 14px", color: "var(--ink-muted)", fontSize: 13 }}>
-      {text}
-    </div>
   );
 }
 
@@ -185,24 +265,7 @@ function ProductRow({
 
 function ProductGlyph({ type }: { type: string }) {
   const ch = type === "subscription" ? "♾" : type === "clip_card" ? "▦" : type === "private" ? "✦" : "◉";
-  return (
-    <span
-      style={{
-        width: 28,
-        height: 28,
-        borderRadius: "50%",
-        background: "var(--surface-2)",
-        border: "1px solid var(--line)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        fontSize: 13,
-        color: "var(--ink-soft)",
-      }}
-    >
-      {ch}
-    </span>
-  );
+  return <AvatarCircle fontSize={13} fontWeight={400}>{ch}</AvatarCircle>;
 }
 
 // ── Instructor row ──────────────────────────────────────────────────
@@ -221,25 +284,7 @@ function InstructorRow({
 
   return (
     <Row
-      lead={
-        <span
-          style={{
-            width: 28,
-            height: 28,
-            borderRadius: "50%",
-            background: "var(--surface-2)",
-            border: "1px solid var(--line)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: 11,
-            color: "var(--ink-soft)",
-            fontWeight: 500,
-          }}
-        >
-          {instructor.initials}
-        </span>
-      }
+      lead={<AvatarCircle>{instructor.initials}</AvatarCircle>}
       title={instructor.display_name}
       meta={instructor.specialty ?? "—"}
       trail={statusBadge}
@@ -258,24 +303,7 @@ function LocationRow({
 }) {
   return (
     <Row
-      lead={
-        <span
-          style={{
-            width: 28,
-            height: 28,
-            borderRadius: "50%",
-            background: "var(--surface-2)",
-            border: "1px solid var(--line)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: 13,
-            color: "var(--ink-soft)",
-          }}
-        >
-          📍
-        </span>
-      }
+      lead={<AvatarCircle fontSize={13} fontWeight={400}>📍</AvatarCircle>}
       title={location.name}
       meta={[location.address, `${location.default_capacity} capacity`].filter(Boolean).join(" · ")}
       trail={
@@ -285,6 +313,45 @@ function LocationRow({
             {location.is_active ? "Active" : "Inactive"}
           </StateBadge>
         </>
+      }
+      onSelect={onEdit}
+    />
+  );
+}
+
+// ── Discount code row ───────────────────────────────────────────────
+function DiscountCodeRow({
+  code,
+  currency,
+  onEdit,
+}: {
+  code: DiscountCode;
+  currency: string;
+  onEdit: () => void;
+}) {
+  const valueLabel =
+    code.discount_type === "percent"
+      ? `${code.discount_value}% off`
+      : `${currency} ${code.discount_value.toLocaleString("nb-NO")} off`;
+
+  const meta = [
+    code.code,
+    valueLabel,
+    code.max_redemptions ? `${code.times_redeemed}/${code.max_redemptions} uses` : `${code.times_redeemed} uses`,
+    code.valid_until ? `Expires ${new Date(code.valid_until).toLocaleDateString("nb-NO")}` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  return (
+    <Row
+      lead={<AvatarCircle fontWeight={600} letterSpacing="-0.02em">%</AvatarCircle>}
+      title={code.description || code.code}
+      meta={meta}
+      trail={
+        <StateBadge tone={code.is_active ? "good" : "neutral"}>
+          {code.is_active ? "Active" : "Inactive"}
+        </StateBadge>
       }
       onSelect={onEdit}
     />

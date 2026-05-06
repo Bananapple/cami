@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Drawer } from "../components/Drawer";
-import { Button } from "../components/Button";
+import { DrawerBody } from "../components/DrawerBody";
+import { DrawerFooter } from "../components/DrawerFooter";
 import { StateBadge } from "../components/Badge";
 import { Field, FieldRow, inputStyle } from "../components/Field";
 import { useManageLocations, type ManagedLocation } from "@/manage/hooks/useManageLocations";
@@ -93,35 +94,28 @@ export function LocationDrawerV2({
         ) : undefined
       }
       actions={
-        <>
-          {isEditing && (
-            <Button
-              variant="danger"
-              size="sm"
-              onClick={() => {
-                toggleActive.mutate(
-                  { id: location!.id, is_active: !location!.is_active },
-                  {
-                    onSuccess: () => {
-                      toast.success(location!.is_active ? "Location deactivated" : "Location activated");
-                      onClose();
-                    },
-                  }
-                );
-              }}
-              style={{ marginRight: "auto" }}
-            >
-              {location!.is_active ? "Deactivate" : "Activate"}
-            </Button>
-          )}
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button variant="primary" onClick={save} loading={pending}>
-            {mode === "create" ? "Create location" : "Save"}
-          </Button>
-        </>
+        <DrawerFooter
+          isEditing={isEditing}
+          isActive={location?.is_active}
+          onDeactivate={() => {
+            toggleActive.mutate(
+              { id: location!.id, is_active: !location!.is_active },
+              {
+                onSuccess: () => {
+                  toast.success(location!.is_active ? "Location deactivated" : "Location activated");
+                  onClose();
+                },
+              }
+            );
+          }}
+          onCancel={onClose}
+          onSave={save}
+          loading={pending}
+          saveLabel={mode === "create" ? "Create location" : "Save"}
+        />
       }
     >
-      <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 16 }}>
+      <DrawerBody>
         <Field label="Name">
           <input
             type="text"
@@ -162,7 +156,7 @@ export function LocationDrawerV2({
             />
           </Field>
         </FieldRow>
-      </div>
+      </DrawerBody>
     </Drawer>
   );
 }

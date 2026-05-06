@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Drawer } from "../components/Drawer";
+import { DrawerBody } from "../components/DrawerBody";
 import { Button } from "../components/Button";
 import { Field, FieldRow, inputStyle } from "../components/Field";
 import { useStudioContext } from "@/context/StudioContext";
@@ -93,7 +94,7 @@ export function AddClientDrawer({ open, onClose }: { open: boolean; onClose: () 
         )
       }
     >
-      <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 16 }}>
+      <DrawerBody>
         {!link && (
           <>
             <FieldRow>
@@ -204,7 +205,7 @@ export function AddClientDrawer({ open, onClose }: { open: boolean; onClose: () 
             </div>
           </div>
         )}
-      </div>
+      </DrawerBody>
     </Drawer>
   );
 }

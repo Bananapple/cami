@@ -4,6 +4,7 @@ import { PageHeader } from "../shell/PageHeader";
 import { Button } from "../components/Button";
 import { StateBadge, Count } from "../components/Badge";
 import { EmptyState } from "../components/EmptyState";
+import { AvatarCircle } from "../components/AvatarCircle";
 import { useSchedule, type ScheduleClass } from "@/manage/hooks/useSchedule";
 import { useClassAttendance } from "@/manage/hooks/useClassAttendance";
 import { useStudioContext } from "@/context/StudioContext";
@@ -300,23 +301,7 @@ function AttendeeRow({
         opacity: disabled ? 0.55 : 1,
       }}
     >
-      <span
-        style={{
-          width: 28,
-          height: 28,
-          borderRadius: "50%",
-          background: "var(--surface-2)",
-          border: "1px solid var(--line)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontSize: 11,
-          color: "var(--ink-soft)",
-          fontWeight: 500,
-        }}
-      >
-        {initials}
-      </span>
+      <AvatarCircle>{initials}</AvatarCircle>
       <span style={{ fontSize: 14, color: "var(--ink)" }}>{name}</span>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         {statusBadge && <StateBadge tone={statusBadge.tone}>{statusBadge.label}</StateBadge>}

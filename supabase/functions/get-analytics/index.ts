@@ -34,7 +34,7 @@ Deno.serve(async (req) => {
     const { data: { user }, error: authError } = await userClient.auth.getUser();
     if (authError || !user) return json({ error: "Unauthorized" }, 401);
 
-    const { studio_id } = await req.json();
+    const { studio_id, period = "day" } = await req.json();
     if (!studio_id) return json({ error: "studio_id required" }, 400);
 
     // --- Verify caller is admin for this studio ---
@@ -55,16 +55,33 @@ Deno.serve(async (req) => {
     }
 
     const now = new Date();
-    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-    const dateFrom = thirtyDaysAgo.toISOString().slice(0, 10);
+    const periodDays = ({ day: 30, week: 210, month: 900, year: 1825 } as Record<string, number>)[period] ?? 30;
+    const groupFn = ({ day: "toDate(timestamp)", week: "toMonday(timestamp)", month: "toStartOfMonth(timestamp)", year: "toStartOfYear(timestamp)" } as Record<string, string>)[period] ?? "toDate(timestamp)";
+    const dateFrom = new Date(now.getTime() - periodDays * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
     const phHeaders = {
       "Authorization": `Bearer ${POSTHOG_SECRET_KEY}`,
       "Content-Type": "application/json",
     };
 
+    // Priority: known referrer → UTM from URL (PostHog doesn't extract $utm_source into event props) → Direct → Other
+    // maps.google.com referrer is the reliable Maps signal; $geoip_city_name is present for all geocoded traffic so it can't distinguish Maps from Search
+    const sourceExpr = `multiIf(
+      properties.$referring_domain LIKE '%maps.google%', 'Maps',
+      properties.$referring_domain LIKE '%google%', 'Search',
+      properties.$referring_domain LIKE '%instagram%', 'Instagram',
+      properties.$referring_domain LIKE '%facebook%', 'Facebook',
+      properties.$referring_domain LIKE '%tiktok%', 'TikTok',
+      extractURLParameter(properties.$current_url, 'utm_source') LIKE '%instagram%', 'Instagram',
+      extractURLParameter(properties.$current_url, 'utm_source') LIKE '%facebook%', 'Facebook',
+      extractURLParameter(properties.$current_url, 'utm_source') LIKE '%tiktok%', 'TikTok',
+      extractURLParameter(properties.$current_url, 'utm_source') LIKE '%google%', 'Search',
+      properties.$referring_domain = '' OR properties.$referring_domain IS NULL, 'Direct',
+      'Other'
+    )`;
+
     // Run queries in parallel
-    const [visitorsRes, dailyRes, conversionsRes, dailyConversionsRes, sourcesRes] = await Promise.all([
+    const [visitorsRes, dailyRes, conversionsRes, dailyConversionsRes, sourcesRes, dailyBySourceRes, sourceConversionsRes] = await Promise.all([
       // Unique people over 30 days — any event with studio_id (catches pageleave + pageview)
       fetch(`${POSTHOG_HOST}/api/projects/${POSTHOG_PROJECT_ID}/query/`, {
         method: "POST",
@@ -82,7 +99,7 @@ Deno.serve(async (req) => {
           },
         }),
       }),
-      // Daily unique visitors for sparkline
+      // Visitors grouped by period unit
       fetch(`${POSTHOG_HOST}/api/projects/${POSTHOG_PROJECT_ID}/query/`, {
         method: "POST",
         headers: phHeaders,
@@ -90,7 +107,7 @@ Deno.serve(async (req) => {
           query: {
             kind: "HogQLQuery",
             query: `
-              SELECT toDate(timestamp) as date, count(DISTINCT distinct_id) as daily_uniques
+              SELECT ${groupFn} as date, count(DISTINCT distinct_id) as daily_uniques
               FROM events
               WHERE timestamp >= '${dateFrom}'
                 AND properties.studio_id = '${studio_id}'
@@ -118,7 +135,7 @@ Deno.serve(async (req) => {
           },
         }),
       }),
-      // booking_completed events per day
+      // booking_completed events grouped by period unit
       fetch(`${POSTHOG_HOST}/api/projects/${POSTHOG_PROJECT_ID}/query/`, {
         method: "POST",
         headers: phHeaders,
@@ -126,7 +143,7 @@ Deno.serve(async (req) => {
           query: {
             kind: "HogQLQuery",
             query: `
-              SELECT toDate(timestamp) as date, count() as daily_conversions
+              SELECT ${groupFn} as date, count() as daily_conversions
               FROM events
               WHERE event = 'booking_completed'
                 AND timestamp >= '${dateFrom}'
@@ -137,7 +154,7 @@ Deno.serve(async (req) => {
           },
         }),
       }),
-      // Referrer sources breakdown
+      // Sources aggregate (visit share + conv rate via simple per-source query)
       fetch(`${POSTHOG_HOST}/api/projects/${POSTHOG_PROJECT_ID}/query/`, {
         method: "POST",
         headers: phHeaders,
@@ -146,14 +163,8 @@ Deno.serve(async (req) => {
             kind: "HogQLQuery",
             query: `
               SELECT
-                multiIf(
-                  properties.$referring_domain = '' OR properties.$referring_domain IS NULL, 'Direct',
-                  properties.$referring_domain LIKE '%google%' AND properties.$geoip_city_name IS NOT NULL, 'Maps',
-                  properties.$referring_domain LIKE '%google%', 'Search',
-                  properties.$referring_domain LIKE '%instagram%' OR properties.$utm_source LIKE '%instagram%', 'Instagram',
-                  'Other'
-                ) as source,
-                count(DISTINCT session_id) as visits
+                ${sourceExpr} as source,
+                count(DISTINCT distinct_id) as visits
               FROM events
               WHERE event = '$pageview'
                 AND timestamp >= '${dateFrom}'
@@ -164,25 +175,59 @@ Deno.serve(async (req) => {
           },
         }),
       }),
+      // Visitors by source grouped by period unit (stacked area chart)
+      fetch(`${POSTHOG_HOST}/api/projects/${POSTHOG_PROJECT_ID}/query/`, {
+        method: "POST",
+        headers: phHeaders,
+        body: JSON.stringify({
+          query: {
+            kind: "HogQLQuery",
+            query: `
+              SELECT
+                ${groupFn} as date,
+                ${sourceExpr} as source,
+                count(DISTINCT distinct_id) as visits
+              FROM events
+              WHERE event = '$pageview'
+                AND timestamp >= '${dateFrom}'
+                AND properties.studio_id = '${studio_id}'
+              GROUP BY date, source
+              ORDER BY date, source
+            `,
+          },
+        }),
+      }),
+      // booking_completed per source (for per-source conv rate)
+      fetch(`${POSTHOG_HOST}/api/projects/${POSTHOG_PROJECT_ID}/query/`, {
+        method: "POST",
+        headers: phHeaders,
+        body: JSON.stringify({
+          query: {
+            kind: "HogQLQuery",
+            query: `
+              SELECT
+                ${sourceExpr} as source,
+                count() as conversions
+              FROM events
+              WHERE event = 'booking_completed'
+                AND timestamp >= '${dateFrom}'
+                AND properties.studio_id = '${studio_id}'
+              GROUP BY source
+            `,
+          },
+        }),
+      }),
     ]);
 
-    const [visitorsData, dailyData, conversionsData, dailyConversionsData, sourcesData] = await Promise.all([
+    const [visitorsData, dailyData, conversionsData, dailyConversionsData, sourcesData, dailyBySourceData, sourceConversionsData] = await Promise.all([
       visitorsRes.json(),
       dailyRes.json(),
       conversionsRes.json(),
       dailyConversionsRes.json(),
       sourcesRes.json(),
+      dailyBySourceRes.json(),
+      sourceConversionsRes.json(),
     ]);
-
-    const debug = {
-      projectId: POSTHOG_PROJECT_ID,
-      studioId: studio_id,
-      visitorsStatus: visitorsRes.status,
-      dailyStatus: dailyRes.status,
-      visitorsRaw: visitorsData,
-      dailyRaw: dailyData,
-    };
-    console.log("get-analytics debug:", JSON.stringify(debug));
 
     const visitors = visitorsData?.results?.[0]?.[0] ?? 0;
     const conversions = conversionsData?.results?.[0]?.[0] ?? 0;
@@ -193,18 +238,26 @@ Deno.serve(async (req) => {
     const dailyConversions: { date: string; count: number }[] =
       (dailyConversionsData?.results ?? []).map(([date, count]: [string, number]) => ({ date, count }));
     const avgPerDay = dailyBreakdown.length > 0
-      ? Math.round(dailyBreakdown.reduce((s, d) => s + d.count, 0) / 30)
+      ? Math.round(dailyBreakdown.reduce((s, d) => s + d.count, 0) / periodDays)
       : 0;
 
     const sourcesRaw: [string, number][] = sourcesData?.results ?? [];
     const totalVisits = sourcesRaw.reduce((s, [, v]) => s + v, 0);
+    const convBySource = new Map<string, number>(
+      (sourceConversionsData?.results ?? []).map(([src, c]: [string, number]) => [src, c])
+    );
     const sources = sourcesRaw.map(([name, visits]) => ({
       name,
       visits,
       pct: totalVisits > 0 ? Math.round((visits / totalVisits) * 100) : 0,
+      convRate: visits > 0 ? Math.round(((convBySource.get(name) ?? 0) / visits) * 1000) / 10 : 0,
     }));
+    console.log("get-analytics:", { studioId: studio_id, period, visitors, sources: sources.map(s => s.name) });
 
-    return json({ visitors, avgPerDay, dailyBreakdown, dailyConversions, conversions, conversionRate, sources, noData: dailyBreakdown.length === 0, _debug: debug });
+    const dailyBySource: { date: string; source: string; count: number }[] =
+      (dailyBySourceData?.results ?? []).map(([date, source, count]: [string, string, number]) => ({ date, source, count }));
+
+    return json({ visitors, avgPerDay, dailyBreakdown, dailyConversions, conversions, conversionRate, sources, dailyBySource, noData: dailyBreakdown.length === 0 });
   } catch (err) {
     console.error("get-analytics error:", err);
     return json({ error: "Internal error" }, 500);

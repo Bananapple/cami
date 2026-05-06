@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Drawer } from "../components/Drawer";
-import { Button } from "../components/Button";
+import { DrawerBody } from "../components/DrawerBody";
+import { DrawerFooter } from "../components/DrawerFooter";
 import { StateBadge } from "../components/Badge";
 import { Field, FieldRow, inputStyle } from "../components/Field";
 import { useManageProducts, type Product } from "@/manage/hooks/useManageProducts";
@@ -90,35 +91,28 @@ export function ProductDrawerV2({
         ) : undefined
       }
       actions={
-        <>
-          {isEditing && (
-            <Button
-              variant="danger"
-              size="sm"
-              onClick={() => {
-                toggleActive.mutate(
-                  { id: product!.id, is_active: !product!.is_active },
-                  {
-                    onSuccess: () => {
-                      toast.success(product!.is_active ? "Product deactivated" : "Product activated");
-                      onClose();
-                    },
-                  }
-                );
-              }}
-              style={{ marginRight: "auto" }}
-            >
-              {product!.is_active ? "Deactivate" : "Activate"}
-            </Button>
-          )}
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button variant="primary" onClick={save} loading={isPending}>
-            {mode === "create" ? "Create product" : "Save"}
-          </Button>
-        </>
+        <DrawerFooter
+          isEditing={isEditing}
+          isActive={product?.is_active}
+          onDeactivate={() => {
+            toggleActive.mutate(
+              { id: product!.id, is_active: !product!.is_active },
+              {
+                onSuccess: () => {
+                  toast.success(product!.is_active ? "Product deactivated" : "Product activated");
+                  onClose();
+                },
+              }
+            );
+          }}
+          onCancel={onClose}
+          onSave={save}
+          loading={isPending}
+          saveLabel={mode === "create" ? "Create product" : "Save"}
+        />
       }
     >
-      <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 16 }}>
+      <DrawerBody>
         <Field label="Name">
           <input
             type="text"
@@ -219,7 +213,7 @@ export function ProductDrawerV2({
             style={{ ...inputStyle, height: "auto", padding: "8px 10px", resize: "vertical" }}
           />
         </Field>
-      </div>
+      </DrawerBody>
     </Drawer>
   );
 }

@@ -7,6 +7,8 @@ import { StateBadge, CategoryChip, Count } from "../components/Badge";
 import { Row } from "../components/Row";
 import { OverflowMenu } from "../components/OverflowMenu";
 import { EmptyState } from "../components/EmptyState";
+import { AvatarCircle } from "../components/AvatarCircle";
+import { LoadingPlaceholder } from "../components/LoadingPlaceholder";
 import { useClassAttendance } from "@/manage/hooks/useClassAttendance";
 import { useClassWaitlist } from "@/manage/hooks/useClassWaitlist";
 import { useCancelClass } from "@/manage/hooks/useCancelClass";
@@ -216,7 +218,7 @@ export function ClassDrawerV2({
             action={<EditLink onClick={() => setWalkInOpen(true)}>Add walk-in</EditLink>}
             flush
           >
-            {attLoading && <LoadingRow text="Loading attendees…" />}
+            {attLoading && <LoadingPlaceholder text="Loading attendees…" />}
             {!attLoading && attending.length === 0 && (
               <EmptyState title="No bookings yet" hint="Spots are open — share the schedule link with members." />
             )}
@@ -244,7 +246,7 @@ export function ClassDrawerV2({
       {/* ── Waitlist tab ── */}
       {tab === "waitlist" && (
         <DrawerSection title={`Waitlist · ${waitlist.length}`} flush>
-          {wlLoading && <LoadingRow text="Loading waitlist…" />}
+          {wlLoading && <LoadingPlaceholder text="Loading waitlist…" />}
           {!wlLoading && waitlist.length === 0 && (
             <EmptyState
               title="No one waiting"
@@ -255,7 +257,7 @@ export function ClassDrawerV2({
             <Row
               key={w.id}
               lead={
-                <span style={initialsStyle}>{initialsFor(w.full_name)}</span>
+                <AvatarCircle>{initialsFor(w.full_name)}</AvatarCircle>
               }
               title={w.full_name ?? "Unknown"}
               meta={
@@ -283,7 +285,7 @@ export function ClassDrawerV2({
           {cancelled.map((a) => (
             <Row
               key={a.booking_id}
-              lead={<span style={initialsStyle}>{initialsFor(a.full_name)}</span>}
+              lead={<AvatarCircle>{initialsFor(a.full_name)}</AvatarCircle>}
               title={
                 <span style={{ color: "var(--ink-muted)", textDecoration: "line-through" }}>{a.full_name}</span>
               }
@@ -409,7 +411,7 @@ function AttendeeRow({
   };
   return (
     <Row
-      lead={<span style={initialsStyle}>{initials}</span>}
+      lead={<AvatarCircle>{initials}</AvatarCircle>}
       title={name}
       meta={email ?? "—"}
       trail={
@@ -491,24 +493,6 @@ function KV({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
-
-function LoadingRow({ text }: { text: string }) {
-  return <p style={{ padding: "16px 20px", color: "var(--ink-muted)", fontSize: 13, margin: 0 }}>{text}</p>;
-}
-
-const initialsStyle: React.CSSProperties = {
-  width: 28,
-  height: 28,
-  borderRadius: "50%",
-  background: "var(--surface-2)",
-  border: "1px solid var(--line)",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  fontSize: 11,
-  color: "var(--ink-soft)",
-  fontWeight: 500,
-};
 
 function initialsFor(name: string | null | undefined): string {
   if (!name) return "?";

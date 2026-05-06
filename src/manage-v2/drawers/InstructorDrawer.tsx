@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Drawer } from "../components/Drawer";
-import { Button } from "../components/Button";
+import { DrawerBody } from "../components/DrawerBody";
+import { DrawerFooter } from "../components/DrawerFooter";
 import { StateBadge } from "../components/Badge";
 import { Field, FieldRow, inputStyle } from "../components/Field";
 import { useManageInstructors, type ManagedInstructor, type InstructorStatus } from "@/manage/hooks/useManageInstructors";
@@ -160,35 +161,28 @@ export function InstructorDrawerV2({
       subtitle={mode === "create" ? "New instructor for your studio" : "Edit instructor profile"}
       headerMeta={headerBadge}
       actions={
-        <>
-          {isEditing && (
-            <Button
-              variant="danger"
-              size="sm"
-              onClick={() => {
-                toggleActive.mutate(
-                  { id: instructor!.id, is_active: !instructor!.is_active },
-                  {
-                    onSuccess: () => {
-                      toast.success(instructor!.is_active ? "Instructor deactivated" : "Instructor activated");
-                      onClose();
-                    },
-                  }
-                );
-              }}
-              style={{ marginRight: "auto" }}
-            >
-              {instructor!.is_active ? "Deactivate" : "Activate"}
-            </Button>
-          )}
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button variant="primary" onClick={save} loading={pending}>
-            {mode === "create" ? "Add instructor" : "Save"}
-          </Button>
-        </>
+        <DrawerFooter
+          isEditing={isEditing}
+          isActive={instructor?.is_active}
+          onDeactivate={() => {
+            toggleActive.mutate(
+              { id: instructor!.id, is_active: !instructor!.is_active },
+              {
+                onSuccess: () => {
+                  toast.success(instructor!.is_active ? "Instructor deactivated" : "Instructor activated");
+                  onClose();
+                },
+              }
+            );
+          }}
+          onCancel={onClose}
+          onSave={save}
+          loading={pending}
+          saveLabel={mode === "create" ? "Add instructor" : "Save"}
+        />
       }
     >
-      <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 16 }}>
+      <DrawerBody>
         <FieldRow>
           <Field label="First name">
             <input
@@ -332,7 +326,7 @@ export function InstructorDrawerV2({
             <option value="inactive">Inactive</option>
           </select>
         </Field>
-      </div>
+      </DrawerBody>
     </Drawer>
   );
 }

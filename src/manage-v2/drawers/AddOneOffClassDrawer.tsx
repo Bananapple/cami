@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Drawer } from "../components/Drawer";
-import { Button } from "../components/Button";
+import { DrawerBody } from "../components/DrawerBody";
+import { DrawerFooter } from "../components/DrawerFooter";
 import { Field, FieldRow, inputStyle } from "../components/Field";
 import { useSchedule, type ClassTemplate } from "@/manage/hooks/useSchedule";
 import { toast } from "sonner";
@@ -80,13 +81,16 @@ export function AddOneOffClassDrawer({ open, onClose }: { open: boolean; onClose
       title="Add one-off class"
       subtitle="A single class instance, not tied to the recurring schedule"
       actions={
-        <>
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button variant="primary" onClick={save} loading={pending}>Add class</Button>
-        </>
+        <DrawerFooter
+          isEditing={false}
+          onCancel={onClose}
+          onSave={save}
+          loading={pending}
+          saveLabel="Add class"
+        />
       }
     >
-      <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 16 }}>
+      <DrawerBody>
         <Field label="Class type" help="Defaults to template's duration / capacity / price">
           <select
             value={draft.template_id}
@@ -182,7 +186,7 @@ export function AddOneOffClassDrawer({ open, onClose }: { open: boolean; onClose
             style={inputStyle}
           />
         </Field>
-      </div>
+      </DrawerBody>
     </Drawer>
   );
 }

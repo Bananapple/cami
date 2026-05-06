@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Drawer } from "../components/Drawer";
-import { Button } from "../components/Button";
+import { DrawerBody } from "../components/DrawerBody";
+import { DrawerFooter } from "../components/DrawerFooter";
 import { Field, FieldRow, inputStyle } from "../components/Field";
 import { useSchedule, type ScheduleClass } from "@/manage/hooks/useSchedule";
 import { toast } from "sonner";
@@ -94,13 +95,16 @@ export function EditClassDrawer({
       title={`Edit · ${cls.class_name}`}
       subtitle="Changes apply only to this single class instance"
       actions={
-        <>
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button variant="primary" onClick={save} loading={pending}>Save</Button>
-        </>
+        <DrawerFooter
+          isEditing
+          onCancel={onClose}
+          onSave={save}
+          loading={pending}
+          saveLabel="Save"
+        />
       }
     >
-      <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 16 }}>
+      <DrawerBody>
         <FieldRow>
           <Field label="Instructor">
             <select
@@ -186,7 +190,7 @@ export function EditClassDrawer({
             style={{ ...(inputStyle as React.CSSProperties), height: "auto", padding: "8px 10px", resize: "vertical" }}
           />
         </Field>
-      </div>
+      </DrawerBody>
     </Drawer>
   );
 }

@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { PageHeader } from "../shell/PageHeader";
-import { Button } from "../components/Button";
 import { Row, RowList } from "../components/Row";
 import { StateBadge, Count } from "../components/Badge";
 import { EmptyState } from "../components/EmptyState";
+import { AvatarCircle } from "../components/AvatarCircle";
+import { LoadingPlaceholder } from "../components/LoadingPlaceholder";
 import { useClientsView, type SegmentKey, type MemberSummary } from "@/manage/hooks/useClientsView";
 import { getPlanHealth } from "../lib/planHealth";
 import { MemberDrawerV2 } from "../drawers/MemberDrawer";
@@ -95,9 +96,7 @@ export function ClientsScreen() {
       </div>
 
       <RowList>
-        {isLoading && (
-          <div style={{ padding: "16px 14px", color: "var(--ink-muted)", fontSize: 13 }}>Loading members…</div>
-        )}
+        {isLoading && <LoadingPlaceholder text="Loading members…" />}
         {!isLoading && filtered.length === 0 && (
           <EmptyState
             title={search ? "No matches" : "No members in this segment"}
@@ -155,25 +154,7 @@ function MemberRow({
 
   return (
     <Row
-      lead={
-        <span
-          style={{
-            width: 28,
-            height: 28,
-            borderRadius: "50%",
-            background: "var(--surface-2)",
-            border: "1px solid var(--line)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: 11,
-            color: "var(--ink-soft)",
-            fontWeight: 500,
-          }}
-        >
-          {initials}
-        </span>
-      }
+      lead={<AvatarCircle>{initials}</AvatarCircle>}
       title={member.full_name}
       meta={meta}
       trail={

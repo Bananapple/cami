@@ -79,7 +79,6 @@
   font-family: 'Inter', system-ui, sans-serif;
 }
 .sm-app .sm-pagehead h1,
-.sm-app .sm-greeting h1,
 .sm-app .sm-drawer-head h3 {
   font-family: 'DM Serif Display', Georgia, serif;
   font-weight: 400;
@@ -307,6 +306,64 @@
     font-size: 18px;
     line-height: 1;
   }
+}
+
+/* —— Toggle switch ——————————————————————————— */
+.sm-toggle {
+  position: relative;
+  width: 44px; height: 24px;
+  border-radius: 12px;
+  background: var(--line-strong);
+  border: none;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 150ms;
+  padding: 0;
+}
+.sm-toggle.on { background: var(--action); }
+.sm-toggle::after {
+  content: '';
+  position: absolute;
+  top: 3px; left: 3px;
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: white;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  transition: transform 150ms;
+}
+.sm-toggle.on::after { transform: translateX(20px); }
+
+/* —— Setting row (referral program card) ———— */
+.sm-setting-card {
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  background: var(--surface);
+  overflow: hidden;
+}
+.sm-setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.sm-setting-row:last-child { border-bottom: none; }
+.sm-setting-row .body { flex: 1; min-width: 0; }
+.sm-setting-row .body p { font-size: var(--t-small); color: var(--ink); margin: 0; }
+.sm-setting-row .body .hint { font-size: 12px; color: var(--ink-muted); margin-top: 2px; }
+.sm-setting-row .ctrl { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.sm-setting-row input[type="number"] {
+  width: 60px; height: 30px;
+  text-align: center;
+  padding: 0 8px;
+  font-size: var(--t-small);
+  font-family: inherit;
+  color: var(--ink);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--r-input);
+  outline: none;
 }
 
 /* —— Buttons ————————————————————————————————— */
@@ -710,20 +767,6 @@
 .sm-kpi .sub {
   font-size: var(--t-small);
   color: var(--ink-muted);
-}
-
-/* Greeting on Home */
-.sm-greeting h1 {
-  font-size: var(--t-h1);
-  font-weight: 600;
-  letter-spacing: -0.012em;
-  margin: 0 0 4px;
-  line-height: 1.2;
-}
-.sm-greeting .sub {
-  font-size: var(--t-small);
-  color: var(--ink-muted);
-  margin: 0;
 }
 
 /* —— Inline-edit field —————————————————————— */

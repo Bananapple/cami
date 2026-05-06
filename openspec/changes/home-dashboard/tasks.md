@@ -55,4 +55,4 @@
 - [ ] 7.2 Verify period toggle switches all tiles; verify WTD/MTD/YTD comparison values look correct
 - [ ] 7.3 Verify `booking_completed` event appears in PostHog after a test booking (paid and credit paths)
 - [ ] 7.4 Verify Traffic panel shows "No data yet" on first deploy, then populates after a few page views
-- [ ] 7.5 Commit all changes and push to deploy to Vercel
+- [x] 7.5 Commit all changes and push to deploy to Vercel
