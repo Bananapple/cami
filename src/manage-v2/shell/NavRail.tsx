@@ -90,6 +90,18 @@ export function NavRail({
               {it.label}
             </button>
           ))}
+          {onSignOut && (
+            <button
+              type="button"
+              className="sm-nav-item"
+              onClick={onSignOut}
+            >
+              <span className="ic">
+                <NavIcon name="sign-out" />
+              </span>
+              Sign out
+            </button>
+          )}
         </nav>
         <button type="button" className="sm-nav-search" onClick={onSearchClick}>
           <NavIcon name="search" />
@@ -112,24 +124,6 @@ export function NavRail({
             <div className="av">{userInitials}</div>
             <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{userName}</span>
           </button>
-          {onSignOut && (
-            <button
-              type="button"
-              onClick={onSignOut}
-              style={{
-                all: "unset",
-                cursor: "pointer",
-                fontSize: 11.5,
-                color: "var(--ink-muted)",
-                paddingTop: 6,
-                display: "block",
-                width: "100%",
-                paddingLeft: 36,
-              }}
-            >
-              Sign out
-            </button>
-          )}
         </div>
       </aside>
     </>

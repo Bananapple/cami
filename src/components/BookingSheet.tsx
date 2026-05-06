@@ -1,11 +1,11 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { ArrowLeft } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useClassInstances } from "@/hooks/useClassInstances";
 import type { ClassInstance } from "@/hooks/useClassInstances";
 import DateStrip from "@/components/booking/DateStrip";
-import SessionList from "@/components/booking/SessionList";
+import SessionFeed from "@/components/booking/SessionFeed";
 import OrderSummary from "@/components/booking/OrderSummary";
 import AuthForm from "@/components/booking/AuthForm";
 import ProfileForm from "@/components/booking/ProfileForm";
@@ -15,7 +15,7 @@ import { useStudioContext } from "@/context/StudioContext";
 import { useMembership } from "@/hooks/useMembership";
 import { useProducts } from "@/hooks/useProducts";
 import { useWaitlist } from "@/hooks/useWaitlist";
-import { formatTime, formatDate } from "@/lib/timezone";
+import { formatTime, formatDate, todayInTimezone } from "@/lib/timezone";
 
 type Step = "date" | "confirm" | "auth" | "profile" | "checkout";
 
@@ -28,7 +28,16 @@ interface BookingSheetProps {
 const BookingSheet = ({ isOpen, onClose, templateId }: BookingSheetProps) => {
   const [step, setStep] = useState<Step>("date");
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const studioCtx = useStudioContext();
+  const studioName = studioCtx?.studio?.name ?? "Studio";
+  const location = studioCtx?.studio?.address ?? "";
+  const studioTz = studioCtx?.studio?.timezone ?? "Europe/Oslo";
+  const [visibleDate, setVisibleDate] = useState(() => todayInTimezone(studioTz));
   const [selectedSession, setSelectedSession] = useState<ClassInstance | null>(null);
+  const scrollToDateFn = useRef<((date: Date) => void) | null>(null);
+  const registerScrollFn = useCallback((fn: (date: Date) => void) => {
+    scrollToDateFn.current = fn;
+  }, []);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [waitlistJoined, setWaitlistJoined] = useState(false);
@@ -47,10 +56,6 @@ const BookingSheet = ({ isOpen, onClose, templateId }: BookingSheetProps) => {
     ? allSessions.filter((s) => s.template_id === templateId)
     : allSessions;
   const { isAuthenticated } = useAuth();
-  const studioCtx = useStudioContext();
-  const studioName = studioCtx?.studio?.name ?? "Studio";
-  const location = studioCtx?.studio?.address ?? "";
-  const studioTz = studioCtx?.studio?.timezone ?? "Europe/Oslo";
   const { membership } = useMembership();
   const { waitlist, join: joinWaitlist } = useWaitlist();
 
@@ -161,8 +166,14 @@ const BookingSheet = ({ isOpen, onClose, templateId }: BookingSheetProps) => {
     }
   };
 
+  const handleDateSelect = (date: Date) => {
+    setVisibleDate(date);
+    scrollToDateFn.current?.(date);
+  };
+
   const handleSelectSession = (session: ClassInstance) => {
     setSelectedSession(session);
+    setSelectedDate(new Date(session.starts_at));
     setStep("confirm");
   };
 
@@ -282,18 +293,25 @@ const BookingSheet = ({ isOpen, onClose, templateId }: BookingSheetProps) => {
   const showBack = step !== "date";
   const showSplitLayout = step === "auth" || step === "profile" || step === "checkout";
 
+  const visibleDateLabel = visibleDate.toLocaleDateString("nb-NO", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    timeZone: studioTz,
+  });
+
   return (
     <Sheet open={isOpen} onOpenChange={(open) => !open && handleClose()}>
       <SheetContent
         side="right"
-        className={`p-0 border-l border-border bg-background overflow-y-auto ${
-          showSplitLayout ? "w-full sm:max-w-2xl" : "w-full sm:max-w-md"
-        }`}
+        className={`p-0 border-l border-border bg-background flex flex-col ${
+          step === "date" ? "overflow-hidden" : "overflow-y-auto"
+        } ${showSplitLayout ? "w-full sm:max-w-2xl" : "w-full sm:max-w-md"}`}
       >
         <SheetTitle className="sr-only">Book a Session</SheetTitle>
 
         {/* Header bar */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border flex-shrink-0">
           {showBack ? (
             <button onClick={goBack} className="p-1 hover:opacity-70 transition-opacity" aria-label="Go back">
               <ArrowLeft className="w-5 h-5 text-foreground" />
@@ -309,18 +327,26 @@ const BookingSheet = ({ isOpen, onClose, templateId }: BookingSheetProps) => {
 
         {/* Step: Date & Session Selection */}
         {step === "date" && (
-          <div className="px-6 py-6 space-y-6">
-            <div>
-              <h2 className="text-2xl font-serif text-foreground">{studioName}</h2>
-              <p className="text-sm text-muted-foreground font-serif mt-1">
-                {location ? `Upcoming sessions in ${location}` : "Upcoming sessions"}
+          <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+            {/* Sticky top: studio name, date strip, sessions-for label */}
+            <div className="px-6 pt-6 pb-4 flex-shrink-0 space-y-4">
+              <div>
+                <h2 className="text-2xl font-serif text-foreground">{studioName}</h2>
+                <p className="text-sm text-muted-foreground font-serif mt-1">
+                  {location ? `Upcoming sessions in ${location}` : "Upcoming sessions"}
+                </p>
+              </div>
+              <DateStrip selectedDate={visibleDate} onSelectDate={handleDateSelect} />
+              <p className="text-xs font-sans font-medium uppercase tracking-[0.15em] text-muted-foreground">
+                Sessions for {visibleDateLabel}
               </p>
             </div>
-            <DateStrip selectedDate={selectedDate} onSelectDate={setSelectedDate} />
-            <SessionList
+            {/* Scrollable session feed */}
+            <SessionFeed
               sessions={sessions}
-              selectedDate={selectedDate}
               onSelectSession={handleSelectSession}
+              onVisibleDateChange={setVisibleDate}
+              registerScrollFn={registerScrollFn}
             />
           </div>
         )}

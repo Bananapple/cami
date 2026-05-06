@@ -7,6 +7,7 @@ type IconName =
   | "schedule"
   | "clients"
   | "studio"
+  | "sign-out"
   | "search"
   | "plus"
   | "close"
@@ -135,6 +136,14 @@ export function NavIcon({ name, size = 14 }: { name: IconName; size?: number }) 
         <svg {...props}>
           <circle cx="8" cy="8" r="5.5" />
           <path d="M8 5v3.2L10 10" />
+        </svg>
+      );
+    case "sign-out":
+      return (
+        <svg {...props}>
+          <path d="M10.5 5.5L13.5 8l-3 2.5" />
+          <path d="M13.5 8H6" />
+          <path d="M6 2.5H3.5A1 1 0 0 0 2.5 3.5v9a1 1 0 0 0 1 1H6" />
         </svg>
       );
     default:
