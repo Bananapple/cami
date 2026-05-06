@@ -148,7 +148,7 @@ BEGIN
     email     = EXCLUDED.email,
     full_name = EXCLUDED.full_name;
 
-  -- Studio members
+  -- Studio members (trigger may have already created rows from auth.users insert)
   INSERT INTO studio_members (studio_id, user_id, role, total_sessions, level, joined_at, status)
   VALUES
     (sid, u1, 'member', 32, 'REGULAR', now()-'180d'::interval, 'active'),
@@ -158,7 +158,12 @@ BEGIN
     (sid, u5, 'member',  2, 'STARTER', now()-'14d'::interval,  'active'),
     (sid, u6, 'member',  1, 'STARTER', now()-'5d'::interval,   'active'),
     (sid, u7, 'member',  9, 'REGULAR', now()-'150d'::interval, 'active'),
-    (sid, u8, 'member',  1, 'STARTER', now()-'60d'::interval,  'active');
+    (sid, u8, 'member',  1, 'STARTER', now()-'60d'::interval,  'active')
+  ON CONFLICT (studio_id, user_id) DO UPDATE SET
+    total_sessions = EXCLUDED.total_sessions,
+    level          = EXCLUDED.level,
+    joined_at      = EXCLUDED.joined_at,
+    status         = EXCLUDED.status;
 
   -- Memberships
   INSERT INTO memberships (studio_id, user_id, plan_name, status, credits_remaining, valid_until)
