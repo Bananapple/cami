@@ -26,6 +26,8 @@ This is a **multi-tenant SaaS platform** for yoga studios in Scandinavia, Europe
 
 **Security hardening (2026-04-30):** 28-finding audit implemented — see `docs/SECURITY-HARDENING.md`.
 
+**Design system:** Manager UI uses three labelling primitives (`StateBadge`, `CategoryChip`, `Count`) defined in `src/manage-v2/components/Badge.tsx`. Booking state and membership health always route through mapping functions in `src/manage-v2/lib/bookingStatus.ts` and `src/manage-v2/lib/planHealth.ts` — never hardcode tone/label inline. Full reference: `docs/DESIGN-SYSTEM.md`.
+
 **Edge Function deploy notes:**
 - `payment-webhook` must be deployed with `--no-verify-jwt` (Stripe sends no JWT)
 - `notify-waitlist-offer` must be deployed with `--no-verify-jwt` (DB webhook sends no JWT)
