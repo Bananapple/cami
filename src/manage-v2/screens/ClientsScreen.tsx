@@ -2,16 +2,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { PageHeader } from "../shell/PageHeader";
 import { Row, RowList } from "../components/Row";
-import { StateBadge, Count, CategoryChip } from "../components/Badge";
+import { StateBadge, Count } from "../components/Badge";
 import { EmptyState } from "../components/EmptyState";
 import { AvatarCircle } from "../components/AvatarCircle";
 import { LoadingPlaceholder } from "../components/LoadingPlaceholder";
 import { MemberFilterBar } from "../components/MemberFilterBar";
 import {
   useClientsView,
-  frequencyTier,
-  PLAN_LABELS,
-  FREQUENCY_LABELS,
   type SegmentKey,
   type MemberSummary,
   type TagFilter,
@@ -186,7 +183,6 @@ export function ClientsScreen() {
           <MemberRow
             key={m.user_id}
             member={m}
-            frequency={frequencyTier(m, config)}
             selected={activeUserId === m.user_id}
             onClick={() => setActiveUserId(m.user_id)}
           />
@@ -209,12 +205,10 @@ export function ClientsScreen() {
 // ── Member row ─────────────────────────────────────────────────────
 function MemberRow({
   member,
-  frequency,
   selected,
   onClick,
 }: {
   member: MemberSummary;
-  frequency: ReturnType<typeof frequencyTier>;
   selected: boolean;
   onClick: () => void;
 }) {
@@ -229,24 +223,16 @@ function MemberRow({
 
   const lastVisit = member.last_booking_at ? relativeDate(member.last_booking_at) : "never";
 
-  // Frequency + plan tier as small inline badges on the title line — these
-  // are the most operationally useful at-a-glance signals.
-  const tierBadge = frequency !== "none" ? FREQUENCY_LABELS[frequency] : null;
-  const planBadge = member.plan_type ? PLAN_LABELS[member.plan_type] ?? null : null;
-
-  const meta = `${member.email ?? "—"} · last visit ${lastVisit}`;
-
   return (
     <Row
       lead={<AvatarCircle>{initials}</AvatarCircle>}
-      title={
+      title={member.full_name}
+      meta={
         <>
-          {member.full_name}
-          {tierBadge && <CategoryChip>{tierBadge}</CategoryChip>}
-          {planBadge && <CategoryChip>{planBadge}</CategoryChip>}
+          {member.email ?? "—"}
+          <span className="sm-hide-mobile"> · last visit {lastVisit}</span>
         </>
       }
-      meta={meta}
       trail={
         <>
           <Count value={member.total_sessions} label="visits" />

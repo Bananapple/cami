@@ -66,11 +66,26 @@ export function PrimitivesPreview() {
           </Row>
         </Section>
 
-        <Section title="CategoryChip (level)">
+        <Section title="CategoryChip — soft fill, color-coded by type">
           <Row>
-            <CategoryChip>Beginner</CategoryChip>
-            <CategoryChip>Open</CategoryChip>
-            <CategoryChip>All levels</CategoryChip>
+            <CategoryChip variant="plan">Subscription</CategoryChip>
+            <CategoryChip variant="plan">Clip card</CategoryChip>
+            <CategoryChip variant="plan">Drop-in</CategoryChip>
+          </Row>
+          <Row>
+            <CategoryChip variant="frequency">Casual</CategoryChip>
+            <CategoryChip variant="frequency">Regular</CategoryChip>
+            <CategoryChip variant="frequency">Devotee</CategoryChip>
+          </Row>
+          <Row>
+            <CategoryChip variant="time">Morning</CategoryChip>
+            <CategoryChip variant="time">Midday</CategoryChip>
+            <CategoryChip variant="time">Evening</CategoryChip>
+          </Row>
+          <Row>
+            <CategoryChip variant="level">Beginner</CategoryChip>
+            <CategoryChip variant="level">Open</CategoryChip>
+            <CategoryChip variant="level">All levels</CategoryChip>
           </Row>
         </Section>
 

@@ -178,7 +178,7 @@ function TemplateRow({
       <div className="body">
         <div className="title">
           <span>{template.name}</span>
-          <CategoryChip>{template.level ?? "All levels"}</CategoryChip>
+          <CategoryChip variant="level">{template.level ?? "All levels"}</CategoryChip>
         </div>
         <div className="meta-line">
           {template.default_duration_minutes} min · {template.default_max_capacity} spots ·{" "}

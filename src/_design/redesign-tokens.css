@@ -71,34 +71,6 @@
 }
 .sm-app * { box-sizing: border-box; }
 .sm-app button { font-family: inherit; }
-/* Override global DM Serif Display on h1-h6 from index.css base layer.
-   Most v2 headings (eyebrows, day-headers, section labels) use Inter.
-   The two exceptions are page titles and drawer titles — they keep
-   DM Serif as the editorial accent. */
-.sm-app h1, .sm-app h2, .sm-app h3, .sm-app h4, .sm-app h5, .sm-app h6 {
-  font-family: 'Inter', system-ui, sans-serif;
-}
-.sm-app .sm-pagehead h1,
-.sm-app .sm-drawer-head h3 {
-  font-family: 'DM Serif Display', Georgia, serif;
-  font-weight: 400;
-  letter-spacing: -0.005em;
-}
-.sm-app .sm-drawer-head h3 { font-size: 22px; }
-
-/* Hide the native time picker indicator (clock icon) on time inputs.
-   We always render our own inline picker affordance. */
-.sm-app input[type="time"]::-webkit-calendar-picker-indicator,
-.sm-app input[type="time"]::-webkit-clear-button,
-.sm-app input[type="time"]::-webkit-inner-spin-button {
-  display: none;
-  -webkit-appearance: none;
-  appearance: none;
-}
-.sm-app input[type="time"] {
-  -webkit-appearance: none;
-  appearance: none;
-}
 
 /* —— Layout ————————————————————————————————— */
 .sm-shell {
@@ -223,148 +195,6 @@
   color: var(--ink-muted);
 }
 .sm-pagehead .actions { display: flex; gap: 8px; align-items: center; }
-
-/* —— Mobile burger ———————————————————————————— */
-.sm-burger {
-  flex-shrink: 0;
-  width: 38px;
-  height: 38px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--r-input);
-  color: var(--ink);
-  cursor: pointer;
-  padding: 0;
-}
-.sm-burger:hover { background: var(--surface-2); }
-.sm-burger-fixed {
-  position: fixed;
-  bottom: 20px;
-  right: 16px;
-  z-index: 25;
-  box-shadow: 0 2px 8px rgba(20, 18, 16, 0.14);
-}
-
-/* —— Mobile rail slide-in ———————————————————— */
-@keyframes sm-rail-slide-in {
-  from { transform: translateX(-100%); }
-  to { transform: translateX(0); }
-}
-@keyframes sm-rail-scrim-fade {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-.sm-rail-mobile-open {
-  animation: sm-rail-slide-in 180ms ease-out;
-  box-shadow: 0 12px 40px rgba(20, 18, 16, 0.18);
-}
-.sm-rail-scrim {
-  animation: sm-rail-scrim-fade 180ms ease-out;
-}
-
-/* —— Mobile content padding ——————————————————— */
-/* shift only the page title/subtitle right of the fixed burger */
-@media (max-width: 640px) {
-  .sm-content {
-    padding: 20px 14px 80px;
-  }
-  .sm-pagehead {
-    margin-bottom: 18px;
-  }
-}
-
-/* —— Responsive utilities ———————————————————— */
-@media (max-width: 640px)  { .sm-hide-mobile  { display: none !important; } }
-@media (min-width: 641px)  { .sm-hide-desktop { display: none !important; } }
-
-/* Trail stack: row on desktop, column (stacked) on mobile */
-.sm-trail-stack { display: flex; flex-direction: row; align-items: center; gap: 12px; }
-@media (max-width: 640px) {
-  .sm-trail-stack { flex-direction: column; align-items: flex-end; gap: 3px; }
-}
-
-/* Compact icon buttons in PageHeader actions on mobile */
-@media (max-width: 640px) {
-  .sm-hdr-icon-btn {
-    width: 34px; height: 32px;
-    border: 1px solid var(--line);
-    border-radius: var(--r-input);
-    background: var(--surface);
-    color: var(--ink);
-    cursor: pointer;
-    display: flex; align-items: center; justify-content: center;
-    padding: 0;
-  }
-  .sm-hdr-icon-btn--action {
-    background: var(--action);
-    border-color: var(--action);
-    color: var(--action-on);
-    font-weight: 700;
-    font-size: 18px;
-    line-height: 1;
-  }
-}
-
-/* —— Toggle switch ——————————————————————————— */
-.sm-toggle {
-  position: relative;
-  width: 44px; height: 24px;
-  border-radius: 12px;
-  background: var(--line-strong);
-  border: none;
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: background 150ms;
-  padding: 0;
-}
-.sm-toggle.on { background: var(--action); }
-.sm-toggle::after {
-  content: '';
-  position: absolute;
-  top: 3px; left: 3px;
-  width: 18px; height: 18px;
-  border-radius: 50%;
-  background: white;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
-  transition: transform 150ms;
-}
-.sm-toggle.on::after { transform: translateX(20px); }
-
-/* —— Setting row (referral program card) ———— */
-.sm-setting-card {
-  border: 1px solid var(--line);
-  border-radius: var(--r-card);
-  background: var(--surface);
-  overflow: hidden;
-}
-.sm-setting-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 14px 16px;
-  border-bottom: 1px solid var(--line-soft);
-}
-.sm-setting-row:last-child { border-bottom: none; }
-.sm-setting-row .body { flex: 1; min-width: 0; }
-.sm-setting-row .body p { font-size: var(--t-small); color: var(--ink); margin: 0; }
-.sm-setting-row .body .hint { font-size: 12px; color: var(--ink-muted); margin-top: 2px; }
-.sm-setting-row .ctrl { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
-.sm-setting-row input[type="number"] {
-  width: 60px; height: 30px;
-  text-align: center;
-  padding: 0 8px;
-  font-size: var(--t-small);
-  font-family: inherit;
-  color: var(--ink);
-  background: var(--bg);
-  border: 1px solid var(--line);
-  border-radius: var(--r-input);
-  outline: none;
-}
 
 /* —— Buttons ————————————————————————————————— */
 .sm-btn {
@@ -545,8 +375,8 @@
   display: inline-flex; align-items: center;
   padding: 1px 7px;
   border-radius: var(--r-input);
-  border: none;
-  background: var(--surface-2);
+  border: 1px solid var(--line);
+  background: transparent;
   font-family: 'JetBrains Mono', monospace;
   font-size: 10.5px;
   letter-spacing: 0.04em;
@@ -555,10 +385,6 @@
   line-height: 1.5;
   white-space: nowrap;
 }
-.sm-cat.plan      { background: var(--info-soft);  color: var(--info); }
-.sm-cat.frequency { background: var(--good-soft);  color: var(--good); }
-.sm-cat.time      { background: var(--warn-soft);  color: var(--warn); }
-.sm-cat.level     { background: var(--surface-2);  color: var(--ink-muted); }
 
 .sm-count {
   display: inline-flex; align-items: baseline; gap: 4px;
@@ -588,33 +414,6 @@
   display: flex; flex-direction: column;
   box-shadow: -1px 0 0 rgba(0,0,0,0.02);
 }
-
-/* Mobile: drawer becomes a bottom sheet — full width, top-anchored
-   close to the top of the viewport so the action bar at the bottom
-   is reachable with a thumb. */
-@media (max-width: 640px) {
-  .sm-drawer-scrim {
-    position: fixed;
-  }
-  .sm-drawer {
-    position: fixed;
-    top: auto;
-    left: 0; right: 0; bottom: 0;
-    width: 100%;
-    height: 85vh;
-    max-height: 92vh;
-    border-left: 0;
-    border-top: 1px solid var(--line);
-    border-radius: var(--r-large) var(--r-large) 0 0;
-    box-shadow: 0 -8px 24px rgba(20,18,16,0.10);
-  }
-  .sm-drawer-head { padding: 14px 16px; }
-  .sm-drawer-section { padding: 14px 16px; }
-  .sm-drawer-actions { padding: 12px 16px; padding-bottom: max(12px, env(safe-area-inset-bottom)); }
-
-  /* The page content under the drawer should not double-scroll */
-  body { overscroll-behavior: contain; }
-}
 .sm-drawer-head {
   padding: 16px 20px;
   border-bottom: 1px solid var(--line-soft);
@@ -623,7 +422,7 @@
   flex-shrink: 0;
 }
 .sm-drawer-head h3 {
-  margin: 0; font-size: 19px; font-weight: 500;
+  margin: 0; font-size: 17px; font-weight: 600;
   letter-spacing: -0.01em; color: var(--ink); line-height: 1.3;
 }
 .sm-drawer-head .sub {
@@ -771,6 +570,20 @@
 .sm-kpi .sub {
   font-size: var(--t-small);
   color: var(--ink-muted);
+}
+
+/* Greeting on Home */
+.sm-greeting h1 {
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.018em;
+  margin: 0 0 4px;
+  line-height: 1.15;
+}
+.sm-greeting .sub {
+  font-size: var(--t-small);
+  color: var(--ink-muted);
+  margin: 0;
 }
 
 /* —— Inline-edit field —————————————————————— */

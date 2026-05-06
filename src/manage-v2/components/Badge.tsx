@@ -10,10 +10,18 @@ export function StateBadge({ tone = "neutral", children }: { tone?: StateBadgeTo
 }
 
 // ── CategoryChip ────────────────────────────────────────────────────
-// Neutral mono outline, no color. Uppercase, monospace.
+// Soft-fill capsule, no border. Color-coded by semantic category.
 
-export function CategoryChip({ children }: { children: ReactNode }) {
-  return <span className="sm-cat">{children}</span>;
+export type CategoryChipVariant = "default" | "plan" | "frequency" | "time" | "level";
+
+export function CategoryChip({
+  children,
+  variant = "default",
+}: {
+  children: ReactNode;
+  variant?: CategoryChipVariant;
+}) {
+  return <span className={`sm-cat${variant !== "default" ? ` ${variant}` : ""}`}>{children}</span>;
 }
 
 // ── Count ───────────────────────────────────────────────────────────

@@ -163,7 +163,7 @@ function ClassRow({
     <Row
       lead={timeStr}
       title={c.class_name}
-      titleSuffix={<CategoryChip>{levelLabel}</CategoryChip>}
+      titleSuffix={<CategoryChip variant="level">{levelLabel}</CategoryChip>}
       meta={`${c.instructor_name} · ${c.location_name} · ${durationMin} min`}
       trail={
         <>

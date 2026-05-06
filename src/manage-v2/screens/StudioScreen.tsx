@@ -245,7 +245,7 @@ function ProductRow({
     <Row
       lead={<ProductGlyph type={product.type} />}
       title={product.name}
-      titleSuffix={<CategoryChip>{TYPE_LABEL[product.type] ?? product.type}</CategoryChip>}
+      titleSuffix={<CategoryChip variant="plan">{TYPE_LABEL[product.type] ?? product.type}</CategoryChip>}
       meta={meta || "—"}
       trail={
         <div className="sm-trail-stack">

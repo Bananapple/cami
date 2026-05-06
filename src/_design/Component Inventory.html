@@ -1,0 +1,863 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Studio Manager — Claude Code Handoff (Step 4)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;450;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg:        hsl(36 38% 96%);
+    --surface:   hsl(36 28% 98%);
+    --surface-2: hsl(30 22% 93%);
+    --paper:     hsl(20 28% 92%);
+    --ink:       hsl(20 18% 18%);
+    --ink-soft:  hsl(20 12% 36%);
+    --ink-muted: hsl(20 10% 52%);
+    --ink-faint: hsl(20 10% 68%);
+    --line:      hsl(20 16% 86%);
+    --line-soft: hsl(20 14% 90%);
+    --action:    hsl(2 48% 52%);
+    --action-soft: hsl(2 48% 95%);
+    --good:      hsl(150 32% 38%);
+    --warn:      hsl(28 60% 44%);
+    --bad:       hsl(0 56% 48%);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 14px; line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    font-feature-settings: "ss01", "cv11";
+  }
+  .doc { max-width: 920px; margin: 0 auto; padding: 64px 48px 120px; }
+
+  .eyebrow {
+    display: flex; align-items: center; gap: 10px;
+    font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--ink-muted); font-weight: 500;
+  }
+  .eyebrow .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--action); }
+  h1.doc-title {
+    font-size: 40px; font-weight: 600; letter-spacing: -0.022em;
+    line-height: 1.1; margin: 16px 0 6px;
+  }
+  .lede {
+    font-size: 17px; line-height: 1.55; color: var(--ink-soft);
+    max-width: 64ch; margin: 0 0 24px;
+  }
+  .meta {
+    display: flex; flex-wrap: wrap; gap: 8px 18px;
+    color: var(--ink-muted); font-size: 13px;
+    padding: 12px 0;
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 56px;
+  }
+  .meta b { color: var(--ink-soft); font-weight: 600; }
+
+  h2.section {
+    font-size: 24px; font-weight: 600; letter-spacing: -0.012em;
+    line-height: 1.2; margin: 56px 0 4px;
+  }
+  h2.section .num {
+    display: block; font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; color: var(--action);
+    letter-spacing: 0.1em; text-transform: uppercase;
+    margin-bottom: 6px; font-weight: 500;
+  }
+  .section-lede {
+    color: var(--ink-soft); margin: 0 0 24px; max-width: 64ch;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    margin: 16px 0;
+    overflow: hidden;
+  }
+  .card-head {
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--line-soft);
+    display: flex; align-items: baseline; justify-content: space-between;
+    gap: 16px;
+  }
+  .card-head h3 {
+    margin: 0; font-size: 14px; font-weight: 600; color: var(--ink);
+  }
+  .card-head .role {
+    font-family: 'JetBrains Mono', monospace; font-size: 12px;
+    color: var(--ink-muted);
+  }
+  .card-body { padding: 18px 20px; }
+
+  table.props { width: 100%; border-collapse: collapse; }
+  table.props td {
+    padding: 8px 0;
+    border-bottom: 1px solid var(--line-soft);
+    font-size: 13px; color: var(--ink-soft); vertical-align: top;
+  }
+  table.props tr:last-child td { border-bottom: 0; }
+  table.props td:first-child {
+    font-family: 'JetBrains Mono', monospace; font-size: 12.5px;
+    color: var(--ink); font-weight: 500;
+    width: 28%; padding-right: 16px; white-space: nowrap;
+  }
+  table.props td code {
+    font-family: 'JetBrains Mono', monospace; font-size: 11.5px;
+    background: var(--paper); padding: 1px 5px; border-radius: 4px; color: var(--ink);
+  }
+
+  pre, code.tok {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px; color: var(--ink);
+  }
+  pre {
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 14px 16px;
+    overflow-x: auto;
+    margin: 8px 0 0;
+    line-height: 1.6;
+  }
+  pre .c { color: var(--ink-muted); }
+  pre .k { color: var(--action); }
+
+  ul.spec { margin: 0; padding-left: 16px; }
+  ul.spec li { margin-bottom: 6px; font-size: 13px; color: var(--ink-soft); }
+  ul.spec li b { color: var(--ink); font-weight: 600; }
+
+  .flag {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--warn);
+    border-radius: 8px;
+    padding: 14px 18px;
+    margin: 12px 0;
+  }
+  .flag .lab {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em;
+    color: var(--warn); font-weight: 600; margin-bottom: 6px;
+  }
+  .flag p { margin: 0; font-size: 13px; color: var(--ink-soft); }
+  .flag p + p { margin-top: 6px; }
+
+  .toc {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 22px 24px;
+    margin: 28px 0 8px;
+  }
+  .toc h4 {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.14em;
+    color: var(--ink-muted); margin: 0 0 12px; font-weight: 600;
+  }
+  .toc ol {
+    margin: 0; padding-left: 20px; columns: 2; column-gap: 28px;
+    font-size: 13px;
+  }
+  .toc li { margin-bottom: 4px; color: var(--ink-soft); }
+  .toc li b { color: var(--ink); font-weight: 500; }
+
+  .file-tree {
+    font-family: 'JetBrains Mono', monospace; font-size: 12px;
+    color: var(--ink-soft); line-height: 1.7;
+    background: var(--paper);
+    padding: 16px 20px;
+    border-radius: 8px;
+    border: 1px solid var(--line);
+  }
+  .file-tree b { color: var(--ink); font-weight: 600; }
+
+  h4.sub-h {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em;
+    color: var(--ink-muted); margin: 18px 0 8px; font-weight: 600;
+  }
+</style>
+</head>
+<body>
+<main class="doc">
+
+  <div class="eyebrow"><span class="dot"></span> Studio Manager · Claude Code Handoff · Step 4 (rev 2)</div>
+  <h1 class="doc-title">Build inventory.</h1>
+  <p class="lede">Everything Claude Code needs to ship the redesign — token names, component contracts, the data-model corrections that surfaced during design, and a build order. No new design decisions; this is a faithful translation of Steps 1–3 into something a build agent can execute.</p>
+
+  <div style="background: var(--paper); border: 1px solid var(--line); border-radius: 12px; padding: 22px 26px; margin: 24px 0 28px;">
+    <div style="font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-muted); font-weight: 600; margin-bottom: 8px;">How to hand this off</div>
+    <p style="margin: 0 0 12px;">In your repo (or a fresh project) open Claude Code and point it at three things, in this order:</p>
+    <ol style="margin: 0; padding-left: 20px;">
+      <li style="margin-bottom: 8px;"><b>This document</b> — <code>Component Inventory.html</code>. Read end-to-end. Sections A &amp; A.5 are non-negotiable; B–F are the implementation contract.</li>
+      <li style="margin-bottom: 8px;"><b>The token file</b> — <code>redesign-tokens.css</code>. Drop into the project as the source of truth for color, type, spacing, radius, motion. All component CSS references token names only.</li>
+      <li style="margin-bottom: 8px;"><b>The screen prototypes</b> — <code>Redesign.html</code> and the JSX in <code>screens/</code>. These are the visual reference. They use inline styles and prop-based composition; treat them as the spec for what each screen looks like, not as production code to copy verbatim.</li>
+    </ol>
+    <p style="margin: 14px 0 0;"><b>Suggested first prompt:</b> <i>"Read Component Inventory.html section A.5 first and tell me which backend dependencies I need to confirm with the team before you start. Then propose a build sequence based on section F's checklist. Don't write code yet."</i></p>
+    <p style="margin: 8px 0 0; color: var(--ink-muted); font-size: 13px;">This forces Claude Code to surface the schema/API gaps <i>before</i> generating frontend code that assumes data that doesn't exist.</p>
+  </div>
+
+  <div class="meta">
+    <span><b>Stack assumed</b> React + CSS modules or Tailwind tokens</span>
+    <span><b>Files</b> 1 token CSS, 11 components, 6 screens</span>
+    <span><b>Data flags</b> 3 + 7 backend deps</span>
+  </div>
+
+  <!-- ============== TOC ============== -->
+  <div class="toc">
+    <h4>Build order</h4>
+    <ol>
+      <li><b>Tokens</b> — port redesign-tokens.css</li>
+      <li><b>Primitives</b> — Button, Badge, Field, Kpi</li>
+      <li><b>Row</b> — single template, slot props</li>
+      <li><b>Drawer</b> — chrome + tabs + action bar</li>
+      <li><b>EmptyState, OverflowMenu, Stat</b></li>
+      <li><b>Shell</b> — rail + content area</li>
+      <li><b>Home screen</b></li>
+      <li><b>Studio screen</b></li>
+      <li><b>Schedule screen</b></li>
+      <li><b>ClassDrawer</b></li>
+      <li><b>MemberDrawer + Clients screen</b></li>
+      <li><b>Today screen</b> — instructor check-in</li>
+      <li><b>ClassTypeDrawer</b> — class types + schedule grid + exceptions</li>
+      <li><b>Mobile responsiveness pass</b></li>
+      <li><b>Replace existing /manage routes</b></li>
+    </ol>
+  </div>
+
+  <!-- ============== DATA FLAGS ============== -->
+  <h2 class="section"><span class="num">A · Data flags</span>Things to fix in the data layer, not the UI</h2>
+  <p class="section-lede">Two things that surfaced during design that are not pure visual concerns — they affect schema or data-derived labels.</p>
+
+  <div class="flag">
+    <div class="lab">DATA-1 · Class label is <i>level</i>, not <i>type</i></div>
+    <p>The category chip on Schedule rows currently shows discipline (Pilates / Yoga). In a manager view that's not operationally useful — operators need to know <b>level</b> (Beginner / Open / All levels) to plan substitutions, capacity, and pricing. Discipline is implicit from the class title.</p>
+    <p><b>Schema:</b> keep the <code>category</code> field on <code>class_template</code>, but the value rendered in <code>&lt;CategoryChip&gt;</code> on Schedule and ClassDrawer should be <code>level</code>. Discipline can stay as a separate field, surfaced only in filters and reporting.</p>
+    <p><b>Mockups using "Pilates/Yoga":</b> Schedule.jsx, ClassDrawer.jsx — replace with "Beginner", "Open", "All levels" before merging.</p>
+  </div>
+
+  <div class="flag">
+    <div class="lab">DATA-3 · Booking-state codes leak to UI as raw strings</div>
+    <p>Today's check-in screen surfaces booking states like <code>payment_failed</code> and <code>cancelled</code> as raw enum codes. <b>Render rule:</b> all booking states pass through a label map and render via <code>&lt;StateBadge&gt;</code> with the proper tone — <code>payment_failed</code> → warn "Payment failed", <code>cancelled</code> → neutral "Cancelled", <code>no_show</code> → bad "No-show", <code>checked_in</code> → good "Checked in". Never render the enum code itself. The map lives next to the StateBadge component so it's the only place these strings exist.</p>
+  </div>
+
+  <div class="flag">
+    <div class="lab">DATA-2 · Plan label vs membership state are not the same axis</div>
+    <p>On the Clients list, the trailing state badge shows <i>plan name</i> ("All Inclusive", "10-Clip · 3 left") with a state tone. That's two axes collapsed into one. <b>Plan</b> is a category (clip card / subscription / drop-in / no plan); <b>plan health</b> is the state (active / low credits / lapsed / inactive).</p>
+    <p><b>Render rule:</b> the trailing badge on a client row is <i>plan health</i>. The plan name belongs on the meta-line under the client's name, alongside last-visit date.</p>
+  </div>
+
+  <!-- ============== BACKEND DEPENDENCIES ============== -->
+  <h2 class="section"><span class="num">A.5 · Backend dependencies</span>Things the design assumes that may not yet exist</h2>
+  <p class="section-lede">The redesign surfaces a few pieces of state the current backend may not track. Each item below is small in isolation — most are a column or a derived counter — but they need to be agreed on before frontend work starts. <b>Stoplight key:</b> 🟢 already in the data model · 🟡 likely derivable / cheap addition · 🔴 needs a new pipeline or integration.</p>
+
+  <div class="card">
+    <div class="card-head"><h3>Member &amp; instructor states</h3><span class="role">enum expansion</span></div>
+    <div class="card-body">
+      <ul class="spec">
+        <li>🟡 <b>Member states rendered:</b> Active · New · Lapsed · No plan. The Clients screen filters by these. <code>active</code> and <code>no_plan</code> are derivable; <code>new</code> = first booking within last 30 days; <code>lapsed</code> = last visit &gt; 60 days.</li>
+        <li>🟡 <b>Member "On leave"</b> — explicitly paused membership, distinct from lapsed. New enum value on <code>member.status</code>: <code>on_leave</code>. Operators set this manually; billing pauses; member doesn't appear in lapsed reporting.</li>
+        <li>🟡 <b>Instructor "On leave"</b> — same idea on <code>instructor.status</code>. Excludes them from substitute-picker dropdown but keeps history visible.</li>
+        <li>🟢 <b>Plan health</b> — derivable from existing fields: <code>active</code> if subscription current, <code>low_credits</code> if clip card ≤ 3 left, <code>expiring</code> if subscription cancels in &lt; 14d, <code>lapsed</code> if expired. No schema change.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h3>Booking lifecycle states</h3><span class="role">attendance + refund tracking</span></div>
+    <div class="card-body">
+      <ul class="spec">
+        <li>🟡 <b>Booking states rendered in Recent activity:</b> Booked · Attended · No-show · Cancelled · Refunded. Need a single <code>booking.status</code> enum capturing all five. <code>attended</code> requires the instructor (or system) to mark check-in.</li>
+        <li>🟡 <b>Class fill rate "Past" mode</b> needs <i>actual attendance</i>, not bookings. If no-show data isn't captured, the Past tab effectively shows booking rate, not fill rate. Worth being explicit about which one operators want.</li>
+        <li>🟡 <b>"First visit" flag</b> on a booking — derivable as a count query but a denormalized boolean on the booking row makes the Class drawer's "Drop-in · first visit" meta-line cheap.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h3>Waitlist with offer state</h3><span class="role">timestamped lifecycle</span></div>
+    <div class="card-body">
+      <ul class="spec">
+        <li>🟡 <b>ClassDrawer waitlist tab</b> shows entries like "Offered 11m ago" and "In line · #2". Requires the waitlist row to track:
+          <ul>
+            <li><code>position</code> (queue order)</li>
+            <li><code>status</code>: <code>waiting</code> · <code>offered</code> · <code>accepted</code> · <code>expired</code> · <code>declined</code></li>
+            <li><code>offered_at</code> (timestamp)</li>
+          </ul>
+        </li>
+        <li>🟡 <b>Unmet demand metric</b> on Home — count of waitlisted members whose offer expired or who never got an offer before the class started. Derivable once the above states exist.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h3>Traffic &amp; conversion attribution</h3><span class="role">analytics integration</span></div>
+    <div class="card-body">
+      <ul class="spec">
+        <li>🔴 <b>Traffic sources by day</b> — the Home Traffic card stacks visits per source (Google · Instagram · Direct · Facebook · TikTok). Requires a web-analytics integration (GA4, Plausible, Fathom) feeding daily counts per source <i>or</i> a UTM-tagged session tracker on the public site. This is the only 🔴 in the deck — it's the largest piece of new infra implied.</li>
+        <li>🔴 <b>Per-source conversion rate</b> — visits-to-bookings attributed by first-touch source. Requires the booking event to carry a source attribution at signup, which means the signup form has to read the visitor's session source.</li>
+        <li>🟡 <b>Booking trend cash-in</b> — already implied by existing booking + payment tables. Just needs an aggregation per period bucket.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h3>Member activity feed &amp; stats</h3><span class="role">denormalized counters welcome</span></div>
+    <div class="card-body">
+      <ul class="spec">
+        <li>🟢 <b>Recent activity</b> on MemberDrawer — derivable from bookings + payments. No schema change; just an ordered query.</li>
+        <li>🟡 <b>Stats grid</b> (visits this month · YTD · total spent · avg per week) — all derivable, but for any member with hundreds of bookings, denormalized counters on the member row make the drawer open in &lt; 50ms instead of running 4 aggregations.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h3>Class capacity &amp; level</h3><span class="role">already covered, just verify</span></div>
+    <div class="card-body">
+      <ul class="spec">
+        <li>🟢 <b>Capacity</b> on each class instance — assumed present. The Schedule row's "8/12" trail and ClassDrawer's "x/y booked" both depend on it.</li>
+        <li>🟡 <b>Level</b> on class template (DATA-1) — see the data flag above.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h3>BACKEND-7 · Class-type schedule cutover</h3><span class="role">prospective-only schedule changes</span></div>
+    <div class="card-body">
+      <ul class="spec">
+        <li>🟡 <b>Cutover date on schedule rules.</b> When an operator edits a class type's recurring schedule, the new schedule applies <i>from a chosen date forward</i>. Existing future <code>class_instances</code> generated under the old schedule survive unchanged. Schema: <code>schedule_rule.effective_from</code> + <code>effective_to</code> (or a <code>schedule_rule_versions</code> table) so the materializer can pick the right rule per date.</li>
+        <li>🟡 <b>Materializer behavior:</b> when generating instances for a date, look up the rule version active on that date. Existing instances are immutable once materialized; only un-materialized future dates pick up the new rule.</li>
+        <li>🟢 <b>Existing bookings</b> stay attached to their original class_instance. No cascade. The cutover affects what <i>gets created</i>, not what already exists.</li>
+        <li><b>Exceptions table</b> (<code>schedule_exceptions</code>) is already wired up per the schema review: <code>cancel</code> and <code>reschedule</code> kinds are read by the materializer. UI ships these two kinds for MVP; <code>sub_instructor</code> and <code>relocate</code> stay schema-only until follow-up.</li>
+        <li>UI surface: cutover-date callout under the schedule grid in ClassTypeDrawer. Default = next occurrence of the earliest day in the new schedule.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ============== TOKENS ============== -->
+  <h2 class="section"><span class="num">B · Tokens</span>Single source of truth</h2>
+  <p class="section-lede">All values live in <code class="tok">redesign-tokens.css</code>. Components reference token names only — no inline hex, no inline px values for spacing or radii. If a value needs to change, it changes once in tokens.</p>
+
+  <div class="card">
+    <div class="card-head"><h3>Token groups</h3><span class="role">redesign-tokens.css</span></div>
+    <div class="card-body">
+      <table class="props">
+        <tr><td>Surface</td><td><code>--bg --surface --surface-2 --paper</code> · warm cream base, no fills</td></tr>
+        <tr><td>Ink</td><td><code>--ink --ink-soft --ink-muted --ink-faint</code> · 4-step ramp</td></tr>
+        <tr><td>Border</td><td><code>--line --line-soft --line-strong</code> · 1px borders define every surface</td></tr>
+        <tr><td>Action</td><td><code>--action --action-hover --action-soft --action-on</code> · single rose, only for primary CTA / focus / active nav</td></tr>
+        <tr><td>Semantic</td><td><code>--good --warn --bad --info</code> + <code>-soft</code> pair for each</td></tr>
+        <tr><td>Type</td><td><code>--t-display --t-h1 --t-h2 --t-body --t-small --t-eyebrow --t-mono</code> · 32 / 24 / 18 / 14 / 13 / 11 / 12.5</td></tr>
+        <tr><td>Spacing</td><td><code>--s1..--s12</code> · 4 / 8 / 12 / 16 / 20 / 24 / 32 / 48</td></tr>
+        <tr><td>Radii</td><td><code>--r-input --r-card --r-large --r-pill</code> · 6 / 8 / 12 / 999</td></tr>
+      </table>
+      <h4 class="sub-h">Hard rules</h4>
+      <ul class="spec">
+        <li>No DM Serif Display anywhere in <code>/manage</code>. Inter only. (Public site keeps it as editorial accent.)</li>
+        <li>All numeric data uses <code>font-variant-numeric: tabular-nums</code>.</li>
+        <li>No drop shadows on cards. Surfaces are bordered, not raised.</li>
+        <li>No gradient backgrounds except the brand logo mark.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ============== PRIMITIVES ============== -->
+  <h2 class="section"><span class="num">C · Primitives</span>Eleven components, contracts</h2>
+  <p class="section-lede">Each card below is a one-component spec: props, variants, where it's used, and what it must <i>not</i> do.</p>
+
+  <!-- 01 Button -->
+  <div class="card">
+    <div class="card-head"><h3>01 · Button</h3><span class="role">&lt;Button variant size /&gt;</span></div>
+    <div class="card-body">
+      <table class="props">
+        <tr><td>variant</td><td><code>"primary" | "secondary" | "ghost" | "danger"</code> — default <code>"secondary"</code></td></tr>
+        <tr><td>size</td><td><code>"md" | "sm"</code> — md = 32px, sm = 26px</td></tr>
+        <tr><td>icon</td><td>Optional leading icon node, 14px</td></tr>
+        <tr><td>loading</td><td>Replaces children with spinner; preserves width</td></tr>
+        <tr><td>asChild</td><td>For wrapping &lt;a&gt; — keeps button styling</td></tr>
+      </table>
+      <h4 class="sub-h">Rules</h4>
+      <ul class="spec">
+        <li><b>Primary</b> on a single surface — never two on one action bar. <b>Danger</b> outlined; filled red is reserved for AlertDialog confirm.</li>
+        <li>Inputs share the 32px height so form rows align cleanly.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 02 Badge -->
+  <div class="card">
+    <div class="card-head"><h3>02 · Badge — three primitives</h3><span class="role">&lt;StateBadge&gt; &lt;CategoryChip&gt; &lt;Count&gt;</span></div>
+    <div class="card-body">
+      <h4 class="sub-h">StateBadge — colored capsule with leading dot</h4>
+      <table class="props">
+        <tr><td>tone</td><td><code>"good" | "warn" | "bad" | "info" | "neutral"</code></td></tr>
+        <tr><td>children</td><td>Title-cased label rendered at runtime, never raw enum</td></tr>
+      </table>
+      <h4 class="sub-h">CategoryChip — soft-fill capsule, color-coded by semantic type</h4>
+      <table class="props">
+        <tr><td>children</td><td>UPPERCASE, monospace. No border — background fill only.</td></tr>
+        <tr><td>variant</td><td><code>"default" | "plan" | "frequency" | "time" | "level"</code> — controls fill color</td></tr>
+      </table>
+      <table class="props">
+        <tr><td><code>plan</code></td><td>Info blue (<code>--info-soft / --info</code>) — Subscription, Clip card, Drop-in, product types</td></tr>
+        <tr><td><code>frequency</code></td><td>Good teal (<code>--good-soft / --good</code>) — Casual, Regular, Devotee</td></tr>
+        <tr><td><code>time</code></td><td>Warn amber (<code>--warn-soft / --warn</code>) — Morning, Midday, Evening</td></tr>
+        <tr><td><code>level</code></td><td>Neutral (<code>--surface-2 / --ink-muted</code>) — Beginner, Open, All levels</td></tr>
+        <tr><td><code>default</code></td><td>Neutral — unclassified labels</td></tr>
+      </table>
+      <h4 class="sub-h">Count — bare tabular numeral, NOT a pill</h4>
+      <table class="props">
+        <tr><td>value</td><td>number or "x / y" string</td></tr>
+        <tr><td>label</td><td>Optional unit string ("credits", "booked")</td></tr>
+        <tr><td>tone</td><td><code>"default" | "warn" | "danger"</code> — applied to the number only, when the number itself is the alert</td></tr>
+      </table>
+      <h4 class="sub-h">Rules</h4>
+      <ul class="spec">
+        <li><b>Pill shape (full border-radius) is reserved for StateBadge.</b> CategoryChip uses <code>--r-input</code> (slightly rounded rectangle). Never wrap a count in either.</li>
+        <li><b>Always pass a variant.</b> The correct variant is determined by what dimension the chip encodes — plan type, engagement frequency, time preference, or class level. Never use <code>default</code> for data that fits a named category.</li>
+        <li><b>On mobile, chips are hidden.</b> Wrap chips in <code>&lt;span className="sm-hide-mobile"&gt;</code> on list rows — the drawer shows the full detail. Similarly, "last visit" meta text is hidden on mobile to keep the row clean.</li>
+        <li>Sits inline next to the row title — never in the trailing edge column where StateBadges live.</li>
+        <li>Marketing tags ("Most Popular", "Best Value") <b>do not exist</b> on /manage.</li>
+        <li>Active/Inactive on products is read-only on the row — toggling lives in the OverflowMenu (Spec 06).</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 03 Row -->
+  <div class="card">
+    <div class="card-head"><h3>03 · Row</h3><span class="role">&lt;Row&gt; with lead / body / trail slots</span></div>
+    <div class="card-body">
+      <table class="props">
+        <tr><td>lead</td><td>Avatar (28×28) | tabular time string | numeric prefix | null</td></tr>
+        <tr><td>title</td><td>Required. 14px / 500. Inline category chip allowed.</td></tr>
+        <tr><td>meta</td><td>Optional second line. 13px / muted. Tabular nums for numeric content.</td></tr>
+        <tr><td>trail</td><td>Right column: count + state badge + overflow menu, in that order. Right-aligned.</td></tr>
+        <tr><td>onSelect</td><td>Called when row body is clicked — opens the relevant drawer</td></tr>
+        <tr><td>onMenuAction</td><td><code>(action: string) =&gt; void</code> — fired by OverflowMenu</td></tr>
+        <tr><td>selected</td><td>boolean — applies <code>--surface-2</code> tint (e.g. when its drawer is open)</td></tr>
+      </table>
+      <h4 class="sub-h">Container — &lt;RowList&gt;</h4>
+      <ul class="spec">
+        <li>Bordered list (1px <code>--line</code>) with internal 1px <code>--line-soft</code> dividers. Never per-row cards.</li>
+        <li>Padding <code>12px 14px</code>. Hover = <code>--surface-2</code>. No translation, shadow, or border thickening.</li>
+        <li>Click on row body opens drawer. Click on trail items does <i>not</i> navigate; they're descriptive.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 04 Drawer -->
+  <div class="card">
+    <div class="card-head"><h3>04 · Drawer</h3><span class="role">&lt;Drawer&gt; · 520px right sheet</span></div>
+    <div class="card-body">
+      <table class="props">
+        <tr><td>open</td><td>boolean</td></tr>
+        <tr><td>onClose</td><td>() =&gt; void</td></tr>
+        <tr><td>title</td><td>Required. 17px / 600.</td></tr>
+        <tr><td>subtitle</td><td>Optional dim sub-line under the title.</td></tr>
+        <tr><td>headerMeta</td><td>Slot for one StateBadge + optional CategoryChip + key Counts</td></tr>
+        <tr><td>headerLead</td><td>Optional avatar (e.g. MemberDrawer). 44×44.</td></tr>
+        <tr><td>tabs</td><td><code>{`{ id, label, count? }[]`}</code></td></tr>
+        <tr><td>activeTab / onTabChange</td><td>Underline-tab state</td></tr>
+        <tr><td>actions</td><td>Slot — render bar via &lt;DrawerActions&gt;</td></tr>
+        <tr><td>nestedDrawer</td><td>Optional second-level drawer (member from class, class from member). One nesting level only.</td></tr>
+      </table>
+      <h4 class="sub-h">DrawerSection — vertical-divider layout</h4>
+      <table class="props">
+        <tr><td>title</td><td>Eyebrow label, 11px uppercase</td></tr>
+        <tr><td>action</td><td>Optional inline edit link, right-aligned in section header</td></tr>
+        <tr><td>children</td><td>Section body</td></tr>
+      </table>
+      <h4 class="sub-h">DrawerActions — sticky bottom bar</h4>
+      <ul class="spec">
+        <li>Tinted strip (<code>--surface-2</code>) at the bottom of the drawer.</li>
+        <li>Layout: <b>destructive far-left</b>, ghost in middle, primary far-right.</li>
+        <li>Only one primary. Never two filled buttons.</li>
+        <li>Confirm dialogs use AlertDialog component — never hand-rolled overlays.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 05 EmptyState -->
+  <div class="card">
+    <div class="card-head"><h3>05 · EmptyState</h3><span class="role">&lt;EmptyState&gt;</span></div>
+    <div class="card-body">
+      <table class="props">
+        <tr><td>icon</td><td>14–18px outlined glyph, ink-faint</td></tr>
+        <tr><td>title</td><td>Single-line sentence. Pattern: "No {`{thing}`} yet" or "No {`{thing}`} in {`{scope}`}"</td></tr>
+        <tr><td>hint</td><td>Optional secondary line, ink-muted</td></tr>
+        <tr><td>action</td><td>Optional &lt;Button&gt; — only when there's a meaningful action to take from this surface</td></tr>
+      </table>
+      <h4 class="sub-h">Rules</h4>
+      <ul class="spec">
+        <li>Lives <i>inside</i> the list/drawer container — same border frame, never a separate centered block.</li>
+        <li>Pick one of <b>hint</b> or <b>action</b>. Not both.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 06 OverflowMenu -->
+  <div class="card">
+    <div class="card-head"><h3>06 · OverflowMenu</h3><span class="role">&lt;OverflowMenu items={`{...}`} /&gt;</span></div>
+    <div class="card-body">
+      <table class="props">
+        <tr><td>items</td><td><code>{`{ id, label, group, danger?, dialog? }[]`}</code></td></tr>
+        <tr><td>onAction</td><td><code>(id: string) =&gt; void</code></td></tr>
+      </table>
+      <h4 class="sub-h">Group ordering</h4>
+      <ul class="spec">
+        <li>Group 1 — edit / duplicate / share</li>
+        <li>Group 2 — activate / deactivate (state mutation)</li>
+        <li>Group 3 — archive / delete (destructive, ink-bad)</li>
+        <li>Items needing confirmation end with "…" — opens AlertDialog.</li>
+      </ul>
+      <h4 class="sub-h">Where it lives</h4>
+      <ul class="spec">
+        <li>Trailing edge of any &lt;Row&gt;. Click on row body still opens drawer; ⋯ button stops propagation.</li>
+        <li><b>This is where Active/Deactivate moves to.</b> The state badge on the row is read-only.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 07 FormField -->
+  <div class="card">
+    <div class="card-head"><h3>07 · FormField</h3><span class="role">&lt;Field label help error&gt;...&lt;/Field&gt;</span></div>
+    <div class="card-body">
+      <table class="props">
+        <tr><td>label</td><td>13px / soft / 500. Always above input. No placeholder-as-label.</td></tr>
+        <tr><td>help</td><td>11.5px / muted, below input</td></tr>
+        <tr><td>error</td><td>11.5px / bad, replaces help when present</td></tr>
+        <tr><td>children</td><td>&lt;input&gt; / &lt;select&gt; / &lt;textarea&gt; — 1px <code>--line</code>, 6px radius, 32px height</td></tr>
+      </table>
+      <h4 class="sub-h">FieldRow — two-up only</h4>
+      <ul class="spec">
+        <li>Use only when both fields are short (number+select, date+time). Never three-up.</li>
+        <li>Form action bars follow DrawerActions rules: ghost cancel + primary save, right-aligned.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 08 Shell + Nav -->
+  <div class="card">
+    <div class="card-head"><h3>08 · Shell &amp; NavRail</h3><span class="role">&lt;Shell active&gt; · &lt;NavRail&gt; · &lt;PageHeader&gt;</span></div>
+    <div class="card-body">
+      <h4 class="sub-h">NavRail</h4>
+      <ul class="spec">
+        <li><b>220px wide</b> on laptop. <code>--surface-2</code> background, 1px right border.</li>
+        <li><b>Fixed to viewport — never scrolls.</b> The rail is <code>position: fixed</code> (or sticky-equivalent) with <code>height: 100vh</code>. The page content scrolls <i>independently</i> of the rail. Studio brand stays at the top, profile + sign-out stay at the bottom, regardless of how long the page is.</li>
+        <li>5 fixed destinations: Home / Today / Schedule / Clients / Studio. Studio name doubles as wordmark — replaces the old "Studio Manager" top bar.</li>
+        <li>Active item: <code>--surface</code> fill on a <code>--surface-2</code> rail with 1px line ring. Action color reserved for the icon accent only.</li>
+        <li>⌘K search anchored bottom of rail. Profile + sign-out anchored to rail bottom — not page header.</li>
+        <li><b>Mobile (&lt;640px):</b> rail collapses entirely behind a burger; full viewport given to the page. Same item list when expanded.</li>
+      </ul>
+      <h4 class="sub-h">Page scroll model</h4>
+      <ul class="spec">
+        <li><b>Page content area scrolls; rail doesn't.</b> The Shell is a 2-column flex: rail left (fixed), content right (scrolls). Page-level <code>overflow: auto</code> lives on the content column, not on body or html.</li>
+        <li><b>PageHeader is <i>not</i> sticky.</b> It scrolls with the content. (If a future screen needs a sticky header, that's an opt-in prop on PageHeader, not the default.)</li>
+        <li>Section eyebrows in long lists (e.g. Schedule day-groups, Studio sections) are <i>not</i> sticky on the page — they scroll naturally. They <i>are</i> sticky inside drawer bodies. See Drawer scroll below.</li>
+      </ul>
+      <h4 class="sub-h">Drawer scroll model</h4>
+      <ul class="spec">
+        <li><b>Single scroll surface.</b> Drawer header (title + tabs + headerMeta) is pinned at top. DrawerActions bar is pinned at bottom. Everything between scrolls as one unit. Lists inside the body do <i>not</i> have independent <code>overflow</code>.</li>
+        <li>Why: nested scroll regions (notes scroll + list scroll inside one drawer) confuse trackpad and keyboard navigation. One scroll surface = one mental model.</li>
+        <li><b>Section eyebrows are sticky inside the drawer body</b> — when scrolling past Notes, the <code>ATTENDING · 17</code> eyebrow + its trailing CTA stick to the top of the scroll area. Implementation: <code>position: sticky; top: 0;</code> on the section header, with a 1px <code>--line-soft</code> bottom border that appears when stuck (use a <code>:has()</code> trick or a sentinel + IntersectionObserver).</li>
+        <li><b>Tab switch resets scroll-to-top.</b> Each tab is independent content; switching to Waitlist and back to Attending lands you at the top, not at your previous scroll position.</li>
+        <li><b>Nested drawers</b> (member opens from inside class drawer) overlay with their own independent scroll. Closing the nested drawer restores the parent's scroll position.</li>
+        <li><b>Mobile (&lt;640px):</b> drawer becomes a bottom sheet. Same scroll model — header pinned top, actions pinned bottom, body scrolls.</li>
+      </ul>
+      <h4 class="sub-h">PageHeader</h4>
+      <ul class="spec">
+        <li>Title 24px / 600. Sub-line 13px / muted. Single tabular count, never repeated below.</li>
+        <li>Trailing CTA = page-level primary action. One primary maximum.</li>
+        <li>Search and global actions belong in the rail, not the page header.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 10 Schedule grid primitives -->
+  <div class="card">
+    <div class="card-head"><h3>10 · Schedule grid primitives</h3><span class="role">&lt;DayPill&gt; &lt;TimeChip&gt; &lt;CheckCircle&gt;</span></div>
+    <div class="card-body">
+      <h4 class="sub-h">DayPill — fixed-width day-of-week label</h4>
+      <table class="props">
+        <tr><td>day</td><td>3-letter abbreviation: Mon · Tue · Wed · Thu · Fri · Sat · Sun</td></tr>
+      </table>
+      <ul class="spec" style="margin-top: 8px;">
+        <li>40×28, capsule shape, action-soft fill, action-tone text. Fixed width so day rows align.</li>
+        <li>Used in the schedule grid inside ClassTypeDrawer. Not a button — it's a label, not a toggle.</li>
+      </ul>
+      <h4 class="sub-h">TimeChip — removable time slot</h4>
+      <table class="props">
+        <tr><td>time</td><td>HH:MM in 24h, tabular-nums</td></tr>
+        <tr><td>onRemove</td><td>Optional × handler. When present, × renders inline at chip's right edge.</td></tr>
+      </table>
+      <ul class="spec" style="margin-top: 8px;">
+        <li>Paper fill, 1px line border, 999px radius. The × is part of the chip, not a separate hover-revealed control — visible always for predictability.</li>
+        <li>Companion control: <b>+ time</b> at the end of each day's row — dashed-border ghost button. Opens a time picker.</li>
+      </ul>
+      <h4 class="sub-h">CheckCircle — instructor check-in control</h4>
+      <table class="props">
+        <tr><td>checked</td><td>boolean</td></tr>
+        <tr><td>disabled</td><td>For cancelled bookings — non-checkable</td></tr>
+        <tr><td>onChange</td><td>Toggle handler</td></tr>
+      </table>
+      <ul class="spec" style="margin-top: 8px;">
+        <li>32px visible target inside a 44px hit area (extend with padding, not size — Today is used during class on a phone or tablet).</li>
+        <li>Unchecked: 1.5px line-strong border, transparent fill. Checked: solid <code>--good</code> fill, white check glyph. Disabled: 50% opacity, no hover.</li>
+        <li>Single-tap toggle. No long-press or modal — instructor flow must be 1-tap-per-attendee.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 09 Kpi -->
+  <div class="card">
+    <div class="card-head"><h3>09 · Kpi</h3><span class="role">&lt;Kpi label value unit? delta? trend? sub /&gt;</span></div>
+    <div class="card-body">
+      <table class="props">
+        <tr><td>label</td><td>11px uppercase eyebrow, ink-muted</td></tr>
+        <tr><td>value</td><td>28px / 600 / tabular-nums. Number or signed string ("+4").</td></tr>
+        <tr><td>unit</td><td>Optional small ink-soft suffix ("kr"), inline with value</td></tr>
+        <tr><td>delta</td><td>Optional percentage string ("+125%", "-40%")</td></tr>
+        <tr><td>trend</td><td><code>"up" | "down"</code> — colors the delta and prepends ▲/▼</td></tr>
+        <tr><td>sub</td><td>Required context line ("Last week: 3,780 kr"). 12px / muted.</td></tr>
+        <tr><td>tone</td><td><code>"default" | "warn" | "bad"</code> — applied to the value when the number itself is the alert</td></tr>
+      </table>
+      <h4 class="sub-h">Rules</h4>
+      <ul class="spec">
+        <li><b>Trend color is on the delta only</b>, never the value. Up = good, down = bad — but only when "up" is actually good for that metric (bookings yes, churn no).</li>
+        <li>Tile is a bordered surface; never a fill-on-fill card. Hover = <code>--surface-2</code>.</li>
+        <li>Default grid is 2×2 on Home, but &lt;Kpi&gt; is reusable in any 2-up or 4-up section.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ============== SCREEN COMPOSITIONS ============== -->
+  <h2 class="section"><span class="num">D · Screen compositions</span>What goes where</h2>
+  <p class="section-lede">For each redesigned screen, the components used and the data shape it expects.</p>
+
+  <div class="card">
+    <div class="card-head"><h3>Home · /manage/home</h3><span class="role">period-toggled analytics dashboard</span></div>
+    <div class="card-body">
+      <ul class="spec">
+        <li><b>Greeting</b> — "Home" + period label sub-line ("Week commencing 27 Apr"). Period toggle (Week / Month / Year) using &lt;Segments&gt; in the trailing slot.</li>
+        <li><b>KPI tiles</b> — 2×2 grid of &lt;Kpi&gt; (new primitive). Each tile: eyebrow label, large tabular value with optional unit, optional delta with up/down trend, sub-line context.</li>
+        <li>Default KPIs: Bookings · Cash in · Active subscription value · Net members. Deltas compare against the previous period.</li>
+        <li><b>Unmet demand</b> — <i>conditional</i>. Hidden entirely when count = 0. Renders as a single-row card with warn StateBadge ("N unmet") + inline sentence only when there is actual signal. Don't render an empty/green state.</li>
+        <li><b>Booking trend</b> — bar chart card. Bars in <code>--action</code>; the last bar (in-progress period) at 70% opacity. Hovering any bar shows a dark tooltip with the bar's label, bookings count, and cash-in (kr). Non-hovered bars dim to 45% so the focused bar reads cleanly.</li>
+        <li><b>Class fill rate</b> — per-class ranked list, <i>worst-first</i>. Section head has a Past / Upcoming &lt;Segments&gt; toggle and shows the average across the set ("62% avg · 89/144 spots"). Each row uses the standard Row template: lead = day · time (tabular), body = class name + instructor, trail = thin fill bar + "booked/cap · %" text. Bar color: red &lt;50%, amber &lt;80%, green ≥80%. Sort lifts problems to the top — this card is operational, not a vanity metric.</li>
+        <li><b>Traffic · last 30 days</b> — single card with two parts. Top row: 5 source chips (Google / Instagram / Direct / Facebook / TikTok), each chip = colored swatch + source name + visitor total + per-source conversion %. Below: 30 stacked bars, one per day, segments colored to match the chips. Section head shows total visitors. The chip row carries the per-source conversion data so the chart stays a clean stacked bar without overlapping conversion lines.</li>
+        <li><b>Source colors</b> (fixed): Google <code>hsl(210 60% 55%)</code>, Instagram <code>hsl(330 65% 60%)</code>, Direct <code>hsl(155 35% 45%)</code>, Facebook <code>hsl(220 50% 45%)</code>, TikTok <code>hsl(2 48% 60%)</code>. These are the only place outside <code>--action</code> where chromatic color is used.</li>
+        <li>Page maxes at <code>1080px</code> centered — denser than wide-table screens; the dashboard reads top-to-bottom.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h3>Studio · /manage/studio</h3><span class="role">products · instructors · locations</span></div>
+    <div class="card-body">
+      <ul class="spec">
+        <li><b>PageHeader</b> — title "Studio", sub "Products, instructors, and locations", trailing "Studio settings" secondary.</li>
+        <li><b>3 sections</b>, each with section-header (eyebrow + section CTA) and a RowList:
+          <ul>
+            <li>Products — Row(lead=glyph, title+CategoryChip, meta=plan terms, trail=price + StateBadge + OverflowMenu)</li>
+            <li>Instructors — Row(lead=initials, title=name, meta=class count, trail=StateBadge + OverflowMenu)</li>
+            <li>Locations — Row(lead=📍, title+CategoryChip="Default", meta=address+capacity, trail=StateBadge + OverflowMenu)</li>
+          </ul>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h3>Schedule · /manage/schedule</h3><span class="role">day-grouped class list</span></div>
+    <div class="card-body">
+      <ul class="spec">
+        <li><b>PageHeader</b> — "Schedule", sub "Next 4 weeks · 32 classes", trailing "Edit sequence" + "Add one-off class" primary.</li>
+        <li><b>Day groups</b> — eyebrow with optional "Today" prefix + count.</li>
+        <li><b>Row</b>(lead=time as tabular mono, title+CategoryChip, meta=instructor · room · duration, trail=Count "x / y" + StateBadge).</li>
+        <li>⚠️ <b>Category chip value = level, not discipline</b> (see DATA-1).</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h3>ClassDrawer</h3><span class="role">opened from Schedule row</span></div>
+    <div class="card-body">
+      <ul class="spec">
+        <li>Drawer header — title=class name, subtitle=date · time · instructor · room, headerMeta=(StateBadge, CategoryChip=level, Count "x / y" booked).</li>
+        <li>Tabs — Attending (count) / Waitlist (count) / Cancelled (count) / Details.</li>
+        <li>DrawerSections — Notes (with edit-link), Attending (RowList of bookings).</li>
+        <li>DrawerActions — danger "Cancel class" left, ghost "Sub instructor" middle, primary "Edit class" right.</li>
+        <li>Click an attending row → opens MemberDrawer as nested level (one allowed).</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h3>MemberDrawer</h3><span class="role">opened from Clients row</span></div>
+    <div class="card-body">
+      <ul class="spec">
+        <li>Drawer header with headerLead (44px avatar). headerMeta=(StateBadge=plan health, CategoryChip="Member", Count=visits this month).</li>
+        <li>Tabs — Overview / Activity (count) / Billing / Notes (count).</li>
+        <li>DrawerSections — Stats grid (4-up Stat), Plan (with Change plan link), Recent activity (RowList preview), Contact (key/value table with Edit link).</li>
+        <li>DrawerActions — danger "Deactivate" left, ghost "Send message" middle, primary "Edit member" right.</li>
+        <li>Click an activity row → nested ClassDrawer (one allowed).</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h3>Clients · /manage/clients</h3><span class="role">filtered member list</span></div>
+    <div class="card-body">
+      <ul class="spec">
+        <li>PageHeader — "Clients", sub "128 members · 14 new this month", trailing primary "Add client".</li>
+        <li>Segments row — All / Active / New / Lapsed / No plan, with counts.</li>
+        <li>Row(lead=initials, title=name, meta=email · last visit, trail=Count visits + StateBadge plan-health).</li>
+        <li>⚠️ <b>Trailing badge = plan health, not plan name</b> (see DATA-2).</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h3>Today · /manage/today</h3><span class="role">instructor check-in (highest-frequency operational screen)</span></div>
+    <div class="card-body">
+      <ul class="spec">
+        <li><b>Single screen, single day, no period toggle.</b> Default = today. PageHeader: title "Today", sub "<i>Weekday · D Month · N classes</i>", trailing ghost "View schedule".</li>
+        <li><b>Class-grouped list.</b> Each class is a Row that expands inline to reveal attendees. Row content: lead=time (24h), title=class name + optional <b>"Next up"</b> badge, meta=duration · instructor · room, trail=Count <code>booked / capacity</code> (when expanded, also "<i>X/Y checked in</i>").</li>
+        <li><b>Auto-expansion rule:</b> the class whose start time is closest to now (and not yet ended) is expanded by default and gets the "Next up" badge. All other classes start collapsed. User-driven expansion overrides this — once user toggles, don't re-snap.</li>
+        <li><b>Past classes</b> render at 60% opacity, collapsed. Their attendee state is preserved (who actually showed). Tap to expand for retroactive corrections.</li>
+        <li><b>Attendee row</b>: lead=initials avatar (28px, neutral), title=name, meta=plan summary (e.g. "All Inclusive · 8 visits" / "10-Clip · 3 left" / "Drop-in · first visit"), trail=status-conditional + CheckCircle.
+          <ul>
+            <li>State <b>ok</b> → CheckCircle is interactive.</li>
+            <li>State <b>payment_failed</b> → warn StateBadge "Payment failed" + inline ghost "Collect" button + CheckCircle remains active (instructor can still check them in; payment is collected after).</li>
+            <li>State <b>cancelled</b> → row at 55% opacity, neutral StateBadge "Cancelled", CheckCircle disabled.</li>
+            <li>State <b>no_show</b> → set after class ends; renders bad StateBadge "No-show" with disabled CheckCircle.</li>
+          </ul>
+        </li>
+        <li><b>Expansion footer</b> — small action row at the bottom of the expanded class: ghost "Add walk-in" + ghost "Class details". "Class details" opens the existing ClassDrawer for substitutes / capacity changes / notes / cancellation. Today is intentionally <i>read-mostly</i> — destructive actions live in ClassDrawer.</li>
+        <li><b>Mobile</b>: same content, single column, 44px hit target on CheckCircle is critical (instructor checking in on a phone at the door).</li>
+        <li>⚠️ <b>Status normalization</b>: backend codes like <code>payment_failed</code> must never reach UI raw — render through StateBadge with proper Title Case label (see DATA-3 below).</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h3>ClassTypeDrawer · opened from Schedule &gt; Edit sequence</h3><span class="role">class types · recurring schedule · exceptions</span></div>
+    <div class="card-body">
+      <ul class="spec">
+        <li><b>Drawer header</b> — title "Edit sequence", subtitle "Class types and recurring schedule". Standard close button. <i>No tabs</i> — single scroll body.</li>
+        <li><b>Sticky section eyebrow</b> at the top of the body: <code>CLASS TYPES · N</code> + sub "Templates that generate the recurring schedule" + trailing primary "+ Add class type". Sticks while the type list scrolls.</li>
+        <li><b>List of class types</b> — same Row template as Studio &gt; Products. lead=hidden (or glyph), title=name, meta=<code>level · duration · capacity · default price</code>, trail=StateBadge (Active/Inactive) + pencil-icon edit affordance. Click row → inline expand to edit form.</li>
+        <li><b>Inline edit form</b> appears below the row, separated by a top border. Form sections in order:
+          <ol>
+            <li><b>Basics</b> — Name (required) · Description (textarea, 2 rows) · Level (select) · Duration · Default capacity · Default price · Default teacher.</li>
+            <li><b>Recurring schedule</b> — the schedule grid (see below).</li>
+            <li><b>Exceptions</b> — per-date overrides (see below).</li>
+            <li>Form actions row at bottom: ghost <b>Cancel</b> + primary <b>Save changes</b>.</li>
+          </ol>
+        </li>
+        <li><b>Schedule grid</b> — paper-fill panel containing one row per active day-of-week:
+          <ul>
+            <li>Each day-row: <code>&lt;DayPill&gt;</code> (fixed-width) on the left · horizontal flow of <code>&lt;TimeChip&gt;</code>s · trailing dashed-ghost <b>+ time</b> · × on the far right to remove the entire day.</li>
+            <li>Below the last day: ghost <b>+ Add day</b> button. Inserts a new day-row with a day-of-week selector.</li>
+            <li>Empty days never render — the grid grows linearly. No 7-column week view.</li>
+            <li><b>Cutover-date callout</b> directly under the grid: info-tone strip stating <code>"Cutover from [Mon · 11 May 2026]. Future instances generated from this date use the new schedule."</code> with inline "Change date" link. Default = next occurrence of the earliest day in the new schedule.</li>
+          </ul>
+        </li>
+        <li><b>Exceptions sub-section</b> — per-date overrides for a specific instance:
+          <ul>
+            <li>Eyebrow: <code>EXCEPTIONS · N</code> + trailing text-link <b>+ Add exception</b>.</li>
+            <li>Helper line: "One-off changes to specific dates: cancel a class, or move it to a different time."</li>
+            <li>Each exception row: date column (110px, tabular-nums) · StateBadge (bad "Cancelled" / info "Rescheduled") · detail text · Edit text-link · × to remove.</li>
+            <li><b>MVP scope:</b> support <code>cancel</code> and <code>reschedule</code> (time change) only. <code>sub_instructor</code> and <code>relocate</code> are in the schema but ship behind a follow-up — they need richer pickers.</li>
+            <li>Add-exception flow (sheet or popover, NOT a nested drawer): pick date from rule's future occurrences → choose kind → if reschedule, pick new time → optional reason → save. Materializer handles the rest.</li>
+          </ul>
+        </li>
+        <li><b>Single scroll surface</b> — entire drawer body is one scroll. Section eyebrow sticks. Form expansion inside a row scrolls naturally; long forms cause the parent body to grow, not a nested scroll region.</li>
+        <li><b>Drawer width</b> — 720px. Wider than 520px because of the schedule grid. Mobile: full bottom sheet.</li>
+        <li>⚠️ <b>Cutover semantics (BACKEND-7)</b> — saving a schedule change is <i>prospective only</i>. Existing future <code>class_instances</code> survive unchanged. The new schedule applies from the cutover date forward. Existing bookings stay attached to their original instance. The materializer must respect the cutover.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ============== FILE LAYOUT ============== -->
+  <h2 class="section"><span class="num">E · File layout</span>Suggested module tree</h2>
+  <p class="section-lede">Mirrors the prototype but split for a real codebase.</p>
+  <div class="file-tree">
+<b>src/manage/</b><br>
+&nbsp;&nbsp;<b>tokens/</b><br>
+&nbsp;&nbsp;&nbsp;&nbsp;tokens.css&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:var(--ink-muted)"># port from redesign-tokens.css</span><br>
+&nbsp;&nbsp;<b>components/</b><br>
+&nbsp;&nbsp;&nbsp;&nbsp;Button.tsx<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Badge.tsx&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:var(--ink-muted)"># exports StateBadge, CategoryChip, Count</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;Row.tsx&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:var(--ink-muted)"># exports Row, RowList</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;Drawer.tsx&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:var(--ink-muted)"># Drawer, DrawerSection, DrawerActions, DrawerTabs</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;EmptyState.tsx<br>
+&nbsp;&nbsp;&nbsp;&nbsp;OverflowMenu.tsx<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Field.tsx&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:var(--ink-muted)"># Field, FieldRow</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;Stat.tsx<br>
+&nbsp;&nbsp;<b>shell/</b><br>
+&nbsp;&nbsp;&nbsp;&nbsp;Shell.tsx<br>
+&nbsp;&nbsp;&nbsp;&nbsp;NavRail.tsx<br>
+&nbsp;&nbsp;&nbsp;&nbsp;PageHeader.tsx<br>
+&nbsp;&nbsp;&nbsp;&nbsp;ScheduleGrid.tsx&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:var(--ink-muted)"># DayPill, TimeChip, day-row template</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;CheckCircle.tsx<br>
+&nbsp;&nbsp;<b>shell/</b><br>
+&nbsp;&nbsp;&nbsp;&nbsp;Shell.tsx<br>
+&nbsp;&nbsp;&nbsp;&nbsp;NavRail.tsx<br>
+&nbsp;&nbsp;&nbsp;&nbsp;PageHeader.tsx<br>
+&nbsp;&nbsp;<b>screens/</b><br>
+&nbsp;&nbsp;&nbsp;&nbsp;HomeScreen.tsx<br>
+&nbsp;&nbsp;&nbsp;&nbsp;TodayScreen.tsx<br>
+&nbsp;&nbsp;&nbsp;&nbsp;StudioScreen.tsx<br>
+&nbsp;&nbsp;&nbsp;&nbsp;ScheduleScreen.tsx<br>
+&nbsp;&nbsp;&nbsp;&nbsp;ClientsScreen.tsx<br>
+&nbsp;&nbsp;<b>drawers/</b><br>
+&nbsp;&nbsp;&nbsp;&nbsp;ClassDrawer.tsx<br>
+&nbsp;&nbsp;&nbsp;&nbsp;MemberDrawer.tsx<br>
+&nbsp;&nbsp;&nbsp;&nbsp;ClassTypeDrawer.tsx&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:var(--ink-muted)"># Edit sequence: types + schedule + exceptions</span>
+  </div>
+
+  <!-- ============== ACCEPTANCE CHECKLIST ============== -->
+  <h2 class="section"><span class="num">F · Acceptance checklist</span>What "done" looks like</h2>
+  <p class="section-lede">Run this before merging.</p>
+
+  <div class="card">
+    <div class="card-body">
+      <ul class="spec">
+        <li>☐ <b>Type</b> — DM Serif Display does not appear in any /manage bundle. Inter is the only loaded face.</li>
+        <li>☐ <b>Surfaces</b> — no element has both a fill and a parent fill. Borders define structure.</li>
+        <li>☐ <b>Pills</b> — pill-shaped capsules appear only as StateBadge. Counts and categories are not pilled.</li>
+        <li>☐ <b>Marketing tags</b> — "Most Popular" / "Best Value" do not render anywhere in /manage.</li>
+        <li>☐ <b>Active toggle</b> — clicking the StateBadge does nothing. Activate/Deactivate lives in OverflowMenu.</li>
+        <li>☐ <b>Action bars</b> — destructive button is leftmost, primary is rightmost, only one primary per bar.</li>
+        <li>☐ <b>Drawer width</b> — 520px on desktop, full bottom sheet on mobile. Never two side-by-side drawers.</li>
+        <li>☐ <b>Tabs</b> — underline tabs throughout. No segmented controls in drawers.</li>
+        <li>☐ <b>Locale</b> — every visible string is English. No mixed-locale data labels.</li>
+        <li>☐ <b>Tabular numerals</b> — all data (counts, prices, dates, times) align with <code>tabular-nums</code>.</li>
+        <li>☐ <b>Schedule chip</b> — value is level, not discipline (DATA-1).</li>
+        <li>☐ <b>Clients trail</b> — badge shows plan health; plan name is on meta-line (DATA-2).</li>
+        <li>☐ <b>Rail is fixed</b> — page content scrolls independently of the rail; brand stays top, profile stays bottom regardless of page length.</li>
+        <li>☐ <b>Drawer scroll</b> — header + action bar pinned, single scroll surface in between, section eyebrows sticky.</li>
+        <li>☐ <b>Mobile</b> — at &lt;640px the rail collapses behind a burger, drawers become bottom sheets.</li>
+        <li>☐ <b>Today auto-expand</b> — the class closest to now (not yet ended) is expanded on first load with a "Next up" badge. User toggle wins after that.</li>
+        <li>☐ <b>CheckCircle hit area</b> — 32px visible, 44px hit area on Today's attendee rows. Single tap toggles. No long-press, no modal.</li>
+        <li>☐ <b>Booking-state codes</b> — no <code>payment_failed</code>-style raw enum strings reach the DOM. All booking states render through StateBadge with mapped labels (DATA-3).</li>
+        <li>☐ <b>Schedule cutover</b> — saving a class-type schedule change does not mutate existing future <code>class_instances</code>. Materializer respects the cutover date (BACKEND-7).</li>
+        <li>☐ <b>Schedule grid linear</b> — empty days never render. No 7-column week-view variant. Add day → ghost row → real row.</li>
+        <li>☐ <b>Exceptions MVP</b> — only <code>cancel</code> and <code>reschedule</code> kinds wired up in the form. <code>sub_instructor</code> and <code>relocate</code> are stubbed out behind a feature flag for follow-up.</li>
+      </ul>
+    </div>
+  </div>
+
+  <p style="margin-top: 64px; padding-top: 20px; border-top: 1px solid var(--line-soft); color: var(--ink-muted); font-size: 13px;">
+    <b style="color: var(--ink-soft);">End of design phase.</b> Hand to Claude Code with this document, the four mockup screens (<code>Redesign.html</code>), and <code>redesign-tokens.css</code>. The component vocabulary doc (<code>Component Vocabulary.html</code>) is the visual reference; this doc is the build contract.
+  </p>
+
+</main>
+</body>
+</html>

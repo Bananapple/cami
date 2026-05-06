@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Studio Manager — Redesign (Step 3)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;450;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="redesign-tokens.css" />
+<style>
+  body { margin: 0; background: #f0eee9; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="screens/Icons.jsx"></script>
+<script type="text/babel" src="screens/Shell.jsx"></script>
+<script type="text/babel" src="screens/Home.jsx"></script>
+<script type="text/babel" src="screens/Today.jsx"></script>
+<script type="text/babel" src="screens/Studio.jsx"></script>
+<script type="text/babel" src="screens/Schedule.jsx"></script>
+<script type="text/babel" src="screens/ClassDrawer.jsx"></script>
+<script type="text/babel" src="screens/MemberDrawer.jsx"></script>
+<script type="text/babel" src="screens/EditSequenceDrawer.jsx"></script>
+
+<script type="text/babel" data-presets="env,react">
+const App = () => (
+  <DesignCanvas>
+    <DCSection
+      id="redesign"
+      title="Studio Manager · Redesign"
+      subtitle="Eight component specs applied to five real surfaces. Inter only · 1px border surfaces · warm cream · single rose action color. Click any artboard's expand button to open it fullscreen."
+    >
+      <DCArtboard id="home" label="Home · Analytics dashboard" width={1280} height={1100}>
+        <HomeScreen />
+      </DCArtboard>
+
+      <DCArtboard id="today" label="Today · Instructor check-in" width={1280} height={1100}>
+        <TodayScreen />
+      </DCArtboard>
+
+      <DCArtboard id="studio" label="Studio · Products & instructors" width={1280} height={900}>
+        <StudioScreen />
+      </DCArtboard>
+
+      <DCArtboard id="schedule" label="Schedule · Day-grouped class list" width={1280} height={900}>
+        <ScheduleScreen />
+      </DCArtboard>
+
+      <DCArtboard id="class-drawer" label="ClassDrawer · Bootylicious — opened from Schedule" width={1280} height={900}>
+        <div style={{ position: "relative", width: "100%", height: "100%" }}>
+          <ScheduleScreen />
+          <ClassDrawer />
+        </div>
+      </DCArtboard>
+
+      <DCArtboard id="edit-sequence" label="Edit Sequence drawer · Class types with schedule grid + exceptions" width={760} height={1020}>
+        <div style={{ display: "flex", justifyContent: "center", padding: 20 }}>
+          <EditSequenceDrawer />
+        </div>
+      </DCArtboard>
+
+      <DCArtboard id="member-drawer" label="MemberDrawer · Frida Kalo — opened from Clients" width={1280} height={900}>
+        <div style={{ position: "relative", width: "100%", height: "100%" }}>
+          <SmShell active="clients">
+            <div className="sm-content">
+              <header className="sm-pagehead">
+                <div>
+                  <h1>Clients</h1>
+                  <p className="sub">128 members · 14 new this month</p>
+                </div>
+                <div className="actions">
+                  <button className="sm-btn primary"><SmIcon name="plus" /> Add client</button>
+                </div>
+              </header>
+              <div className="sm-segments">
+                <button className="sm-segment on">All <span className="ct">128</span></button>
+                <button className="sm-segment">Active <span className="ct">94</span></button>
+                <button className="sm-segment">New <span className="ct">14</span></button>
+                <button className="sm-segment">Lapsed <span className="ct">20</span></button>
+                <button className="sm-segment">No plan <span className="ct">—</span></button>
+              </div>
+              <div className="sm-list">
+                {[
+                  { i: "FK", n: "Frida Kalo",      e: "frida@proton.me · last visit today",     v: 8,  s: "good", l: "All Inclusive", on: true },
+                  { i: "ES", n: "Elena Sanchez",   e: "elena.s@gmail.com · last visit 2d ago",  v: 6,  s: "good", l: "10-Clip" },
+                  { i: "MB", n: "Marco Bellini",   e: "marco@bellini.io · first visit",         v: 1,  s: "neutral", l: "Drop-in" },
+                  { i: "LB", n: "Lina Berg",       e: "lina.berg@me.com · last visit 1d ago",   v: 22, s: "good", l: "All Inclusive" },
+                  { i: "YT", n: "Yuki Tanaka",     e: "yuki.t@hey.com · last visit 5d ago",     v: 4,  s: "warn", l: "10-Clip · 3 left" },
+                  { i: "OK", n: "Olav Kristensen", e: "olav.k@nrk.no · last visit 12d ago",     v: 1,  s: "neutral", l: "No plan" },
+                  { i: "AS", n: "Anja Storm",      e: "anja@storm.dk · last visit 3w ago",      v: 0,  s: "bad",  l: "Inactive" },
+                ].map(c => (
+                  <button key={c.i} className={"sm-row " + (c.on ? "on" : "")} type="button">
+                    <span className="lead">{c.i}</span>
+                    <div className="body">
+                      <div className="title">{c.n}</div>
+                      <div className="meta-line">{c.e}</div>
+                    </div>
+                    <div className="trail">
+                      <span className="sm-count"><span className="n">{c.v}</span> visits</span>
+                      <span className={"sm-state " + c.s}>{c.l}</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </SmShell>
+          <MemberDrawer />
+        </div>
+      </DCArtboard>
+    </DCSection>
+  </DesignCanvas>
+);
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

@@ -83,7 +83,7 @@ export function ClassDrawerV2({
       headerMeta={
         <>
           <StateBadge tone={stateTone}>{stateLabel}</StateBadge>
-          <CategoryChip>{cls.level ?? "All levels"}</CategoryChip>
+          <CategoryChip variant="level">{cls.level ?? "All levels"}</CategoryChip>
           <Count value={`${cls.booked_count} / ${cls.max_capacity}`} label="booked" />
         </>
       }

@@ -13,8 +13,8 @@ import {
   useClientsView,
   frequencyTier,
   PLAN_LABELS,
-  TIME_LABELS,
   FREQUENCY_LABELS,
+  TIME_LABELS,
 } from "@/manage/hooks/useClientsView";
 import { toast } from "sonner";
 import { useStudioContext } from "@/context/StudioContext";
@@ -27,7 +27,7 @@ import { SendMessageModal } from "../components/SendMessageModal";
 import { SectionEyebrow } from "../components/SectionEyebrow";
 import { supabase } from "@/integrations/supabase/client";
 
-type Tab = "overview" | "activity" | "billing" | "notes";
+type Tab = "overview" | "activity" | "billing" | "notes" | "insights";
 
 export function MemberDrawerV2({
   userId,
@@ -70,7 +70,7 @@ export function MemberDrawerV2({
 
   const ytdStats = useMemo(() => computeYtdStats(bookings), [bookings]);
   const recentActivity = useMemo(
-    () => bookings.filter((b) => b.status === "confirmed").slice(0, 4),
+    () => bookings.filter((b) => b.status === "confirmed").slice(0, 5),
     [bookings]
   );
 
@@ -112,8 +112,6 @@ export function MemberDrawerV2({
         member ? (
           <>
             <StateBadge tone={planHealth.tone}>{planHealth.label}</StateBadge>
-            {member.membership && <CategoryChip>{member.membership.plan_name}</CategoryChip>}
-            <Count value={ytdStats.attended} label="this year" />
           </>
         ) : undefined
       }
@@ -122,6 +120,7 @@ export function MemberDrawerV2({
         { id: "activity", label: "Activity", count: bookings.length },
         { id: "billing", label: "Billing" },
         { id: "notes", label: "Notes", count: notifications.length },
+        { id: "insights", label: "Insights" },
       ]}
       activeTab={tab}
       onTabChange={(id) => setTab(id as Tab)}
@@ -146,33 +145,61 @@ export function MemberDrawerV2({
 
       {member && tab === "overview" && (
         <>
-          <DrawerSection title="Stats · This year">
+          <DrawerSection>
             <StatGrid>
               <Stat label="Booked" value={ytdStats.booked} />
               <Stat label="Attended" value={ytdStats.attended} />
               <Stat label="No-shows" value={ytdStats.noShows} tone={ytdStats.noShows > 0 ? "warn" : "default"} />
               <Stat label="Spend" value={`${currency} ${fmt(ytdStats.spend)}`} />
             </StatGrid>
+            <div style={{ marginTop: 8, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <span style={{ fontSize: 11.5, color: "var(--ink-faint)" }}>this year</span>
+              {summary && (
+                <div style={{ display: "flex", gap: 4 }}>
+                  {summary.plan_type && (
+                    <CategoryChip variant="plan">
+                      {PLAN_LABELS[summary.plan_type] ?? summary.plan_type}
+                    </CategoryChip>
+                  )}
+                  {(() => {
+                    const tier = frequencyTier(summary, segmentConfig);
+                    return tier !== "none" ? (
+                      <CategoryChip variant="frequency">{FREQUENCY_LABELS[tier]}</CategoryChip>
+                    ) : null;
+                  })()}
+                  {summary.top_time_bucket && (
+                    <CategoryChip variant="time">
+                      {TIME_LABELS[summary.top_time_bucket] ?? summary.top_time_bucket}
+                    </CategoryChip>
+                  )}
+                </div>
+              )}
+            </div>
           </DrawerSection>
 
-          {summary && <ProfileSection summary={summary} config={segmentConfig} />}
-
-          <DrawerSection title="Member insights">
-            <MemberInsights bookings={bookings} />
-          </DrawerSection>
-
-          <DrawerSection title="Recent activity" flush>
-            {recentActivity.length === 0 ? (
-              <EmptyState title="No bookings yet" hint="Once they book a class, it'll show up here." />
-            ) : (
-              <ActivityList bookings={recentActivity} tz={studioTz} />
+          <DrawerSection title="Member">
+            {summary && (summary.credits_expiring_soon || summary.sub_renewing_soon) && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 12 }}>
+                {summary.credits_expiring_soon && (
+                  <RiskAlert
+                    label="Credits expiring soon"
+                    detail={
+                      summary.credits_remaining != null && summary.valid_until
+                        ? `${summary.credits_remaining} credit${summary.credits_remaining === 1 ? "" : "s"} expire on ${formatShortDate(summary.valid_until)}`
+                        : "Clip card expires soon"
+                    }
+                  />
+                )}
+                {summary.sub_renewing_soon && (
+                  <RiskAlert
+                    label="Subscription renewing soon"
+                    detail={summary.valid_until ? `Renews on ${formatShortDate(summary.valid_until)}` : "Renews within 30 days"}
+                  />
+                )}
+              </div>
             )}
-          </DrawerSection>
-
-          <DrawerSection title="Member information">
             <KV label="Email" value={member.email ?? "—"} />
             <KV label="Phone" value={member.phone_number ?? "—"} />
-            <KV label="Level" value={member.level ?? "—"} />
             <KV label="Plan" value={member.membership?.plan_name ?? "No plan"} />
             <KV
               label="Joined"
@@ -182,6 +209,12 @@ export function MemberDrawerV2({
                   : "—"
               }
             />
+            {summary?.source && (
+              <KV
+                label="Source"
+                value={summary.source.replace(/[_-]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}
+              />
+            )}
             <KV
               label="Referral"
               value={
@@ -190,6 +223,27 @@ export function MemberDrawerV2({
                   : "—"
               }
             />
+            {summary && (
+              <>
+                <KV
+                  label="Frequency"
+                  value={frequencyTier(summary, segmentConfig) === "none" ? "Inactive" : FREQUENCY_LABELS[frequencyTier(summary, segmentConfig)]}
+                  hint={`${summary.bookings_last_30d} booking${summary.bookings_last_30d === 1 ? "" : "s"} · last 30 days`}
+                />
+                <KV
+                  label="Time affinity"
+                  value={summary.top_time_bucket ? TIME_LABELS[summary.top_time_bucket] ?? summary.top_time_bucket : "—"}
+                />
+              </>
+            )}
+          </DrawerSection>
+
+          <DrawerSection title="Recent bookings" flush>
+            {recentActivity.length === 0 ? (
+              <EmptyState title="No bookings yet" hint="Once they book a class, it'll show up here." />
+            ) : (
+              <ActivityList bookings={recentActivity} tz={studioTz} />
+            )}
           </DrawerSection>
         </>
       )}
@@ -219,6 +273,16 @@ export function MemberDrawerV2({
               )}
             </p>
           )}
+        </DrawerSection>
+      )}
+
+      {/* ROADMAP: Once studios are live with real booking volume, evolve this into
+          an "Insights & Actions" tab. When there is a recommended action (lapsing
+          member, expiring credits, no booking in N days), this tab should default
+          first and carry a signal badge upstream to the members list row. */}
+      {member && tab === "insights" && (
+        <DrawerSection>
+          <MemberInsights bookings={bookings} />
         </DrawerSection>
       )}
 
@@ -350,57 +414,7 @@ function BookingSparkline({ weeks }: { weeks: number[] }) {
   );
 }
 
-// ── Profile section (post-0024 audience model) ─────────────────────
-// Renders the derived dimensions from member_activity_summary: plan tier,
-// frequency tier, source, time affinity, top class. Surfaces inline alerts
-// for credits-expiring-soon and subscription-renewing-soon.
 
-function ProfileSection({
-  summary,
-  config,
-}: {
-  summary: import("@/manage/hooks/useClientsView").MemberSummary;
-  config: import("@/types/database").SegmentConfig;
-}) {
-  const tier = frequencyTier(summary, config);
-  const planLabel = summary.plan_type ? PLAN_LABELS[summary.plan_type] ?? summary.plan_type : "No plan";
-  const tierLabel = tier === "none" ? "Inactive" : FREQUENCY_LABELS[tier];
-  const sourceLabel = summary.source
-    ? summary.source.replace(/[_-]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
-    : "—";
-  const timeLabel = summary.top_time_bucket ? TIME_LABELS[summary.top_time_bucket] ?? summary.top_time_bucket : "—";
-  const topClass = summary.top_template_name ?? "—";
-
-  return (
-    <DrawerSection title="Profile">
-      {(summary.credits_expiring_soon || summary.sub_renewing_soon) && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 12 }}>
-          {summary.credits_expiring_soon && (
-            <RiskAlert
-              label="Credits expiring soon"
-              detail={
-                summary.credits_remaining != null && summary.valid_until
-                  ? `${summary.credits_remaining} credit${summary.credits_remaining === 1 ? "" : "s"} expire on ${formatShortDate(summary.valid_until)}`
-                  : "Clip card expires soon"
-              }
-            />
-          )}
-          {summary.sub_renewing_soon && (
-            <RiskAlert
-              label="Subscription renewing soon"
-              detail={summary.valid_until ? `Renews on ${formatShortDate(summary.valid_until)}` : "Renews within 30 days"}
-            />
-          )}
-        </div>
-      )}
-      <KV label="Plan" value={planLabel} />
-      <KV label="Frequency" value={tierLabel} hint={`${summary.bookings_last_30d} booking${summary.bookings_last_30d === 1 ? "" : "s"} · last 30 days`} />
-      <KV label="Source" value={sourceLabel} />
-      <KV label="Time affinity" value={timeLabel} />
-      <KV label="Top class" value={topClass} />
-    </DrawerSection>
-  );
-}
 
 function RiskAlert({ label, detail }: { label: string; detail: string }) {
   return (
@@ -463,7 +477,7 @@ function ActivityList({ bookings, tz }: { bookings: MemberBooking[]; tz: string 
                 <span style={isCancelled ? { color: "var(--ink-muted)", textDecoration: "line-through" } : undefined}>
                   {b.class_name}
                 </span>
-                {b.class_level && <CategoryChip>{b.class_level}</CategoryChip>}
+                {b.class_level && <CategoryChip variant="level">{b.class_level}</CategoryChip>}
               </>
             }
             meta={`${dateStr} · ${timeStr}`}
