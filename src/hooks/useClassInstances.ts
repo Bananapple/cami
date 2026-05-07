@@ -52,6 +52,7 @@ export function useClassInstances() {
           instructors ( display_name, initials ),
           locations ( name, timezone )
         `)
+        .eq("studio_id", studioId)
         .eq("status", "scheduled")
         .gte("starts_at", fromISO)
         .lt("starts_at", toISO)

@@ -5,6 +5,8 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const APP_URL = Deno.env.get("APP_URL") ?? "https://brie-alpha.vercel.app";
+const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
+const FROM_EMAIL = Deno.env.get("FROM_EMAIL") ?? "onboarding@resend.dev";
 
 // Allowed origins for return_url to prevent open redirect attacks.
 const ALLOWED_ORIGINS = [APP_URL].map((u) => new URL(u).origin);
@@ -144,6 +146,8 @@ Deno.serve(async (req) => {
             : creditErr.message ?? "Booking failed";
           return json({ error: message }, 409);
         }
+        // Send confirmation email (best-effort — don't fail the booking if email fails)
+        await sendCreditBookingEmail(adminClient, bookingId as string, user, studioId).catch(console.error);
         return json({ booking_id: bookingId, free: true });
       }
     } else {
@@ -441,4 +445,164 @@ function json(body: unknown, status = 200) {
       "Access-Control-Allow-Origin": "*",
     },
   });
+}
+
+async function sendCreditBookingEmail(
+  admin: ReturnType<typeof createClient>,
+  bookingId: string,
+  user: { id: string; email?: string },
+  studioId: string,
+) {
+  if (!RESEND_API_KEY || !user.email) return;
+
+  const idempotencyKey = `booking_confirmation_${bookingId}`;
+
+  const [{ data: booking }, { data: studio }] = await Promise.all([
+    admin.from("bookings").select(`
+      id,
+      class_instances (
+        starts_at,
+        class_templates ( name, default_duration_minutes ),
+        instructors ( display_name ),
+        locations ( name )
+      )
+    `).eq("id", bookingId).single(),
+    admin.from("studios").select("name").eq("id", studioId).single(),
+  ]);
+  if (!booking) return;
+
+  const { error: logErr } = await admin.from("notification_log").insert({
+    studio_id: studioId,
+    user_id: user.id,
+    booking_id: bookingId,
+    channel: "email",
+    template: "booking_confirmation",
+    recipient: user.email,
+    idempotency_key: idempotencyKey,
+  });
+  if (logErr?.code === "23505") return; // already sent
+  if (logErr) { console.error("notification_log insert error:", logErr); return; }
+
+  const ci = (booking as any).class_instances;
+  const startsAt = new Date(ci.starts_at);
+  const duration = ci.class_templates?.default_duration_minutes ?? 60;
+  const className = ci.class_templates?.name ?? "Your class";
+  const instructor = ci.instructors?.display_name ?? "";
+  const location = ci.locations?.name ?? "";
+  const studioName = (studio as any)?.name ?? "Yoga Studio";
+
+  const dateStr = startsAt.toLocaleDateString("nb-NO", {
+    weekday: "long", year: "numeric", month: "long", day: "numeric",
+    timeZone: "Europe/Oslo",
+  });
+  const timeStr = startsAt.toLocaleTimeString("nb-NO", {
+    hour: "2-digit", minute: "2-digit", timeZone: "Europe/Oslo",
+  });
+
+  const endsAt = new Date(startsAt.getTime() + duration * 60_000);
+  const fmtIso = (d: Date | string) => new Date(d).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+  const calParams = new URLSearchParams({
+    action: "TEMPLATE",
+    text: className,
+    dates: `${fmtIso(startsAt)}/${fmtIso(endsAt)}`,
+    ...(location ? { location } : {}),
+  });
+  const calendarUrl = `https://calendar.google.com/calendar/render?${calParams}`;
+
+  const html = buildConfirmationEmail({ studioName, className, dateStr, timeStr, instructor, location, duration, calendarUrl });
+
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${RESEND_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: FROM_EMAIL,
+      to: [user.email],
+      subject: `Booking confirmed — ${className}`,
+      html,
+    }),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    console.error("Resend error (credit booking):", errText);
+    await admin.from("notification_log").update({ error: errText }).eq("idempotency_key", idempotencyKey);
+  }
+}
+
+function buildConfirmationEmail(p: {
+  studioName: string; className: string; dateStr: string; timeStr: string;
+  instructor: string; location: string; duration: number; calendarUrl: string;
+}): string {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Booking confirmed</title>
+</head>
+<body style="margin:0;padding:0;background:#f5f0eb;font-family:'Georgia',serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f0eb;padding:40px 0;">
+    <tr>
+      <td align="center">
+        <table width="560" cellpadding="0" cellspacing="0" style="background:#1a1a1a;border-radius:8px;overflow:hidden;max-width:100%;">
+          <tr>
+            <td style="padding:40px 48px 32px;border-bottom:1px solid #2e2e2e;">
+              <p style="margin:0;font-size:13px;letter-spacing:0.15em;text-transform:uppercase;color:#8a7e6e;">${p.studioName}</p>
+              <h1 style="margin:12px 0 0;font-size:28px;font-weight:400;color:#f5f0eb;line-height:1.2;">Your booking is confirmed</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:32px 48px;">
+              <h2 style="margin:0 0 24px;font-size:20px;font-weight:400;color:#f5f0eb;">${p.className}</h2>
+              <table cellpadding="0" cellspacing="0" width="100%">
+                <tr>
+                  <td style="padding:10px 0;border-bottom:1px solid #2e2e2e;">
+                    <span style="font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:#8a7e6e;font-family:sans-serif;">Date</span>
+                    <p style="margin:4px 0 0;font-size:15px;color:#f5f0eb;">${p.dateStr}</p>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:10px 0;border-bottom:1px solid #2e2e2e;">
+                    <span style="font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:#8a7e6e;font-family:sans-serif;">Time</span>
+                    <p style="margin:4px 0 0;font-size:15px;color:#f5f0eb;">${p.timeStr} · ${p.duration} min</p>
+                  </td>
+                </tr>
+                ${p.instructor ? `<tr>
+                  <td style="padding:10px 0;border-bottom:1px solid #2e2e2e;">
+                    <span style="font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:#8a7e6e;font-family:sans-serif;">Instructor</span>
+                    <p style="margin:4px 0 0;font-size:15px;color:#f5f0eb;">${p.instructor}</p>
+                  </td>
+                </tr>` : ""}
+                ${p.location ? `<tr>
+                  <td style="padding:10px 0;">
+                    <span style="font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:#8a7e6e;font-family:sans-serif;">Location</span>
+                    <p style="margin:4px 0 0;font-size:15px;color:#f5f0eb;">${p.location}</p>
+                  </td>
+                </tr>` : ""}
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:28px 48px 0;text-align:center;">
+              <a href="${p.calendarUrl}" style="display:inline-block;background:#8a7e6e;color:#f5f0eb;text-decoration:none;font-family:sans-serif;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;padding:12px 28px;border-radius:6px;">
+                Add to Google Calendar
+              </a>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:24px 48px 40px;border-top:1px solid #2e2e2e;margin-top:28px;">
+              <p style="margin:0;font-size:13px;color:#8a7e6e;line-height:1.6;font-family:sans-serif;">
+                Need to cancel? You can cancel your booking from your dashboard. Full refunds are available up to 24 hours before class.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
 }
