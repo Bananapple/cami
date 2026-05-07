@@ -349,12 +349,17 @@ Deno.serve(async (req) => {
           // Conflict — check if it's a stale pending booking (abandoned checkout) or a real confirmed one
           const { data: existing } = await adminClient
             .from("bookings")
-            .select("id, status")
+            .select("id, status, payment_id")
             .eq("user_id", user.id)
             .eq("class_instance_id", resolvedClassInstance.id)
             .single();
           if (existing?.status === "pending") {
-            // Reuse the stale booking with the new payment — do NOT mark payment as failed
+            // Expire the old payment before reusing the booking slot. Without this,
+            // the old Stripe session stays valid and can be completed by the browser,
+            // charging the user a second time with no booking row to match.
+            if (existing.payment_id) {
+              await adminClient.from("payments").update({ status: "failed" }).eq("id", existing.payment_id);
+            }
             const { data: replaced, error: replaceErr } = await adminClient
               .from("bookings")
               .update({ payment_id: payment.id, booked_at: new Date().toISOString() })
@@ -532,6 +537,10 @@ async function sendCreditBookingEmail(
   }
 }
 
+function esc(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
 function buildConfirmationEmail(p: {
   studioName: string; className: string; dateStr: string; timeStr: string;
   instructor: string; location: string; duration: number; calendarUrl: string;
@@ -550,36 +559,36 @@ function buildConfirmationEmail(p: {
         <table width="560" cellpadding="0" cellspacing="0" style="background:#1a1a1a;border-radius:8px;overflow:hidden;max-width:100%;">
           <tr>
             <td style="padding:40px 48px 32px;border-bottom:1px solid #2e2e2e;">
-              <p style="margin:0;font-size:13px;letter-spacing:0.15em;text-transform:uppercase;color:#8a7e6e;">${p.studioName}</p>
+              <p style="margin:0;font-size:13px;letter-spacing:0.15em;text-transform:uppercase;color:#8a7e6e;">${esc(p.studioName)}</p>
               <h1 style="margin:12px 0 0;font-size:28px;font-weight:400;color:#f5f0eb;line-height:1.2;">Your booking is confirmed</h1>
             </td>
           </tr>
           <tr>
             <td style="padding:32px 48px;">
-              <h2 style="margin:0 0 24px;font-size:20px;font-weight:400;color:#f5f0eb;">${p.className}</h2>
+              <h2 style="margin:0 0 24px;font-size:20px;font-weight:400;color:#f5f0eb;">${esc(p.className)}</h2>
               <table cellpadding="0" cellspacing="0" width="100%">
                 <tr>
                   <td style="padding:10px 0;border-bottom:1px solid #2e2e2e;">
                     <span style="font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:#8a7e6e;font-family:sans-serif;">Date</span>
-                    <p style="margin:4px 0 0;font-size:15px;color:#f5f0eb;">${p.dateStr}</p>
+                    <p style="margin:4px 0 0;font-size:15px;color:#f5f0eb;">${esc(p.dateStr)}</p>
                   </td>
                 </tr>
                 <tr>
                   <td style="padding:10px 0;border-bottom:1px solid #2e2e2e;">
                     <span style="font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:#8a7e6e;font-family:sans-serif;">Time</span>
-                    <p style="margin:4px 0 0;font-size:15px;color:#f5f0eb;">${p.timeStr} · ${p.duration} min</p>
+                    <p style="margin:4px 0 0;font-size:15px;color:#f5f0eb;">${esc(p.timeStr)} · ${p.duration} min</p>
                   </td>
                 </tr>
                 ${p.instructor ? `<tr>
                   <td style="padding:10px 0;border-bottom:1px solid #2e2e2e;">
                     <span style="font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:#8a7e6e;font-family:sans-serif;">Instructor</span>
-                    <p style="margin:4px 0 0;font-size:15px;color:#f5f0eb;">${p.instructor}</p>
+                    <p style="margin:4px 0 0;font-size:15px;color:#f5f0eb;">${esc(p.instructor)}</p>
                   </td>
                 </tr>` : ""}
                 ${p.location ? `<tr>
                   <td style="padding:10px 0;">
                     <span style="font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:#8a7e6e;font-family:sans-serif;">Location</span>
-                    <p style="margin:4px 0 0;font-size:15px;color:#f5f0eb;">${p.location}</p>
+                    <p style="margin:4px 0 0;font-size:15px;color:#f5f0eb;">${esc(p.location)}</p>
                   </td>
                 </tr>` : ""}
               </table>
@@ -587,7 +596,7 @@ function buildConfirmationEmail(p: {
           </tr>
           <tr>
             <td style="padding:28px 48px 0;text-align:center;">
-              <a href="${p.calendarUrl}" style="display:inline-block;background:#8a7e6e;color:#f5f0eb;text-decoration:none;font-family:sans-serif;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;padding:12px 28px;border-radius:6px;">
+              <a href="${esc(p.calendarUrl)}" style="display:inline-block;background:#8a7e6e;color:#f5f0eb;text-decoration:none;font-family:sans-serif;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;padding:12px 28px;border-radius:6px;">
                 Add to Google Calendar
               </a>
             </td>

@@ -480,6 +480,10 @@ function buildMembershipEmail(p: {
 </html>`;
 }
 
+function esc(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
 function buildConfirmationEmail(p: {
   studioName: string;
   className: string;
@@ -506,7 +510,7 @@ function buildConfirmationEmail(p: {
           <!-- Header -->
           <tr>
             <td style="padding:40px 48px 32px;border-bottom:1px solid #2e2e2e;">
-              <p style="margin:0;font-size:13px;letter-spacing:0.15em;text-transform:uppercase;color:#8a7e6e;">${p.studioName}</p>
+              <p style="margin:0;font-size:13px;letter-spacing:0.15em;text-transform:uppercase;color:#8a7e6e;">${esc(p.studioName)}</p>
               <h1 style="margin:12px 0 0;font-size:28px;font-weight:400;color:#f5f0eb;line-height:1.2;">
                 Your booking is confirmed
               </h1>
@@ -516,33 +520,33 @@ function buildConfirmationEmail(p: {
           <!-- Class details -->
           <tr>
             <td style="padding:32px 48px;">
-              <h2 style="margin:0 0 24px;font-size:20px;font-weight:400;color:#f5f0eb;">${p.className}</h2>
+              <h2 style="margin:0 0 24px;font-size:20px;font-weight:400;color:#f5f0eb;">${esc(p.className)}</h2>
 
               <table cellpadding="0" cellspacing="0" width="100%">
                 <tr>
                   <td style="padding:10px 0;border-bottom:1px solid #2e2e2e;">
                     <span style="font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:#8a7e6e;font-family:sans-serif;">Date</span>
-                    <p style="margin:4px 0 0;font-size:15px;color:#f5f0eb;">${p.dateStr}</p>
+                    <p style="margin:4px 0 0;font-size:15px;color:#f5f0eb;">${esc(p.dateStr)}</p>
                   </td>
                 </tr>
                 <tr>
                   <td style="padding:10px 0;border-bottom:1px solid #2e2e2e;">
                     <span style="font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:#8a7e6e;font-family:sans-serif;">Time</span>
-                    <p style="margin:4px 0 0;font-size:15px;color:#f5f0eb;">${p.timeStr} · ${p.duration} min</p>
+                    <p style="margin:4px 0 0;font-size:15px;color:#f5f0eb;">${esc(p.timeStr)} · ${p.duration} min</p>
                   </td>
                 </tr>
                 ${p.instructor ? `
                 <tr>
                   <td style="padding:10px 0;border-bottom:1px solid #2e2e2e;">
                     <span style="font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:#8a7e6e;font-family:sans-serif;">Instructor</span>
-                    <p style="margin:4px 0 0;font-size:15px;color:#f5f0eb;">${p.instructor}</p>
+                    <p style="margin:4px 0 0;font-size:15px;color:#f5f0eb;">${esc(p.instructor)}</p>
                   </td>
                 </tr>` : ""}
                 ${p.location ? `
                 <tr>
                   <td style="padding:10px 0;">
                     <span style="font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:#8a7e6e;font-family:sans-serif;">Location</span>
-                    <p style="margin:4px 0 0;font-size:15px;color:#f5f0eb;">${p.location}</p>
+                    <p style="margin:4px 0 0;font-size:15px;color:#f5f0eb;">${esc(p.location)}</p>
                   </td>
                 </tr>` : ""}
               </table>
@@ -552,7 +556,7 @@ function buildConfirmationEmail(p: {
           <!-- Add to calendar -->
           <tr>
             <td style="padding:28px 48px 0;text-align:center;">
-              <a href="${p.calendarUrl}" style="display:inline-block;background:#8a7e6e;color:#f5f0eb;text-decoration:none;font-family:sans-serif;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;padding:12px 28px;border-radius:6px;">
+              <a href="${esc(p.calendarUrl)}" style="display:inline-block;background:#8a7e6e;color:#f5f0eb;text-decoration:none;font-family:sans-serif;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;padding:12px 28px;border-radius:6px;">
                 Add to Google Calendar
               </a>
             </td>

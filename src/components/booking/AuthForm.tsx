@@ -37,14 +37,18 @@ const AuthForm = ({ onSuccess }: AuthFormProps) => {
   const codeRef = useRef<HTMLInputElement>(null);
   const { sendOtp, verifyOtp, isAuthenticated, signInWithProvider } = useAuth();
 
+  // Stable ref so the effect below doesn't re-run when the parent re-renders
+  const onSuccessRef = useRef(onSuccess);
+  useEffect(() => { onSuccessRef.current = onSuccess; });
+
   // Fires when OAuth popup completes and session lands in localStorage
   const didCallSuccess = useRef(false);
   useEffect(() => {
     if (isAuthenticated && !didCallSuccess.current) {
       didCallSuccess.current = true;
-      onSuccess();
+      onSuccessRef.current();
     }
-  }, [isAuthenticated, onSuccess]);
+  }, [isAuthenticated]);
 
   useEffect(() => {
     if (cooldown <= 0) return;
