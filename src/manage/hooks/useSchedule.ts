@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useStudioContext } from "@/context/StudioContext";
+import { todayInTimezone } from "@/lib/timezone";
 
 export type ScheduleClass = {
   id: string;
@@ -40,8 +41,8 @@ export function useSchedule(weeksAhead = 4) {
   const studioId = studioCtx?.studio?.id;
   const qc = useQueryClient();
 
-  const start = new Date();
-  start.setHours(0, 0, 0, 0);
+  const tz = studioCtx?.studio?.timezone ?? "Europe/Oslo";
+  const start = todayInTimezone(tz);
   const end = new Date(start);
   end.setDate(end.getDate() + weeksAhead * 7);
 
