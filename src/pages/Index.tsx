@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { posthog } from "@/integrations/posthog";
+import { supabase } from "@/integrations/supabase/client";
+import { googleCalendarUrl } from "@/lib/calendar";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import BookingSheet from "@/components/BookingSheet";
@@ -96,10 +98,42 @@ const Index = () => {
     const bookingId = params.get("booking_id");
     if (status === "success") {
       posthog.capture("booking_completed", { booking_id: bookingId, price: undefined });
-      toast.success("Booking confirmed!", {
-        description: "You're all set. See you on the mat.",
-        duration: 6000,
-      });
+
+      // Fetch class details to build calendar link
+      if (bookingId) {
+        supabase
+          .from("bookings")
+          .select("class_instances ( starts_at, ends_at, class_templates ( name ), locations ( name ) )")
+          .eq("id", bookingId)
+          .single()
+          .then(({ data }) => {
+            const ci = (data as any)?.class_instances;
+            const calUrl = ci?.starts_at && ci?.ends_at
+              ? googleCalendarUrl({
+                  title: ci.class_templates?.name ?? "Yoga class",
+                  startsAt: ci.starts_at,
+                  endsAt: ci.ends_at,
+                  location: ci.locations?.name,
+                })
+              : null;
+
+            toast.success("Booking confirmed!", {
+              description: "You're all set. See you on the mat.",
+              duration: 8000,
+              ...(calUrl ? {
+                action: {
+                  label: "Add to calendar →",
+                  onClick: () => window.open(calUrl, "_blank"),
+                },
+              } : {}),
+            });
+          });
+      } else {
+        toast.success("Booking confirmed!", {
+          description: "You're all set. See you on the mat.",
+          duration: 6000,
+        });
+      }
     } else if (status === "cancelled") {
       toast.info("Booking not completed", {
         description: "Your payment was cancelled. No charge was made.",

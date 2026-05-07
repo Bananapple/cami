@@ -16,8 +16,9 @@ export function useBookings() {
         .from("bookings")
         .select(`
           id, status, cancelled_at, payment_id, membership_id, class_instance_id,
-          class_instances ( id, starts_at, template_id,
-            class_templates ( name, default_duration_minutes )
+          class_instances ( id, starts_at, ends_at, template_id,
+            class_templates ( name, default_duration_minutes ),
+            locations ( name, timezone )
           ),
           payments ( status, amount )
         `)

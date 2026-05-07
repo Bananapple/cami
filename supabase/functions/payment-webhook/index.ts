@@ -276,7 +276,17 @@ async function sendBookingConfirmation(admin: ReturnType<typeof createClient>, p
       hour: "2-digit", minute: "2-digit", timeZone: "Europe/Oslo",
     });
 
-    const html = buildConfirmationEmail({ studioName, className, dateStr, timeStr, instructor, location, duration });
+    const endsAt = new Date(startsAt.getTime() + duration * 60_000);
+    const fmtIso = (d: Date | string) => new Date(d).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+    const calParams = new URLSearchParams({
+      action: "TEMPLATE",
+      text: className,
+      dates: `${fmtIso(startsAt)}/${fmtIso(endsAt)}`,
+      ...(location ? { location } : {}),
+    });
+    const calendarUrl = `https://calendar.google.com/calendar/render?${calParams}`;
+
+    const html = buildConfirmationEmail({ studioName, className, dateStr, timeStr, instructor, location, duration, calendarUrl });
 
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
@@ -478,6 +488,7 @@ function buildConfirmationEmail(p: {
   instructor: string;
   location: string;
   duration: number;
+  calendarUrl: string;
 }): string {
   return `<!DOCTYPE html>
 <html lang="en">
@@ -538,9 +549,18 @@ function buildConfirmationEmail(p: {
             </td>
           </tr>
 
+          <!-- Add to calendar -->
+          <tr>
+            <td style="padding:28px 48px 0;text-align:center;">
+              <a href="${p.calendarUrl}" style="display:inline-block;background:#8a7e6e;color:#f5f0eb;text-decoration:none;font-family:sans-serif;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;padding:12px 28px;border-radius:6px;">
+                Add to Google Calendar
+              </a>
+            </td>
+          </tr>
+
           <!-- Footer note -->
           <tr>
-            <td style="padding:24px 48px 40px;border-top:1px solid #2e2e2e;">
+            <td style="padding:24px 48px 40px;border-top:1px solid #2e2e2e;margin-top:28px;">
               <p style="margin:0;font-size:13px;color:#8a7e6e;line-height:1.6;font-family:sans-serif;">
                 Need to cancel? You can cancel your booking from your dashboard. Full refunds are available up to 24 hours before class.
               </p>

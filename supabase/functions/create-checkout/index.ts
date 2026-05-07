@@ -341,13 +341,39 @@ Deno.serve(async (req) => {
         .select("id")
         .single();
       if (bookingErr || !booking) {
-        await adminClient.from("payments").update({ status: "failed" }).eq("id", payment.id);
         if ((bookingErr as any)?.code === "23505") {
-          return json({ error: "You already have a booking for this class." }, 409);
+          // Conflict — check if it's a stale pending booking (abandoned checkout) or a real confirmed one
+          const { data: existing } = await adminClient
+            .from("bookings")
+            .select("id, status")
+            .eq("user_id", user.id)
+            .eq("class_instance_id", resolvedClassInstance.id)
+            .single();
+          if (existing?.status === "pending") {
+            // Reuse the stale booking with the new payment — do NOT mark payment as failed
+            const { data: replaced, error: replaceErr } = await adminClient
+              .from("bookings")
+              .update({ payment_id: payment.id, booked_at: new Date().toISOString() })
+              .eq("id", existing.id)
+              .select("id")
+              .single();
+            if (!replaceErr && replaced) {
+              bookingId = replaced.id;
+            } else {
+              await adminClient.from("payments").update({ status: "failed" }).eq("id", payment.id);
+              return json({ error: "Failed to create booking record" }, 500);
+            }
+          } else {
+            await adminClient.from("payments").update({ status: "failed" }).eq("id", payment.id);
+            return json({ error: "You already have a booking for this class." }, 409);
+          }
+        } else {
+          await adminClient.from("payments").update({ status: "failed" }).eq("id", payment.id);
+          return json({ error: "Failed to create booking record" }, 500);
         }
-        return json({ error: "Failed to create booking record" }, 500);
+      } else {
+        bookingId = booking.id;
       }
-      bookingId = booking.id;
     }
 
     // --- Call provider adapter to create hosted checkout session ---

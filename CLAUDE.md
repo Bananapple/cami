@@ -48,6 +48,8 @@ npm run test -- src/test/some.test.ts  # Run a single test file
 
 **v2 (live)**: Adding a studio is a row INSERT into `studios` + payment provider onboarding. Schedule is built via `class_templates` + `schedule_rules`; `materialize_class_instances()` populates the 90-day rolling window. `scripts/new-studio.sh` is retired.
 
+Full step-by-step checklist (SQL → Supabase redirect URL → Vercel → Stripe → Resend → manager invite → verification): **`docs/NEW-CUSTOMER.md`**
+
 ## Architecture
 
 ### Stack

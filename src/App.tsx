@@ -16,6 +16,7 @@ import JoinNow from "./pages/JoinNow";
 import Dashboard from "./pages/Dashboard";
 import ArticleDetail from "./pages/ArticleDetail";
 import NotFound from "./pages/NotFound";
+import AuthCallback from "./pages/AuthCallback";
 import { ManageApp } from "./manage/ManageApp";
 import { PrimitivesPreview } from "./manage-v2/_dev/PrimitivesPreview";
 import { ShellPreview } from "./manage-v2/_dev/ShellPreview";
@@ -78,6 +79,7 @@ const App = () => (
           <Route path="/_v2/primitives" element={<PrimitivesPreview />} />
           <Route path="/_v2/shell" element={<ShellPreview />} />
           <Route path="/insights/:slug" element={<ArticleDetail />} />
+          <Route path="/auth/callback" element={<AuthCallback />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
         </BrowserRouter>

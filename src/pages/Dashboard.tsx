@@ -4,15 +4,16 @@ import { useBookings } from "@/hooks/useBookings";
 import { useMembership } from "@/hooks/useMembership";
 import { useStudioMember } from "@/hooks/useStudioMember";
 import { useWaitlist } from "@/hooks/useWaitlist";
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Link, Navigate } from "react-router-dom";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import BookingSheet from "@/components/BookingSheet";
-import { LogOut, CreditCard, User, X, Copy } from "lucide-react";
+import { LogOut, CreditCard, User, X, Copy, CalendarPlus } from "lucide-react";
 import { toast } from "sonner";
 import { useStudioContext } from "@/context/StudioContext";
 import { formatTime, formatDate } from "@/lib/timezone";
+import { googleCalendarUrl, icsDataUrl } from "@/lib/calendar";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -189,17 +190,27 @@ const Dashboard = () => {
                         )}
                       </div>
                       {!isRefundPending && (
-                        <button
-                          onClick={() => setCancelTarget({
-                            id: booking.id,
-                            startsAt: ci?.starts_at ?? "",
-                            hasMembership: !!booking.membership_id,
-                          })}
-                          className="p-2 text-muted-foreground hover:text-destructive transition-colors"
-                          aria-label="Cancel booking"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
+                        <div className="flex items-center gap-1">
+                          {ci?.starts_at && ci?.ends_at && (
+                            <CalendarMenu
+                              title={ci.class_templates?.name ?? "Yoga class"}
+                              startsAt={ci.starts_at}
+                              endsAt={ci.ends_at}
+                              location={ci.locations?.name}
+                            />
+                          )}
+                          <button
+                            onClick={() => setCancelTarget({
+                              id: booking.id,
+                              startsAt: ci?.starts_at ?? "",
+                              hasMembership: !!booking.membership_id,
+                            })}
+                            className="p-2 text-muted-foreground hover:text-destructive transition-colors"
+                            aria-label="Cancel booking"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
                       )}
                     </div>
                   );
@@ -405,5 +416,58 @@ const Dashboard = () => {
     </div>
   );
 };
+
+function CalendarMenu({ title, startsAt, endsAt, location }: {
+  title: string; startsAt: string; endsAt: string; location?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  const calArgs = { title, startsAt, endsAt, location };
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="p-2 text-muted-foreground hover:text-foreground transition-colors"
+        aria-label="Add to calendar"
+      >
+        <CalendarPlus className="w-4 h-4" />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-9 z-50 bg-card border border-border rounded-lg shadow-md py-1 w-48 text-sm">
+          <a
+            href={googleCalendarUrl(calArgs)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 px-3 py-2 hover:bg-muted transition-colors text-foreground no-underline"
+            onClick={() => setOpen(false)}
+          >
+            <CalendarPlus className="w-3.5 h-3.5 shrink-0" />
+            Google Calendar
+          </a>
+          <a
+            href={icsDataUrl(calArgs)}
+            download="class.ics"
+            className="flex items-center gap-2 px-3 py-2 hover:bg-muted transition-colors text-foreground no-underline"
+            onClick={() => setOpen(false)}
+          >
+            <CalendarPlus className="w-3.5 h-3.5 shrink-0" />
+            Apple / Outlook
+          </a>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default Dashboard;
