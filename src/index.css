@@ -4,34 +4,40 @@
 
 @layer base {
   :root {
-    --background: 37 90% 96%;
+    --background: 40 33% 96%;
     --header-bg: 20 35% 77%;
-    --foreground: 10 26% 29%;
+    --foreground: 30 8% 17%;
 
-    --card: 22 33% 88%;
-    --card-foreground: 10 26% 29%;
+    --card: 36 30% 91%;
+    --card-foreground: 30 8% 17%;
 
-    --popover: 20 40% 94%;
-    --popover-foreground: 10 26% 29%;
+    --popover: 36 43% 93%;
+    --popover-foreground: 30 8% 17%;
 
-    --primary: 0 40% 71%;
+    /* Golden amber — shifted hue + more vivid */
+    --primary: 42 58% 46%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 20 30% 85%;
-    --secondary-foreground: 10 26% 29%;
+    --secondary: 20 25% 87%;
+    --secondary-foreground: 30 8% 17%;
 
-    --muted: 20 25% 88%;
-    --muted-foreground: 10 20% 45%;
+    --muted: 36 20% 89%;
+    --muted-foreground: 30 8% 45%;
 
-    --accent: 0 40% 71%;
+    --accent: 35 78% 41%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 20 25% 75%;
-    --input: 20 25% 75%;
-    --ring: 0 40% 71%;
+    --border: 36 20% 82%;
+    --input: 36 20% 82%;
+    --ring: 35 78% 41%;
+
+    /* Sage — secondary accent, cool complement to ochre */
+    --sage-200: 125 18% 88%;
+    --sage-400: 125 14% 56%;
+    --sage-600: 125 16% 38%;
 
     --radius: 1rem;
 
@@ -95,19 +101,38 @@
   }
   body {
     @apply bg-background text-foreground;
-    font-family: 'DM Serif Display', Georgia, serif;
+    font-family: Inter, system-ui, -apple-system, sans-serif;
   }
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'DM Serif Display', Georgia, serif;
+    font-family: Fraunces, Georgia, serif;
   }
   nav, button, input, label, .font-sans {
     font-family: Inter, system-ui, -apple-system, sans-serif;
   }
 }
 
+/* iOS-style notification animations */
+@keyframes ios-notify-in {
+  0%   { opacity: 0; transform: perspective(900px) translateY(-72px) rotateX(-22deg) scale(0.88); }
+  55%  { opacity: 1; transform: perspective(900px) translateY(6px)   rotateX(2deg)  scale(1.01); }
+  100% { opacity: 1; transform: perspective(900px) translateY(0)     rotateX(0deg)  scale(1);    }
+}
+@keyframes ios-notify-out {
+  0%   { opacity: 1; transform: translateY(0)     scale(1);    }
+  100% { opacity: 0; transform: translateY(-64px) scale(0.94); }
+}
+@keyframes ios-notify-advance {
+  0%   { opacity: 0.45; transform: scale(0.9) translateY(16px); }
+  100% { opacity: 1;    transform: scale(1)   translateY(0);    }
+}
+@keyframes blur-fade-in {
+  from { opacity: 0; filter: blur(16px); }
+  to   { opacity: 1; filter: blur(0);    }
+}
+
 @layer utilities {
   .font-serif {
-    font-family: 'DM Serif Display', Georgia, serif;
+    font-family: Fraunces, Georgia, serif;
   }
   .story-link * {
     @apply relative inline-block after:content-[''] after:absolute after:w-full after:scale-x-0 after:h-0.5 after:bottom-0 after:left-0 after:bg-primary after:origin-bottom-right after:transition-transform after:duration-300 hover:after:scale-x-100 hover:after:origin-bottom-left;

@@ -14,7 +14,8 @@ export default {
     },
     extend: {
       fontFamily: {
-        serif: ['"DM Serif Display"', 'Georgia', 'serif'],
+        // TODO: swap Fraunces → Recoleta SemiBold once licensed (see docs/BRAND.md)
+        serif: ['Fraunces', 'Georgia', 'serif'],
         sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
       },
       colors: {
@@ -65,6 +66,11 @@ export default {
         "warm-cream": "hsl(var(--warm-cream))",
         "warm-blush": "hsl(var(--warm-blush))",
         "warm-olive": "hsl(var(--warm-olive))",
+        sage: {
+          200: "hsl(var(--sage-200))",
+          400: "hsl(var(--sage-400))",
+          600: "hsl(var(--sage-600))",
+        },
         header: "hsl(var(--header-bg))",
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
