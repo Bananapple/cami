@@ -61,6 +61,9 @@ const App = () => (
       {/* Marketing routes — no studio context needed */}
       <Routes>
         <Route path="/cami" element={<CamiHome />} />
+        {import.meta.env.VITE_DEPLOY_TARGET === "cami" && (
+          <Route path="/" element={<CamiHome />} />
+        )}
       </Routes>
       <StudioProvider>
         <TooltipProvider>
@@ -70,7 +73,7 @@ const App = () => (
           <RefCapture />
           <PostHogStudioSync />
           <Routes>
-            <Route path="/" element={import.meta.env.VITE_DEPLOY_TARGET === "cami" ? <CamiHome /> : <Index />} />
+            <Route path="/" element={<Index />} />
             <Route path="/classes" element={<Programs />} />
             <Route path="/teachers" element={<Coaches />} />
             <Route path="/journal" element={<Insights />} />
