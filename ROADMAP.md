@@ -146,3 +146,57 @@ Products CRUD lives in StudioView → Products section.
 | `waiver_configs` / `waivers` (new tables) | Digital waivers |
 
 *Tables already live: `studios`, `studio_members`, `studio_payment_providers`, `locations`, `instructors` (+ `specialty`), `class_templates` (+ `description`, `image_url`), `schedule_rules`, `schedule_exceptions`, `class_instances`, `waitlists`, `bookings` (+ `membership_id`, `checked_in_at`), `payments`, `payment_webhook_events`, `notification_log`, `memberships` (+ `product_id`, `credits_remaining`), `products`, `discount_codes`, `discount_redemptions`, `referrals`, `member_activity_summary` (view).*
+
+---
+
+## Future / Data-Driven (requires multi-studio scale + data)
+
+*Items here are data-gated, not just time-gated — they become buildable only once there's enough signal to learn from. All are additive on top of the existing schema.*
+
+### Class Intelligence: Prep Assistant + Teaching Corpus (Wildcard / Moat)
+
+**Origin**: Observed a studio owner arrive to class with a hand-written booklet of poses — significant unpaid prep time per session. Different class profiles (restoration, flow, strength) and different audience levels require different sequences. Instructors track student levels mentally.
+
+**The insight**: There are two separable ideas here, one near-term and one long-term:
+
+**Near-term (Prep Layer)** — digital class plan builder:
+- Instructor fills in a structured sequence before class (pose list, cues, level target) — replaces the paper booklet
+- Lives on `class_instances` or a new `class_plans (class_instance_id, instructor_id, sequence JSONB)` table
+- CRM overlay at prep time: show who's attending, their level, how many times they've done this template → "8 of 12 attendees have done this sequence 3+ times, consider a variation"
+- Low AI risk — mostly structured data entry + query; straightforward to build once instructors are onboarded
+
+**Long-term (Teaching Corpus / AI Moat)** — record, transcribe, and map to sequence:
+- Record class audio; transcribe with Whisper or equivalent
+- Use the pre-filled sequence plan as a grounding document: AI maps transcript segments to planned poses → extract actual cues used, timing, language patterns
+- Build a per-studio (and cross-studio) library of what *good* teaching sounds like for each pose and class type
+- Instructors can review their own sessions, surface top-performing cues from peers
+- Overlay with outcome data from the CRM: classes where attendance retention was highest, re-booking rate, no-show rate → what teaching patterns correlate with sticky students?
+
+**Why this matters strategically:**
+- Creates a proprietary vertical dataset in yoga/pilates that no horizontal booking tool can replicate
+- True "system of action": the platform doesn't just record what happened, it improves what happens next
+- Network effect: more studios → richer corpus → better recommendations → harder to leave
+
+**Unknowns / risks:**
+- Recording consent and privacy (GDPR) is non-trivial — needs explicit opt-in flow
+- Pose-to-transcript mapping accuracy depends heavily on plan quality; low-quality plans break the grounding
+- Wildcard: needs a real pilot with a willing instructor before investing in infra
+- Technically feasible today (Whisper + structured prompting), but needs validation
+
+**Suggested exploration path**: ship the Prep Layer first (no AI, just structured input), get instructors using it, then layer recording on top once the plan data is reliable enough to ground the transcription.
+
+### Demand-Based Scheduling
+- Suggest new time slots or flag low-fill classes based on historical booking patterns across `class_instances`
+- Cross-studio: "studios in your market that added a Saturday 08:00 slot saw +18% weekend bookings"
+
+### Price Elasticity Signals
+- Track conversion rate per product price across studios; surface outliers
+- A/B `products.price_minor` suggestions per market segment (Scandinavia vs. US)
+
+### Churn Prediction + Proactive Outreach
+- Use `member_activity_summary` segment transitions (regular → lapsing) as the training signal
+- Rank members by lapse probability before they go inactive; trigger automated win-back sequences before the 14-day gap
+
+### Referral Network Analysis
+- Use `referrals` graph to identify high-LTV referrers and auto-tier their rewards
+- Surface which class types or instructors generate the most referrals
