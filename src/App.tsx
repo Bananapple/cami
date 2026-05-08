@@ -21,6 +21,7 @@ import { ManageApp } from "./manage/ManageApp";
 import { PrimitivesPreview } from "./manage-v2/_dev/PrimitivesPreview";
 import { ShellPreview } from "./manage-v2/_dev/ShellPreview";
 import { ManageV2App } from "./manage-v2/ManageV2App";
+import CamiHome from "./pages/CamiHome";
 
 const queryClient = new QueryClient();
 
@@ -56,35 +57,39 @@ const RefCapture = () => {
 const App = () => (
   <ErrorBoundary>
   <QueryClientProvider client={queryClient}>
-    <StudioProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-        <ScrollToTop />
-        <RefCapture />
-        <PostHogStudioSync />
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/classes" element={<Programs />} />
-          <Route path="/teachers" element={<Coaches />} />
-          <Route path="/journal" element={<Insights />} />
-          <Route path="/joinnow" element={<JoinNow />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          {/* v2 is now the default at /manage/* */}
-          <Route path="/manage/*" element={<ManageV2App />} />
-          {/* Legacy /manage available for rollback */}
-          <Route path="/manage-legacy/*" element={<ManageApp />} />
-          {/* Dev / design references */}
-          <Route path="/_v2/primitives" element={<PrimitivesPreview />} />
-          <Route path="/_v2/shell" element={<ShellPreview />} />
-          <Route path="/insights/:slug" element={<ArticleDetail />} />
-          <Route path="/auth/callback" element={<AuthCallback />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-        </BrowserRouter>
-      </TooltipProvider>
-    </StudioProvider>
+    <BrowserRouter>
+      {/* Marketing routes — no studio context needed */}
+      <Routes>
+        <Route path="/cami" element={<CamiHome />} />
+      </Routes>
+      <StudioProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <ScrollToTop />
+          <RefCapture />
+          <PostHogStudioSync />
+          <Routes>
+            <Route path="/" element={<Index />} />
+            <Route path="/classes" element={<Programs />} />
+            <Route path="/teachers" element={<Coaches />} />
+            <Route path="/journal" element={<Insights />} />
+            <Route path="/joinnow" element={<JoinNow />} />
+            <Route path="/dashboard" element={<Dashboard />} />
+            {/* v2 is now the default at /manage/* */}
+            <Route path="/manage/*" element={<ManageV2App />} />
+            {/* Legacy /manage available for rollback */}
+            <Route path="/manage-legacy/*" element={<ManageApp />} />
+            {/* Dev / design references */}
+            <Route path="/_v2/primitives" element={<PrimitivesPreview />} />
+            <Route path="/_v2/shell" element={<ShellPreview />} />
+            <Route path="/insights/:slug" element={<ArticleDetail />} />
+            <Route path="/auth/callback" element={<AuthCallback />} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </TooltipProvider>
+      </StudioProvider>
+    </BrowserRouter>
   </QueryClientProvider>
   </ErrorBoundary>
 );

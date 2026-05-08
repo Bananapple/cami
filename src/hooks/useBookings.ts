@@ -65,7 +65,7 @@ export function useBookings() {
         } catch { /* ignore JSON parse error */ }
         throw new Error(message);
       }
-      return data as { cancelled: boolean; refunded: boolean; refund_amount?: number; reason?: string };
+      return data as { cancelled: boolean; refunded: boolean; credit_returned?: boolean; refund_amount?: number; reason?: string };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["bookings"] });

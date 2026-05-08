@@ -72,11 +72,12 @@ Deno.serve(async (req) => {
     const hasPayment = !!booking.payment_id;
     const hasMembership = !!booking.membership_id;
 
-    // --- Always cancel the booking first ---
+    // --- Always cancel the booking first (conditional eq guards against concurrent double-cancel) ---
     await admin
       .from("bookings")
       .update({ status: "cancelled", cancelled_at: new Date().toISOString() })
-      .eq("id", booking_id);
+      .eq("id", booking_id)
+      .eq("status", "confirmed");
 
     // --- Credit-paid booking: return credit if within refund window ---
     if (hasMembership) {
