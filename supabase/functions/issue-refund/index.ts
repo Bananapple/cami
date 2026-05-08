@@ -72,21 +72,23 @@ Deno.serve(async (req) => {
     const hasPayment = !!booking.payment_id;
     const hasMembership = !!booking.membership_id;
 
-    // --- Always cancel the booking first (conditional eq guards against concurrent double-cancel) ---
+    // --- Credit-paid booking: atomic cancel + conditional credit return ---
+    // Single RPC keeps booking cancellation and credit return in one transaction
+    // so a crash between the two ops can't strand the user without their credit.
+    if (hasMembership) {
+      await admin.rpc("cancel_credit_booking", {
+        p_booking_id: booking_id,
+        p_return_credit: outsideWindow,
+      });
+      return json({ cancelled: true, credit_returned: outsideWindow });
+    }
+
+    // --- Payment booking: cancel first, then attempt refund ---
     await admin
       .from("bookings")
       .update({ status: "cancelled", cancelled_at: new Date().toISOString() })
       .eq("id", booking_id)
       .eq("status", "confirmed");
-
-    // --- Credit-paid booking: return credit if within refund window ---
-    if (hasMembership) {
-      if (outsideWindow) {
-        await admin.rpc("return_credit", { p_membership_id: booking.membership_id });
-        return json({ cancelled: true, credit_returned: true });
-      }
-      return json({ cancelled: true, credit_returned: false, reason: "inside_cancellation_window" });
-    }
 
     if (!hasPayment || !outsideWindow) {
       // Mark the payment cancelled so the dashboard doesn't show "refund pending"
