@@ -88,6 +88,10 @@ Deno.serve(async (req) => {
     }
 
     if (!hasPayment || !outsideWindow) {
+      // Mark the payment cancelled so the dashboard doesn't show "refund pending"
+      if (hasPayment) {
+        await admin.from("payments").update({ status: "cancelled" }).eq("id", booking.payment_id);
+      }
       return json({
         cancelled: true,
         refunded: false,

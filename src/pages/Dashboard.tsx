@@ -180,7 +180,7 @@ const Dashboard = () => {
                         </p>
                         {isRefundPending ? (
                           <p className="text-xs text-muted-foreground font-sans">
-                            Cancelled · Refund of kr {booking.payments?.amount} being processed
+                            Cancelled · Refund of kr {booking.payments?.amount} on its way (3–5 business days)
                           </p>
                         ) : (
                           <p className="text-xs text-muted-foreground font-sans">
