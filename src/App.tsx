@@ -58,13 +58,6 @@ const App = () => (
   <ErrorBoundary>
   <QueryClientProvider client={queryClient}>
     <BrowserRouter>
-      {/* Marketing routes — no studio context needed */}
-      <Routes>
-        <Route path="/cami" element={<CamiHome />} />
-        {import.meta.env.VITE_DEPLOY_TARGET === "cami" && (
-          <Route path="/" element={<CamiHome />} />
-        )}
-      </Routes>
       <StudioProvider>
         <TooltipProvider>
           <Toaster />
@@ -73,6 +66,11 @@ const App = () => (
           <RefCapture />
           <PostHogStudioSync />
           <Routes>
+            {/* Marketing routes — don't use StudioContext but safe inside provider */}
+            <Route path="/cami" element={<CamiHome />} />
+            {import.meta.env.VITE_DEPLOY_TARGET === "cami" && (
+              <Route path="/" element={<CamiHome />} />
+            )}
             <Route path="/" element={<Index />} />
             <Route path="/classes" element={<Programs />} />
             <Route path="/teachers" element={<Coaches />} />
