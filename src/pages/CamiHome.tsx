@@ -257,11 +257,59 @@ export default function CamiHome() {
         </button>
       </div>
 
-      {/* ── Hero headline — full width centered on mobile, right half on desktop ── */}
+      {/* ── Hero headline — mobile: two independently positioned blocks ── */}
+
+      {/* Mobile: "Studio AI" at shoulder level */}
       <div
-        className="absolute inset-y-0 left-0 right-0 md:left-[50%] z-20 flex flex-col justify-start pt-[26vh] md:justify-center md:pt-0 items-center px-6 md:pr-16 md:pl-4"
+        className="absolute md:hidden left-0 right-0 z-20 flex justify-center px-6"
+        style={{ top: "18vh" }}
       >
-        <div className="text-center md:text-right w-full" style={{ maxWidth: 480 }}>
+        <h1
+          className="font-serif text-white text-center leading-[1.12]"
+          style={{
+            fontSize: "clamp(2.6rem, 10vw, 3.6rem)",
+            animation: showText1 ? "blur-fade-in 1.1s cubic-bezier(0.4,0,0.2,1) forwards" : "none",
+            opacity: showText1 ? undefined : 0,
+          }}
+        >
+          Studio AI
+        </h1>
+      </div>
+
+      {/* Mobile: "that has your back" + CTA at chest level */}
+      <div
+        className="absolute md:hidden left-0 right-0 z-20 flex flex-col items-center px-6"
+        style={{ top: "50vh" }}
+      >
+        <p
+          className="font-serif text-center leading-[1.12]"
+          style={{
+            fontSize: "clamp(2.6rem, 10vw, 3.6rem)",
+            color: "rgba(255,255,255,0.85)",
+            animation: showText2 ? "blur-fade-in 1.1s cubic-bezier(0.4,0,0.2,1) forwards" : "none",
+            opacity: showText2 ? undefined : 0,
+          }}
+        >
+          that has your back
+        </p>
+        <div
+          className="mt-7"
+          style={{
+            animation: showCta ? "blur-fade-in 0.8s ease forwards" : "none",
+            opacity: showCta ? undefined : 0,
+          }}
+        >
+          <button className="text-sm font-medium px-6 py-3 rounded-full" style={{ background: "white", color: "#1a1611" }}>
+            Book a demo
+          </button>
+        </div>
+      </div>
+
+      {/* Desktop: right half, vertically centered */}
+      <div
+        className="absolute inset-y-0 left-[50%] right-0 z-20 hidden md:flex flex-col justify-center items-center pr-16 pl-4"
+      >
+        <div className="text-right w-full" style={{ maxWidth: 480 }}>
           <h1 className="font-serif leading-[1.12]" style={{ fontSize: "clamp(2.4rem, 3.8vw, 3.6rem)" }}>
             <span
               className="block text-white"
@@ -298,7 +346,7 @@ export default function CamiHome() {
 
       {/* ── Notifications — bottom-center on mobile, right half at 74% on desktop ── */}
       {showNotifs && (
-        <div className="absolute z-20 flex justify-center left-0 right-0 bottom-24 md:bottom-auto md:top-[74%] md:left-[50%] md:right-0">
+        <div className="absolute z-20 flex justify-center left-0 right-0 bottom-6 md:bottom-auto md:top-[74%] md:left-[50%] md:right-0">
           <NotificationSequence />
         </div>
       )}

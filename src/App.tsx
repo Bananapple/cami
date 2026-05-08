@@ -70,7 +70,7 @@ const App = () => (
           <RefCapture />
           <PostHogStudioSync />
           <Routes>
-            <Route path="/" element={<Index />} />
+            <Route path="/" element={import.meta.env.VITE_DEPLOY_TARGET === "cami" ? <CamiHome /> : <Index />} />
             <Route path="/classes" element={<Programs />} />
             <Route path="/teachers" element={<Coaches />} />
             <Route path="/journal" element={<Insights />} />
