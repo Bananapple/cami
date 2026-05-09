@@ -97,10 +97,23 @@ Deno.serve(async (req) => {
       memberEmail = emailInput.trim();
       memberName = nameInput?.trim() ?? memberEmail;
 
-      // Try to find existing auth user by email
-      const { data: { users } } = await admin.auth.admin.listUsers({ perPage: 1000 });
-      const existing = users?.find((u: any) => u.email === memberEmail);
-      resolvedUserId = existing?.id ?? null;
+      // Find existing auth user by email. Paginate so we don't silently miss
+      // past 1000 — beyond that limit, a returning user looks like a new
+      // signup, the studio_members upsert is skipped, and the role grant
+      // silently fails. Cap at 100 pages (100k users) as a safety net.
+      const targetEmail = memberEmail.toLowerCase();
+      let page = 1;
+      while (page <= 100) {
+        const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 1000 });
+        if (error) break;
+        const found = data.users?.find((u: any) => u.email?.toLowerCase() === targetEmail);
+        if (found) {
+          resolvedUserId = found.id;
+          break;
+        }
+        if (!data.users || data.users.length < 1000) break;
+        page++;
+      }
     }
 
     // --- Upsert studio_members row with the correct role ---
