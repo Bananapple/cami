@@ -1,0 +1,24 @@
+-- ============================================================================
+-- Phase 13: Drop dead duplicate waitlist DB-webhook trigger
+--
+-- Two triggers were wired to call the same notify-waitlist-offer Edge Function:
+--   1. notify-waitlist-offer (working) — uses `Authorization: Bearer <secret>`,
+--                                        authenticates against the function's
+--                                        WEBHOOK_SECRET env var.
+--   2. waitlist-offer-notify (dead)    — uses `x-webhook-secret: <secret>` which
+--                                        the function never reads, so every call
+--                                        returns 401 silently.
+--
+-- The dead trigger fires on every UPDATE to waitlists, gets 401'd, and is
+-- discarded. Removing it eliminates wasted HTTP calls + 401 log noise.
+--
+-- Verified safe to drop on 2026-05-09: SHA-256 of the dead trigger's secret
+-- matched the orphaned WAITLIST_WEBHOOK_SECRET env var, while the working
+-- trigger's secret matched WEBHOOK_SECRET. Two completely separate auth chains;
+-- removing the dead one does not affect waitlist offer email delivery.
+--
+-- The orphaned WAITLIST_WEBHOOK_SECRET env var is removed separately via
+-- `supabase secrets unset WAITLIST_WEBHOOK_SECRET`.
+-- ============================================================================
+
+DROP TRIGGER IF EXISTS "waitlist-offer-notify" ON public.waitlists;
