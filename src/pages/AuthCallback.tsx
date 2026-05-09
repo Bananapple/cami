@@ -9,17 +9,7 @@ export default function AuthCallback() {
   }, []);
 
   return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        height: "100vh",
-        fontFamily: "sans-serif",
-        color: "#888",
-        fontSize: 14,
-      }}
-    >
+    <div className="flex items-center justify-center h-screen bg-background text-muted-foreground text-sm">
       Signing in…
     </div>
   );
