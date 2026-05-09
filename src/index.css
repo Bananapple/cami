@@ -105,6 +105,13 @@
   h1, h2, h3, h4, h5, h6 {
     font-family: 'DM Serif Display', Georgia, serif;
   }
+
+  /* Cami deployment: use Fraunces everywhere DM Serif Display would appear */
+  .deploy-cami h1, .deploy-cami h2, .deploy-cami h3,
+  .deploy-cami h4, .deploy-cami h5, .deploy-cami h6,
+  .deploy-cami .font-serif {
+    font-family: Fraunces, Georgia, serif;
+  }
   nav, button, input, label, .font-sans {
     font-family: Inter, system-ui, -apple-system, sans-serif;
   }

@@ -25,6 +25,10 @@ import CamiHome from "./pages/CamiHome";
 
 const queryClient = new QueryClient();
 
+if (import.meta.env.VITE_DEPLOY_TARGET === "cami") {
+  document.documentElement.classList.add("deploy-cami");
+}
+
 const ScrollToTop = () => {
   const { pathname } = useLocation();
   useEffect(() => {
