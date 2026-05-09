@@ -60,6 +60,11 @@ A pre-launch CSO-mode audit + customer-readiness pass shipped 14 audit findings 
 - **137 ESLint warnings in `src/`** — all pre-existing, none added during the 2026-05-09 session. Breakdown: ~80% `react-refresh/only-export-components` (HMR optimization, non-functional), ~15% `react-hooks/exhaustive-deps` (real bugs hiding here), ~5% scattered. Run `npm run lint -- --fix` for auto-fixable ones first, then walk the exhaustive-deps cases manually. Worth a focused session.
 - **Test coverage thin** — 4 test files for a multi-thousand-line codebase. Untested critical paths: BookingSheet (membership detection, promo code, waitlist), all Edge Functions, all manage hooks. Worth scoping before public launch.
 
+### Findings raised during /ship pre-landing review of security-fixes (2026-05-09)
+
+- **CORS fallback to `*` when `APP_URL` unset** — `supabase/functions/_shared/cors.ts:45`. The header comment calls this "safe degraded mode" for dev. Bearer JWT auth (not cookies) limits damage, but a misconfigured prod deploy would advertise CORS to all origins. Fix is ~10 lines: throw at module load when `APP_URL` is unset and `DENO_DEPLOYMENT_ID` is set (i.e. running on Supabase, not local). **Land in `fix/post-audit-cleanup` branch.**
+- **`invite-member` listUsers caps at perPage: 1000** — `supabase/functions/invite-member/index.ts:102`. Past 1000 auth users, an existing-user lookup-by-email returns null, so the studio_members upsert is skipped — invite still mails OK but role grant silently fails. Fine at current scale (1 studio, <100 users). Fix is the pagination loop pattern from `scripts/promote-owner.ts:58-71`. **Land before crossing 1000 auth users platform-wide, or as part of post-audit cleanup if convenient.**
+
 ---
 
 ## ~~Refund / cancellation policy~~ — ✅ DONE (2026-04-24)

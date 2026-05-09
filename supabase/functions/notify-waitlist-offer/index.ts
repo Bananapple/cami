@@ -10,6 +10,15 @@ const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 const FROM_EMAIL = Deno.env.get("FROM_EMAIL") ?? "onboarding@resend.dev";
 const WEBHOOK_SECRET = Deno.env.get("WEBHOOK_SECRET");
 
+function esc(s: string): string {
+  return String(s ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 Deno.serve(async (req) => {
   // Verify the request comes from our Supabase DB webhook, not arbitrary callers.
   if (WEBHOOK_SECRET) {
@@ -120,7 +129,7 @@ Deno.serve(async (req) => {
     if (offerExpiresAt) {
       const expires = new Date(offerExpiresAt);
       const expiryStr = expires.toLocaleTimeString("nb-NO", { hour: "2-digit", minute: "2-digit", timeZone: tz });
-      expiryLine = `<p style="color:#b45309;font-size:14px;margin-top:8px;">⏰ This spot is held for you until <strong>${expiryStr}</strong>. After that it passes to the next person on the list.</p>`;
+      expiryLine = `<p style="color:#b45309;font-size:14px;margin-top:8px;">⏰ This spot is held for you until <strong>${esc(expiryStr)}</strong>. After that it passes to the next person on the list.</p>`;
     }
 
     const html = `
@@ -130,23 +139,23 @@ Deno.serve(async (req) => {
 <body style="font-family:Georgia,serif;background:#fafaf8;margin:0;padding:0;">
   <div style="max-width:560px;margin:40px auto;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e5e5e3;">
     <div style="background:#1a1a18;padding:32px 40px;">
-      <h1 style="color:#f5f0e8;font-size:22px;margin:0;letter-spacing:0.02em;">${studioName}</h1>
+      <h1 style="color:#f5f0e8;font-size:22px;margin:0;letter-spacing:0.02em;">${esc(studioName)}</h1>
     </div>
     <div style="padding:40px;">
       <h2 style="font-size:20px;color:#1a1a18;margin:0 0 8px;">A spot just opened up</h2>
-      <p style="color:#6b6b63;font-size:15px;margin:0 0 24px;">Good news — someone cancelled and you're next in line for <strong>${className}</strong>.</p>
+      <p style="color:#6b6b63;font-size:15px;margin:0 0 24px;">Good news — someone cancelled and you're next in line for <strong>${esc(className)}</strong>.</p>
 
       <div style="background:#f5f0e8;border-radius:8px;padding:20px 24px;margin-bottom:24px;">
-        <p style="margin:0 0 6px;font-size:15px;color:#1a1a18;"><strong>${className}</strong></p>
-        <p style="margin:0 0 4px;font-size:13px;color:#6b6b63;">${dateStr} · ${timeStr}</p>
-        ${instructor ? `<p style="margin:0 0 4px;font-size:13px;color:#6b6b63;">with ${instructor}</p>` : ""}
-        ${location ? `<p style="margin:0;font-size:13px;color:#6b6b63;">📍 ${location}</p>` : ""}
+        <p style="margin:0 0 6px;font-size:15px;color:#1a1a18;"><strong>${esc(className)}</strong></p>
+        <p style="margin:0 0 4px;font-size:13px;color:#6b6b63;">${esc(dateStr)} · ${esc(timeStr)}</p>
+        ${instructor ? `<p style="margin:0 0 4px;font-size:13px;color:#6b6b63;">with ${esc(instructor)}</p>` : ""}
+        ${location ? `<p style="margin:0;font-size:13px;color:#6b6b63;">📍 ${esc(location)}</p>` : ""}
       </div>
 
       ${expiryLine}
 
       <div style="margin-top:28px;text-align:center;">
-        <a href="${studioAppUrl}/dashboard"
+        <a href="${esc(studioAppUrl)}/dashboard"
            style="display:inline-block;background:#1a1a18;color:#f5f0e8;text-decoration:none;padding:14px 32px;border-radius:8px;font-family:Inter,sans-serif;font-size:14px;font-weight:500;letter-spacing:0.08em;text-transform:uppercase;">
           Book your spot →
         </a>

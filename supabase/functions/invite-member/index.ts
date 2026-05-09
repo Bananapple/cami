@@ -175,15 +175,15 @@ Deno.serve(async (req) => {
 <body style="font-family:Georgia,serif;background:#fafaf8;margin:0;padding:0;">
   <div style="max-width:560px;margin:40px auto;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e5e5e3;">
     <div style="background:#1a1a18;padding:32px 40px;">
-      <h1 style="color:#f5f0e8;font-size:22px;margin:0;letter-spacing:0.02em;">${studioName}</h1>
+      <h1 style="color:#f5f0e8;font-size:22px;margin:0;letter-spacing:0.02em;">${esc(studioName)}</h1>
     </div>
     <div style="padding:40px;">
       <h2 style="font-size:20px;color:#1a1a18;margin:0 0 8px;">You've been added as ${memberRole === "manager" ? "a manager" : "an instructor"}</h2>
       <p style="color:#6b6b63;font-size:15px;margin:0 0 24px;">
-        Hi ${memberName}, you now have staff access to <strong>${studioName}</strong>.
+        Hi ${esc(memberName)}, you now have staff access to <strong>${esc(studioName)}</strong>.
       </p>
       <div style="margin-bottom:24px;text-align:center;">
-        <a href="${manageUrl}"
+        <a href="${esc(manageUrl)}"
            style="display:inline-block;background:#1a1a18;color:#f5f0e8;text-decoration:none;padding:14px 32px;border-radius:8px;font-family:Inter,sans-serif;font-size:14px;font-weight:500;letter-spacing:0.08em;text-transform:uppercase;">
           Open studio dashboard →
         </a>
@@ -201,15 +201,15 @@ Deno.serve(async (req) => {
 <body style="font-family:Georgia,serif;background:#fafaf8;margin:0;padding:0;">
   <div style="max-width:560px;margin:40px auto;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e5e5e3;">
     <div style="background:#1a1a18;padding:32px 40px;">
-      <h1 style="color:#f5f0e8;font-size:22px;margin:0;letter-spacing:0.02em;">${studioName}</h1>
+      <h1 style="color:#f5f0e8;font-size:22px;margin:0;letter-spacing:0.02em;">${esc(studioName)}</h1>
     </div>
     <div style="padding:40px;">
-      <h2 style="font-size:20px;color:#1a1a18;margin:0 0 8px;">Welcome to ${studioName}</h2>
+      <h2 style="font-size:20px;color:#1a1a18;margin:0 0 8px;">Welcome to ${esc(studioName)}</h2>
       <p style="color:#6b6b63;font-size:15px;margin:0 0 24px;">
-        Hi ${memberName}, you've been added as a member of <strong>${studioName}</strong>.
+        Hi ${esc(memberName)}, you've been added as a member of <strong>${esc(studioName)}</strong>.
       </p>
       <div style="margin-bottom:24px;text-align:center;">
-        <a href="${studioAppUrl}"
+        <a href="${esc(studioAppUrl)}"
            style="display:inline-block;background:#1a1a18;color:#f5f0e8;text-decoration:none;padding:14px 32px;border-radius:8px;font-family:Inter,sans-serif;font-size:14px;font-weight:500;letter-spacing:0.08em;text-transform:uppercase;">
           Book a class →
         </a>
@@ -264,4 +264,13 @@ function json(req: Request, body: unknown, status = 200) {
     status,
     headers: { ...corsHeaders(req), "Content-Type": "application/json" },
   });
+}
+
+function esc(s: string): string {
+  return String(s ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }

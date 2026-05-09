@@ -56,3 +56,18 @@ COMMENT ON COLUMN studios.from_email IS
   'Per-studio FROM address for transactional emails (booking confirmation, '
   'invite, cancellation, waitlist offer). Must be a verified Resend domain. '
   'Falls back to FROM_EMAIL env var when null.';
+
+-- ----------------------------------------------------------------------------
+-- 3. studios.app_url: per-studio canonical site URL
+--
+-- Was added by hand in the live DB earlier; this ALTER is for fresh-deploy
+-- reproducibility (IF NOT EXISTS makes it a no-op against existing studios).
+-- Read by create-checkout, cancel-class-notify, notify-waitlist-offer,
+-- invite-member, validate-discount to build per-studio absolute URLs.
+-- ----------------------------------------------------------------------------
+ALTER TABLE studios
+  ADD COLUMN IF NOT EXISTS app_url TEXT;
+
+COMMENT ON COLUMN studios.app_url IS
+  'Per-studio canonical site URL (no trailing slash). Used as the base for '
+  'redirect URLs and email links. Falls back to APP_URL env var when null.';

@@ -17,6 +17,15 @@ function json(req: Request, data: unknown, status = 200) {
   });
 }
 
+function esc(s: string): string {
+  return String(s ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders(req) });
@@ -201,13 +210,13 @@ async function sendMessage({
 <body style="font-family:Georgia,serif;background:#fafaf8;margin:0;padding:0;">
   <div style="max-width:560px;margin:40px auto;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e5e5e3;">
     <div style="background:#1a1a18;padding:32px 40px;">
-      <h1 style="color:#f5f0e8;font-size:22px;margin:0;letter-spacing:0.02em;">${studioName}</h1>
+      <h1 style="color:#f5f0e8;font-size:22px;margin:0;letter-spacing:0.02em;">${esc(studioName)}</h1>
     </div>
     <div style="padding:40px;">
-      <p style="color:#1a1a18;font-size:15px;line-height:1.7;margin:0;">Hi ${memberName},</p>
+      <p style="color:#1a1a18;font-size:15px;line-height:1.7;margin:0;">Hi ${esc(memberName)},</p>
       <div style="color:#1a1a18;font-size:15px;line-height:1.7;margin:20px 0;">${escapedBody}</div>
       <p style="color:#9b9b93;font-size:12px;margin-top:32px;">
-        This message was sent to you by ${studioName}.
+        This message was sent to you by ${esc(studioName)}.
       </p>
     </div>
   </div>

@@ -31,6 +31,11 @@ Deno.serve(async (req) => {
 
     const { studio_id, period = "day" } = await req.json();
     if (!studio_id) return json(req, { error: "studio_id required" }, 400);
+    // studio_id is interpolated into HogQL queries below — reject anything
+    // that isn't a UUID before it reaches a query builder.
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(studio_id)) {
+      return json(req, { error: "studio_id must be a UUID" }, 400);
+    }
 
     // --- Verify caller is admin for this studio ---
     const { data: member, error: memberError } = await userClient
