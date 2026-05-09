@@ -53,7 +53,7 @@ Then capture the new `studios.id` for the steps below.
 
 ## 2. Vercel — create the deployment
 
-1. Vercel Dashboard → **Add New Project** → import from GitHub (`Bananapple/brie`)
+1. Vercel Dashboard → **Add New Project** → import from GitHub (`Bananapple/cami`)
 2. **Environment Variables** (Production scope, no quotes):
    ```
    VITE_SUPABASE_URL              = https://xskqpxfjhhxontirezjd.supabase.co
@@ -164,7 +164,7 @@ They may need to sign out + back in (or wait ~5 min for React Query cache) to se
 - [ ] **OTP sign-in** works (check spam if email doesn't arrive)
 - [ ] **SSO sign-in** popup closes correctly and lands them back on the dashboard
 - [ ] **Drop-in booking** with Stripe test card `4242 4242 4242 4242` confirms within ~5 sec, confirmation email arrives
-- [ ] **Email link** in the confirmation goes to `https://fooyoga.no` (not `brie-alpha` or wrong studio)
+- [ ] **Email link** in the confirmation goes to `https://fooyoga.no` (not `brie-hd7s` or wrong studio)
 - [ ] **Email FROM** address is `booking@fooyoga.no` (or fallback `onboarding@resend.dev` if you haven't done step 6 yet)
 - [ ] **`/manage`** loads when signed in as the owner; gives "Not authorised" when signed in as a regular member
 - [ ] **Membership purchase** with the same test card creates an active membership row

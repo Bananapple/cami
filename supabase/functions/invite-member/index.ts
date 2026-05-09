@@ -6,9 +6,8 @@ const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 const FROM_EMAIL = Deno.env.get("FROM_EMAIL") ?? "onboarding@resend.dev";
-// APP_URL fallback intentionally empty — brie-alpha.vercel.app no longer exists.
-// Per-studio URL is read from studios.app_url; this env var is only used as the
-// final fallback when that column is null.
+// Per-studio URL is read from studios.app_url; this env var is only used as
+// the final fallback when that column is null.
 const APP_URL = Deno.env.get("APP_URL") ?? "";
 
 // Valid studio_role values — must match the DB enum

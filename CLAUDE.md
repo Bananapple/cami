@@ -203,7 +203,7 @@ STRIPE_SECRET_KEY
 STRIPE_WEBHOOK_SECRET
 RESEND_API_KEY
 FROM_EMAIL          # e.g. booking@yogabrie.no — defaults to onboarding@resend.dev if unset
-APP_URL             # e.g. https://brie-alpha.vercel.app — used to validate return_url in create-checkout
+APP_URL             # e.g. https://brie-hd7s.vercel.app — used to validate return_url in create-checkout
 ```
 
 Copy `.env.example` → `.env` per studio deployment. Never commit `.env` (gitignored).
@@ -212,8 +212,8 @@ Copy `.env.example` → `.env` per studio deployment. Never commit `.env` (gitig
 
 ## Deployment (YogaBrie / First Studio)
 
-- **Live URL:** https://brie-alpha.vercel.app
-- **Platform:** Vercel (connected to GitHub repo `Bananapple/brie`, auto-deploys on push to `main`)
+- **Live URL:** https://brie-hd7s.vercel.app
+- **Platform:** Vercel (connected to GitHub repo `Bananapple/cami`, auto-deploys on push to `main`)
 - **Supabase project ref:** `xskqpxfjhhxontirezjd` (eu-north-1)
 - **Schedule:** Seeded — 15 class slots migrated to `class_templates` + `schedule_rules`; 90-day `class_instances` window materialized
 

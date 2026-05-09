@@ -173,7 +173,7 @@ async function main() {
   console.log("══════════════════════════════════════════════════════════");
   console.log("");
   console.log(`  1. Vercel — create the project for ${args.appUrl}`);
-  console.log(`     - Import from GitHub (Bananapple/brie)`);
+  console.log(`     - Import from GitHub (Bananapple/cami)`);
   console.log(`     - Set env vars (Production scope):`);
   console.log(`         VITE_SUPABASE_URL              = ${SUPABASE_URL}`);
   console.log(`         VITE_SUPABASE_PUBLISHABLE_KEY  = <anon key from Supabase>`);
