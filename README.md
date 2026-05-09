@@ -18,7 +18,7 @@ npm run dev                # localhost:8080 (or next available port)
 
 ## Provisioning a new studio
 
-In the v2 multi-tenant architecture (see `docs/MIGRATION-MULTITENANT.md`), adding a studio is an INSERT into the `studios` table — not a new Supabase project. The legacy `./scripts/new-studio.sh` is deprecated and will be retired after the v2 migration cutover.
+In the v2 multi-tenant architecture (see `docs/MIGRATION-MULTITENANT.md`), adding a studio is an INSERT into the `studios` table — not a new Supabase project. Use `scripts/provision-studio.ts` to create the row and `scripts/promote-owner.ts` to promote the initial manager. The full runbook lives in `docs/NEW-CUSTOMER.md`. The legacy `./scripts/new-studio.sh` is retired.
 
 ## Key commands
 

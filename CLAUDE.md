@@ -32,6 +32,8 @@ This is a **multi-tenant SaaS platform** for yoga studios in Scandinavia, Europe
 - `payment-webhook` must be deployed with `--no-verify-jwt` (Stripe sends no JWT)
 - `notify-waitlist-offer` must be deployed with `--no-verify-jwt` (DB webhook sends no JWT)
 - `create-checkout` and `issue-refund` use standard JWT auth (no flag needed)
+- All edge functions import CORS handling from `supabase/functions/_shared/cors.ts` — single source of truth for allowed origins / preflight.
+- Per-studio URLs and sender emails are read from `studios.app_url` / `studios.from_email` (added in `0033`). Edge functions fall back to `APP_URL` / `FROM_EMAIL` env only if the row column is null. Email-sending functions also HTML-escape user-provided strings via a shared `esc()` helper.
 
 ## Commands
 
@@ -47,6 +49,10 @@ npm run test -- src/test/some.test.ts  # Run a single test file
 ## Provisioning a New Studio
 
 **v2 (live)**: Adding a studio is a row INSERT into `studios` + payment provider onboarding. Schedule is built via `class_templates` + `schedule_rules`; `materialize_class_instances()` populates the 90-day rolling window. `scripts/new-studio.sh` is retired.
+
+Provisioning helpers live in `scripts/`:
+- `scripts/provision-studio.ts` — INSERTs the `studios` row (slug, name, branding, currency, timezone, `app_url`, `from_email`) from a config object; idempotent.
+- `scripts/promote-owner.ts` — promotes a `studio_members` row to `role='owner'` for the initial manager.
 
 Full step-by-step checklist (SQL → Supabase redirect URL → Vercel → Stripe → Resend → manager invite → verification): **`docs/NEW-CUSTOMER.md`**
 
@@ -130,6 +136,10 @@ All user-facing hooks (`useBookings`, `useMembership`, `usePaymentMethods`, `use
 - `0009_drop_legacy_sessions.sql` — drops legacy `sessions` table and stale columns
 - `0010_products_and_membership_purchase.sql` — `products` table + RLS + seed data; `payments.product_id`; `memberships.product_id`; `activate_membership()`, `renew_membership_by_subscription()`, `cancel_membership_by_subscription()` RPCs
 - `0011_book_with_credit.sql` — `bookings.membership_id`; `book_with_credit()` RPC (atomic credit booking); `return_credit()` RPC (atomic credit return on cancellation)
+- `0030_revoke_definer_executes.sql` — REVOKEs default EXECUTE on `SECURITY DEFINER` RPCs from `anon`/`authenticated`; only callers that explicitly need the function get GRANTed
+- `0031_internal_auth_and_rls_tightening.sql` — internal-auth helpers + studio-scoped RLS tightening across membership / booking / payment tables
+- `0032_webhook_studio_scoping.sql` — webhook ingestion + `payment_webhook_events` are scoped by `studio_id`; cross-studio replay is rejected
+- `0033_studio_visibility_and_from_email.sql` — adds `studios.app_url` and `studios.from_email`; edge functions read these per-studio instead of relying on global `APP_URL` / `FROM_EMAIL` env vars
 
 **Applying migrations:** The Supabase CLI only looks in `supabase/migrations/` — `supabase db push` will NOT pick up files in `migrations-v2/`. Apply these by copy-pasting the SQL file into the Supabase SQL Editor (Dashboard → SQL Editor → New query).
 
