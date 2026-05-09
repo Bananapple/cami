@@ -16,7 +16,7 @@ A pre-launch CSO-mode audit + customer-readiness pass shipped 14 audit findings 
 - **A. Two codebases:** split the platform marketing site (heycami.studio) into its own repo/codebase. Studio app stays one deployable. Cleanest, biggest effort.
 - **B. One codebase, hostname-gated routes:** in `App.tsx`, gate the studio routes by `window.location.hostname`. If host is `heycami.studio`, render only marketing pages and refuse to mount StudioProvider/booking/manage. Smaller change, slightly less clean.
 
-**Sub-question (separate decision):** the "Log in" button on heycami.studio — should staff log in centrally there (and get routed to their studio's `/manage`), or should they log in directly on their studio's site? Centralized auth is better UX for multi-studio operators, harder to build (~couple hours of routing + studio-picker UI).
+**Sub-question (separate decision):** the "Log in" button on heycami.studio — should staff log in centrally there (and get routed to their studio's `/manage`), or should they log in directly on their studio's site? Current code assumes the latter (each Vercel deployment is its own login surface; `/manage` gates on `studio_members` membership for whatever studio that deployment is configured for). Centralized auth is better UX for multi-studio operators (one login → studio picker → land in the right `/manage`), harder to build (~couple hours of routing + studio-picker UI).
 
 **Why deferred:** Both options require design + product decisions before code. Doesn't block real-customer onboarding because the staff workflow is "go directly to your studio's URL."
 
