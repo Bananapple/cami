@@ -243,7 +243,7 @@ export default function CamiHome() {
   const showNotifs       = gte(phase, "notifications");
 
   return (
-    <div className="relative h-screen w-full overflow-hidden" style={{ background: "#e4ddd4" }}>
+    <div className="relative h-screen w-full overflow-hidden" style={{ background: "#e4ddd4", fontFamily: "Fraunces, Georgia, serif" }}>
       {/* GlassFilter SVG — referenced by notification backdropFilter */}
       <GlassFilter />
 

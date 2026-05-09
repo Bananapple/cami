@@ -14,9 +14,9 @@ export default {
     },
     extend: {
       fontFamily: {
-        // TODO: swap Fraunces → Recoleta SemiBold once licensed (see docs/BRAND.md)
-        serif: ['Fraunces', 'Georgia', 'serif'],
+        serif: ['DM Serif Display', 'Georgia', 'serif'],
         sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+        fraunces: ['Fraunces', 'Georgia', 'serif'],
       },
       colors: {
         border: "hsl(var(--border))",

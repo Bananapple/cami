@@ -104,7 +104,7 @@
     font-family: Inter, system-ui, -apple-system, sans-serif;
   }
   h1, h2, h3, h4, h5, h6 {
-    font-family: Fraunces, Georgia, serif;
+    font-family: 'DM Serif Display', Georgia, serif;
   }
   nav, button, input, label, .font-sans {
     font-family: Inter, system-ui, -apple-system, sans-serif;
@@ -132,6 +132,9 @@
 
 @layer utilities {
   .font-serif {
+    font-family: 'DM Serif Display', Georgia, serif;
+  }
+  .font-fraunces {
     font-family: Fraunces, Georgia, serif;
   }
   .story-link * {
