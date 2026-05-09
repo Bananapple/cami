@@ -68,10 +68,10 @@ Deno.serve(async (req) => {
       return new Response("OK", { status: 200 });
     }
 
-    // Fetch user email + studio name in parallel
+    // Fetch user email + studio name + canonical URL + sender email in parallel
     const [{ data: { user } }, { data: studio }] = await Promise.all([
       admin.auth.admin.getUserById(userId),
-      admin.from("studios").select("name").eq("id", studioId).single(),
+      admin.from("studios").select("name, app_url, from_email").eq("id", studioId).single(),
     ]);
 
     if (!user?.email) {
@@ -80,6 +80,9 @@ Deno.serve(async (req) => {
     }
 
     const studioName = (studio as any)?.name ?? "Your Studio";
+    const studioAppUrl: string =
+      (studio as any)?.app_url ?? Deno.env.get("APP_URL") ?? "";
+    const studioFromEmail: string = (studio as any)?.from_email ?? FROM_EMAIL;
     const idempotencyKey = `waitlist_offer_${waitlistId}`;
 
     // Idempotency: INSERT log row before sending — unique constraint is the lock
@@ -143,7 +146,7 @@ Deno.serve(async (req) => {
       ${expiryLine}
 
       <div style="margin-top:28px;text-align:center;">
-        <a href="${Deno.env.get("APP_URL") ?? "https://brie-alpha.vercel.app"}/dashboard"
+        <a href="${studioAppUrl}/dashboard"
            style="display:inline-block;background:#1a1a18;color:#f5f0e8;text-decoration:none;padding:14px 32px;border-radius:8px;font-family:Inter,sans-serif;font-size:14px;font-weight:500;letter-spacing:0.08em;text-transform:uppercase;">
           Book your spot →
         </a>
@@ -165,7 +168,7 @@ Deno.serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from: FROM_EMAIL,
+        from: studioFromEmail,
         to: [user.email],
         subject: `Spot available — ${className} on ${dateStr}`,
         html,

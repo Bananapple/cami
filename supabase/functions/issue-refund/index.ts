@@ -1,5 +1,6 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { getProvider } from "../_shared/providers/index.ts";
+import { corsHeaders } from "../_shared/cors.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -7,32 +8,26 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, {
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-studio-slug",
-        "Access-Control-Allow-Methods": "POST",
-      },
-    });
+    return new Response(null, { headers: corsHeaders(req) });
   }
 
   try {
     // --- Auth ---
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) return json({ error: "Unauthorized" }, 401);
+    if (!authHeader?.startsWith("Bearer ")) return json(req, { error: "Unauthorized" }, 401);
     const jwt = authHeader.slice(7);
 
     const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       global: { headers: { Authorization: `Bearer ${jwt}` } },
     });
     const { data: { user }, error: authErr } = await userClient.auth.getUser();
-    if (authErr || !user) return json({ error: "Unauthorized" }, 401);
+    if (authErr || !user) return json(req, { error: "Unauthorized" }, 401);
 
     const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     // --- Parse body ---
     const { booking_id } = await req.json();
-    if (!booking_id) return json({ error: "booking_id is required" }, 400);
+    if (!booking_id) return json(req, { error: "booking_id is required" }, 400);
 
     // --- Fetch booking with class_instance starts_at and studio cancellation window ---
     const { data: booking, error: bookingErr } = await admin
@@ -44,7 +39,7 @@ Deno.serve(async (req) => {
       `)
       .eq("id", booking_id)
       .single();
-    if (bookingErr || !booking) return json({ error: "Booking not found" }, 404);
+    if (bookingErr || !booking) return json(req, { error: "Booking not found" }, 404);
 
     // --- Authorization: user owns booking OR is staff ---
     const isOwner = booking.user_id === user.id;
@@ -57,12 +52,12 @@ Deno.serve(async (req) => {
         .eq("is_active", true)
         .in("role", ["owner", "manager"])
         .maybeSingle();
-      if (!member) return json({ error: "Forbidden" }, 403);
+      if (!member) return json(req, { error: "Forbidden" }, 403);
     }
 
     // --- Guard: already cancelled ---
     if (booking.status === "cancelled") {
-      return json({ error: "Booking is already cancelled" }, 409);
+      return json(req, { error: "Booking is already cancelled" }, 409);
     }
 
     // --- Determine refund eligibility ---
@@ -80,7 +75,7 @@ Deno.serve(async (req) => {
         p_booking_id: booking_id,
         p_return_credit: outsideWindow,
       });
-      return json({ cancelled: true, credit_returned: outsideWindow });
+      return json(req, { cancelled: true, credit_returned: outsideWindow });
     }
 
     // --- Payment booking: cancel first, then attempt refund ---
@@ -95,7 +90,7 @@ Deno.serve(async (req) => {
       if (hasPayment) {
         await admin.from("payments").update({ status: "cancelled" }).eq("id", booking.payment_id);
       }
-      return json({
+      return json(req, {
         cancelled: true,
         refunded: false,
         reason: !hasPayment ? "no_payment" : "inside_cancellation_window",
@@ -110,7 +105,7 @@ Deno.serve(async (req) => {
       .single();
 
     if (!payment || payment.status !== "succeeded" || !payment.provider_payment_id) {
-      return json({
+      return json(req, {
         cancelled: true,
         refunded: false,
         reason: "payment_not_refundable",
@@ -137,10 +132,10 @@ Deno.serve(async (req) => {
         status: newStatus,
       }).eq("id", payment.id);
 
-      return json({ cancelled: true, refunded: true, refund_amount: refundAmount });
+      return json(req, { cancelled: true, refunded: true, refund_amount: refundAmount });
     } catch (err) {
       console.error("Refund failed after cancellation:", err);
-      return json({
+      return json(req, {
         cancelled: true,
         refunded: false,
         reason: "refund_failed",
@@ -149,16 +144,13 @@ Deno.serve(async (req) => {
     }
   } catch (err) {
     console.error("issue-refund error:", err);
-    return json({ error: `Internal server error: ${err}` }, 500);
+    return json(req, { error: "Internal server error" }, 500);
   }
 });
 
-function json(body: unknown, status = 200) {
+function json(req: Request, body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: {
-      "Content-Type": "application/json",
-      "Access-Control-Allow-Origin": "*",
-    },
+    headers: { ...corsHeaders(req), "Content-Type": "application/json" },
   });
 }

@@ -1,4 +1,5 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { corsHeaders } from "../_shared/cors.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -6,36 +7,30 @@ const POSTHOG_SECRET_KEY = Deno.env.get("POSTHOG_SECRET_KEY");
 const POSTHOG_PROJECT_ID = Deno.env.get("POSTHOG_PROJECT_ID") ?? "undefined";
 const POSTHOG_HOST = "https://us.posthog.com";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST",
-};
-
-function json(body: unknown, status = 200) {
+function json(req: Request, body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { ...corsHeaders(req), "Content-Type": "application/json" },
   });
 }
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders(req) });
 
   try {
     // --- Auth: require valid JWT ---
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) return json({ error: "Unauthorized" }, 401);
+    if (!authHeader?.startsWith("Bearer ")) return json(req, { error: "Unauthorized" }, 401);
     const jwt = authHeader.slice(7);
 
     const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       global: { headers: { Authorization: `Bearer ${jwt}` } },
     });
     const { data: { user }, error: authError } = await userClient.auth.getUser();
-    if (authError || !user) return json({ error: "Unauthorized" }, 401);
+    if (authError || !user) return json(req, { error: "Unauthorized" }, 401);
 
     const { studio_id, period = "day" } = await req.json();
-    if (!studio_id) return json({ error: "studio_id required" }, 400);
+    if (!studio_id) return json(req, { error: "studio_id required" }, 400);
 
     // --- Verify caller is admin for this studio ---
     const { data: member, error: memberError } = await userClient
@@ -46,12 +41,12 @@ Deno.serve(async (req) => {
       .single();
 
     if (memberError || !member || !["owner", "manager"].includes(member.role)) {
-      return json({ error: "Forbidden" }, 403);
+      return json(req, { error: "Forbidden" }, 403);
     }
 
     // --- Query PostHog ---
     if (!POSTHOG_SECRET_KEY) {
-      return json({ visitors: null, conversions: null, conversionRate: null, sources: null, noData: true });
+      return json(req, { visitors: null, conversions: null, conversionRate: null, sources: null, noData: true });
     }
 
     const now = new Date();
@@ -257,9 +252,9 @@ Deno.serve(async (req) => {
     const dailyBySource: { date: string; source: string; count: number }[] =
       (dailyBySourceData?.results ?? []).map(([date, source, count]: [string, string, number]) => ({ date, source, count }));
 
-    return json({ visitors, avgPerDay, dailyBreakdown, dailyConversions, conversions, conversionRate, sources, dailyBySource, noData: dailyBreakdown.length === 0 });
+    return json(req, { visitors, avgPerDay, dailyBreakdown, dailyConversions, conversions, conversionRate, sources, dailyBySource, noData: dailyBreakdown.length === 0 });
   } catch (err) {
     console.error("get-analytics error:", err);
-    return json({ error: "Internal error" }, 500);
+    return json(req, { error: "Internal error" }, 500);
   }
 });

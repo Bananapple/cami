@@ -6,6 +6,7 @@
 // Returns:   { sent: number, skipped: number }
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { corsHeaders } from "../_shared/cors.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -13,14 +14,8 @@ const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 const FROM_EMAIL = Deno.env.get("FROM_EMAIL") ?? "onboarding@resend.dev";
 
 Deno.serve(async (req) => {
-  // Standard CORS pre-flight (Supabase client sends OPTIONS from the browser)
   if (req.method === "OPTIONS") {
-    return new Response("ok", {
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-      },
-    });
+    return new Response("ok", { headers: corsHeaders(req) });
   }
 
   // --- Auth check: must be an authenticated staff request ---
@@ -28,7 +23,7 @@ Deno.serve(async (req) => {
   if (!authHeader?.startsWith("Bearer ")) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
       status: 401,
-      headers: { "Content-Type": "application/json" },
+      headers: { ...corsHeaders(req), "Content-Type": "application/json" },
     });
   }
 
@@ -38,7 +33,7 @@ Deno.serve(async (req) => {
   } catch {
     return new Response(JSON.stringify({ error: "Invalid JSON" }), {
       status: 400,
-      headers: { "Content-Type": "application/json" },
+      headers: { ...corsHeaders(req), "Content-Type": "application/json" },
     });
   }
 
@@ -46,7 +41,7 @@ Deno.serve(async (req) => {
   if (!class_instance_id) {
     return new Response(JSON.stringify({ error: "class_instance_id is required" }), {
       status: 400,
-      headers: { "Content-Type": "application/json" },
+      headers: { ...corsHeaders(req), "Content-Type": "application/json" },
     });
   }
 
@@ -59,7 +54,7 @@ Deno.serve(async (req) => {
   if (!caller || callerErr) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
       status: 401,
-      headers: { "Content-Type": "application/json" },
+      headers: { ...corsHeaders(req), "Content-Type": "application/json" },
     });
   }
 
@@ -82,7 +77,7 @@ Deno.serve(async (req) => {
       console.error("class_instance not found:", class_instance_id, ciErr);
       return new Response(JSON.stringify({ error: "Class instance not found" }), {
         status: 404,
-        headers: { "Content-Type": "application/json" },
+        headers: { ...corsHeaders(req), "Content-Type": "application/json" },
       });
     }
 
@@ -96,21 +91,26 @@ Deno.serve(async (req) => {
       .eq("user_id", caller.id)
       .single();
 
-    if (!membership || !["manager", "staff", "owner"].includes(membership.role)) {
+    // Match the studio_role enum: 'owner', 'manager', 'instructor', 'member'.
+    // Mirror user_is_staff() — owners, managers, and instructors can dispatch cancellations.
+    if (!membership || !["owner", "manager", "instructor"].includes(membership.role)) {
       return new Response(JSON.stringify({ error: "Forbidden" }), {
         status: 403,
-        headers: { "Content-Type": "application/json" },
+        headers: { ...corsHeaders(req), "Content-Type": "application/json" },
       });
     }
 
-    // --- 2. Fetch studio name ---
+    // --- 2. Fetch studio name + canonical URL + sender email ---
     const { data: studio } = await admin
       .from("studios")
-      .select("name")
+      .select("name, app_url, from_email")
       .eq("id", studioId)
       .single();
 
     const studioName: string = (studio as any)?.name ?? "Your Studio";
+    const studioAppUrl: string =
+      (studio as any)?.app_url ?? Deno.env.get("APP_URL") ?? "";
+    const studioFromEmail: string = (studio as any)?.from_email ?? FROM_EMAIL;
 
     // --- 3. Fetch cancelled bookings with member email ---
     const { data: bookings, error: bookErr } = await admin
@@ -128,20 +128,20 @@ Deno.serve(async (req) => {
       console.error("bookings fetch error:", bookErr);
       return new Response(JSON.stringify({ error: "Failed to fetch bookings" }), {
         status: 500,
-        headers: { "Content-Type": "application/json" },
+        headers: { ...corsHeaders(req), "Content-Type": "application/json" },
       });
     }
 
     if (!bookings || bookings.length === 0) {
       return new Response(JSON.stringify({ sent: 0, skipped: 0 }), {
-        headers: { "Content-Type": "application/json" },
+        headers: { ...corsHeaders(req), "Content-Type": "application/json" },
       });
     }
 
     if (!RESEND_API_KEY) {
       console.warn("RESEND_API_KEY not set — skipping cancellation notifications");
       return new Response(JSON.stringify({ sent: 0, skipped: bookings.length }), {
-        headers: { "Content-Type": "application/json" },
+        headers: { ...corsHeaders(req), "Content-Type": "application/json" },
       });
     }
 
@@ -229,7 +229,7 @@ Deno.serve(async (req) => {
       </p>
 
       <div style="text-align:center;">
-        <a href="${Deno.env.get("APP_URL") ?? "https://brie-alpha.vercel.app"}"
+        <a href="${studioAppUrl}"
            style="display:inline-block;background:#1a1a18;color:#f5f0e8;text-decoration:none;padding:14px 32px;border-radius:8px;font-family:Inter,sans-serif;font-size:14px;font-weight:500;letter-spacing:0.08em;text-transform:uppercase;">
           View schedule →
         </a>
@@ -251,7 +251,7 @@ Deno.serve(async (req) => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          from: FROM_EMAIL,
+          from: studioFromEmail,
           to: [recipientEmail],
           subject,
           html,
@@ -271,13 +271,13 @@ Deno.serve(async (req) => {
     }
 
     return new Response(JSON.stringify({ sent, skipped }), {
-      headers: { "Content-Type": "application/json" },
+      headers: { ...corsHeaders(req), "Content-Type": "application/json" },
     });
   } catch (err) {
     console.error("cancel-class-notify error:", err);
     return new Response(JSON.stringify({ error: "Internal error" }), {
       status: 500,
-      headers: { "Content-Type": "application/json" },
+      headers: { ...corsHeaders(req), "Content-Type": "application/json" },
     });
   }
 });

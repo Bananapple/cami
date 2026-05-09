@@ -1,4 +1,5 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { corsHeaders } from "../_shared/cors.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -6,29 +7,23 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, {
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-studio-slug",
-        "Access-Control-Allow-Methods": "POST",
-      },
-    });
+    return new Response(null, { headers: corsHeaders(req) });
   }
 
   try {
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) return json({ error: "Unauthorized" }, 401);
+    if (!authHeader?.startsWith("Bearer ")) return json(req, { error: "Unauthorized" }, 401);
 
     const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       global: { headers: { Authorization: authHeader } },
     });
     const { data: { user } } = await userClient.auth.getUser();
-    if (!user) return json({ error: "Unauthorized" }, 401);
+    if (!user) return json(req, { error: "Unauthorized" }, 401);
 
     const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     const { code, class_instance_id } = await req.json();
-    if (!code || !class_instance_id) return json({ valid: false, label: "Code required" });
+    if (!code || !class_instance_id) return json(req, { valid: false, label: "Code required" });
 
     const normalizedCode = (code as string).trim().toUpperCase();
 
@@ -37,7 +32,7 @@ Deno.serve(async (req) => {
       .select("studio_id, price")
       .eq("id", class_instance_id)
       .single();
-    if (!instance) return json({ valid: false, label: "Class not found" });
+    if (!instance) return json(req, { valid: false, label: "Class not found" });
 
     const studioId = instance.studio_id;
     const originalMinor = Math.round(instance.price * 100);
@@ -128,7 +123,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    return json({
+    return json(req, {
       valid,
       label,
       reason: valid ? undefined : (reason ?? "not_found"),
@@ -138,13 +133,13 @@ Deno.serve(async (req) => {
     });
   } catch (err) {
     console.error("validate-discount error:", err);
-    return json({ error: "Internal server error" }, 500);
+    return json(req, { error: "Internal server error" }, 500);
   }
 });
 
-function json(body: unknown, status = 200) {
+function json(req: Request, body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+    headers: { ...corsHeaders(req), "Content-Type": "application/json" },
   });
 }

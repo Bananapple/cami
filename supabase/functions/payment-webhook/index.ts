@@ -44,33 +44,96 @@ Deno.serve(async (req) => {
     return new Response("Invalid signature", { status: 400 });
   }
 
-  // Idempotency: record the event; skip if already processed
-  const { error: dedupError, count } = await admin
+  // --- Resolve which studio this event belongs to BEFORE dedup or processing.
+  // Without this, a forged/misrouted event with a valid platform-secret signature
+  // could be attributed to the wrong studio. Order of resolution:
+  //   1. Connect account → look up studio_payment_providers by provider_account_id
+  //   2. Event metadata (we set studio_id when creating the checkout session)
+  //   3. Subscription event → look up the membership
+  //   4. Payment lookup by provider_session_id → use payment.studio_id
+  // If none resolve, log and accept the event but leave studio_id NULL — the
+  // dedup constraint allows NULL via NULLS NOT DISTINCT, and downstream
+  // processing falls back to legacy single-tenant behavior.
+  let studioId: string | null = null;
+
+  if (event.connect_account_id) {
+    const { data: spp } = await admin
+      .from("studio_payment_providers")
+      .select("studio_id")
+      .eq("provider", provider)
+      .eq("provider_account_id", event.connect_account_id)
+      .maybeSingle();
+    if (!spp) {
+      console.error(`Webhook from unregistered ${provider} account ${event.connect_account_id} — rejecting`);
+      return new Response("Unknown account", { status: 400 });
+    }
+    studioId = spp.studio_id;
+  } else if (event.metadata?.studio_id) {
+    studioId = event.metadata.studio_id;
+  } else if (event.provider_subscription_id) {
+    const { data: m } = await admin
+      .from("memberships")
+      .select("studio_id")
+      .eq("provider_subscription_id", event.provider_subscription_id)
+      .maybeSingle();
+    studioId = m?.studio_id ?? null;
+  } else if (event.provider_session_id) {
+    const { data: p } = await admin
+      .from("payments")
+      .select("studio_id")
+      .eq("provider", provider)
+      .eq("provider_session_id", event.provider_session_id)
+      .maybeSingle();
+    studioId = p?.studio_id ?? null;
+  }
+
+  // Idempotency: atomically record the event; skip if already processed.
+  // The unique constraint UNIQUE NULLS NOT DISTINCT (provider, provider_event_id, studio_id)
+  // is the atomic lock — concurrent webhook retries are serialized by Postgres
+  // and only one wins (rows.length === 1). Losers see rows.length === 0.
+  const { data: dedupRows, error: dedupError } = await admin
     .from("payment_webhook_events")
-    .insert({
+    .upsert({
       provider,
       provider_event_id: event.provider_event_id,
       event_type: event.type,
       payload: event.raw,
-    }, { count: "exact" })
-    .select()
-    .limit(0);
+      studio_id: studioId,
+    }, { onConflict: "provider,provider_event_id,studio_id", ignoreDuplicates: true })
+    .select("id");
 
-  if (count === 0 || dedupError?.code === "23505") {
-    console.log(`Duplicate webhook event ${event.provider_event_id}, skipping`);
+  if (dedupError) {
+    console.error("Webhook dedup insert failed:", dedupError);
+    return new Response("Internal error", { status: 500 });
+  }
+
+  if (!dedupRows || dedupRows.length === 0) {
+    console.log(`Duplicate webhook event ${event.provider_event_id} for studio ${studioId}, skipping`);
     return new Response("OK", { status: 200 });
   }
 
-  // Find our canonical payment row by provider_session_id
+  // Find our canonical payment row by provider_session_id, scoped by studio.
+  // Adding the studio_id filter prevents a forged event from finding (and
+  // confirming) a payment row in another studio that happens to share a
+  // provider_session_id (unlikely with Stripe's globally unique IDs, but
+  // defense in depth).
   let paymentId: string | null = null;
   if (event.provider_session_id) {
-    const { data: payment } = await admin
+    let q = admin
       .from("payments")
-      .select("id, status, amount")
+      .select("id, status, amount, studio_id")
       .eq("provider", provider)
-      .eq("provider_session_id", event.provider_session_id)
-      .maybeSingle();
+      .eq("provider_session_id", event.provider_session_id);
+    if (studioId) q = q.eq("studio_id", studioId);
+    const { data: payment } = await q.maybeSingle();
     paymentId = payment?.id ?? null;
+    // Validate: if we resolved a studio AND found a payment, they must match.
+    if (studioId && payment && payment.studio_id !== studioId) {
+      console.error(
+        `Studio mismatch: event resolved to ${studioId} but payment ${payment.id} belongs to ${payment.studio_id} — rejecting`,
+      );
+      return new Response("Studio mismatch", { status: 400 });
+    }
   }
 
   // Subscription renewal / cancellation events identify the membership by subscription ID,
@@ -132,9 +195,12 @@ Deno.serve(async (req) => {
 
       case "subscription.renewed":
         // Recurring monthly invoice paid — extend the membership's valid_until.
+        // Pass studioId so the RPC scopes the lookup correctly when two
+        // studios ever share a Stripe subscription_id namespace (post-Connect).
         if (event.provider_subscription_id) {
           await admin.rpc("renew_membership_by_subscription", {
             p_subscription_id: event.provider_subscription_id,
+            p_studio_id: studioId,
           });
         }
         break;
@@ -144,6 +210,7 @@ Deno.serve(async (req) => {
         if (event.provider_subscription_id) {
           await admin.rpc("cancel_membership_by_subscription", {
             p_subscription_id: event.provider_subscription_id,
+            p_studio_id: studioId,
           });
         }
         break;
@@ -234,10 +301,11 @@ async function sendBookingConfirmation(admin: ReturnType<typeof createClient>, p
     // Fetch these first — needed for the idempotency log INSERT (recipient is NOT NULL).
     const [{ data: { user } }, { data: studio }] = await Promise.all([
       admin.auth.admin.getUserById(booking.user_id),
-      admin.from("studios").select("name").eq("id", booking.studio_id).single(),
+      admin.from("studios").select("name, from_email").eq("id", booking.studio_id).single(),
     ]);
     if (!user?.email) return;
     const studioName = (studio as any)?.name ?? "Yoga Studio";
+    const studioFromEmail: string = (studio as any)?.from_email ?? FROM_EMAIL;
 
     // Idempotency: INSERT the log row BEFORE sending.
     // The UNIQUE constraint on idempotency_key is the atomic lock — the first
@@ -295,7 +363,7 @@ async function sendBookingConfirmation(admin: ReturnType<typeof createClient>, p
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from: FROM_EMAIL,
+        from: studioFromEmail,
         to: [user.email],
         subject: `Booking confirmed — ${className}`,
         html,
@@ -326,7 +394,7 @@ async function sendMembershipConfirmation(admin: ReturnType<typeof createClient>
       .select(`
         id, user_id, studio_id, plan_name, credits_remaining, valid_until,
         products ( type, billing_interval, commitment_months, price_minor, currency ),
-        studios ( name )
+        studios ( name, from_email )
       `)
       .eq("id", membershipId)
       .single();
@@ -350,6 +418,7 @@ async function sendMembershipConfirmation(admin: ReturnType<typeof createClient>
 
     const product = membership.products as any;
     const studioName = (membership.studios as any)?.name ?? "Yoga Studio";
+    const studioFromEmail: string = (membership.studios as any)?.from_email ?? FROM_EMAIL;
     const isSubscription = product?.billing_interval === "month";
     const isClipCard = product?.type === "clip_card";
     const priceNOK = product?.price_minor ? (product.price_minor / 100).toLocaleString("nb-NO") : null;
@@ -374,7 +443,7 @@ async function sendMembershipConfirmation(admin: ReturnType<typeof createClient>
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from: FROM_EMAIL,
+        from: studioFromEmail,
         to: [user.email],
         subject: `Welcome — ${membership.plan_name} is now active`,
         html,
@@ -440,7 +509,7 @@ function buildMembershipEmail(p: {
 
           <tr>
             <td style="padding:40px 48px 32px;border-bottom:1px solid #2e2e2e;">
-              <p style="margin:0;font-size:13px;letter-spacing:0.15em;text-transform:uppercase;color:#8a7e6e;">${p.studioName}</p>
+              <p style="margin:0;font-size:13px;letter-spacing:0.15em;text-transform:uppercase;color:#8a7e6e;">${esc(p.studioName)}</p>
               <h1 style="margin:12px 0 0;font-size:28px;font-weight:400;color:#f5f0eb;line-height:1.2;">
                 Your membership is active
               </h1>
@@ -449,13 +518,13 @@ function buildMembershipEmail(p: {
 
           <tr>
             <td style="padding:32px 48px;">
-              <h2 style="margin:0 0 24px;font-size:20px;font-weight:400;color:#f5f0eb;">${p.planName}</h2>
+              <h2 style="margin:0 0 24px;font-size:20px;font-weight:400;color:#f5f0eb;">${esc(p.planName)}</h2>
               <table cellpadding="0" cellspacing="0" width="100%">
                 ${rows.map(row => `
                 <tr>
                   <td style="padding:10px 0;border-bottom:1px solid #2e2e2e;">
-                    <span style="font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:#8a7e6e;font-family:sans-serif;">${row.label}</span>
-                    <p style="margin:4px 0 0;font-size:15px;color:#f5f0eb;">${row.value}</p>
+                    <span style="font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:#8a7e6e;font-family:sans-serif;">${esc(row.label)}</span>
+                    <p style="margin:4px 0 0;font-size:15px;color:#f5f0eb;">${esc(row.value)}</p>
                   </td>
                 </tr>`).join("")}
               </table>
