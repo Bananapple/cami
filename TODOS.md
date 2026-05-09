@@ -55,6 +55,11 @@ A pre-launch CSO-mode audit + customer-readiness pass shipped 14 audit findings 
 - **`/manage/schedule` save doesn't dispatch network request** — verified in DevTools Network tab during smoke test 4 on 2026-05-09. Click Save fires no PATCH request; only the page-load GET appears. Time edits silently don't persist. Pre-existing.
 - **Owner-promotion path required manual SQL** — ✅ Resolved (`scripts/promote-owner.ts`).
 
+### Tech debt found in passing
+
+- **137 ESLint warnings in `src/`** — all pre-existing, none added during the 2026-05-09 session. Breakdown: ~80% `react-refresh/only-export-components` (HMR optimization, non-functional), ~15% `react-hooks/exhaustive-deps` (real bugs hiding here), ~5% scattered. Run `npm run lint -- --fix` for auto-fixable ones first, then walk the exhaustive-deps cases manually. Worth a focused session.
+- **Test coverage thin** — 4 test files for a multi-thousand-line codebase. Untested critical paths: BookingSheet (membership detection, promo code, waitlist), all Edge Functions, all manage hooks. Worth scoping before public launch.
+
 ---
 
 ## ~~Refund / cancellation policy~~ — ✅ DONE (2026-04-24)
