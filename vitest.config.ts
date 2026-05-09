@@ -11,6 +11,15 @@ export default defineConfig({
     include: ["src/**/*.{test,spec}.{ts,tsx}"],
   },
   resolve: {
-    alias: { "@": path.resolve(__dirname, "./src") },
+    alias: [
+      // Swap the real Supabase client for a no-op mock during tests so modules
+      // that import it don't crash on missing VITE_SUPABASE_URL.
+      // Must come before the general "@" alias (first match wins).
+      {
+        find: "@/integrations/supabase/client",
+        replacement: path.resolve(__dirname, "./src/integrations/supabase/client.mock.ts"),
+      },
+      { find: "@", replacement: path.resolve(__dirname, "./src") },
+    ],
   },
 });
