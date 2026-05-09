@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { GlassFilter } from "@/components/ui/liquid-glass-button";
+import AuthForm from "@/components/booking/AuthForm";
 
 type Phase = "idle" | "text1" | "text2" | "cta" | "nav" | "notifications";
 const PHASES: Phase[] = ["idle", "text1", "text2", "cta", "nav", "notifications"];
@@ -185,11 +186,41 @@ function NotificationSequence() {
   );
 }
 
+// ─── Login drawer ─────────────────────────────────────────────────────────────
+
+function LoginDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const manageUrl = (import.meta.env.VITE_MANAGE_URL as string) || "/manage";
+
+  if (!open) return null;
+
+  return (
+    <>
+      <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div
+        className="fixed left-0 right-0 bottom-0 z-50 md:inset-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:w-[440px]"
+        style={{ maxHeight: "92vh", overflowY: "auto" }}
+      >
+        <div className="bg-background rounded-t-2xl md:rounded-2xl p-8 relative">
+          <button
+            onClick={onClose}
+            className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full text-muted-foreground hover:bg-muted transition-colors text-lg"
+            aria-label="Close"
+          >
+            ✕
+          </button>
+          <AuthForm onSuccess={() => { window.location.href = manageUrl; }} />
+        </div>
+      </div>
+    </>
+  );
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function CamiHome() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [phase, setPhase] = useState<Phase>("idle");
+  const [loginOpen, setLoginOpen] = useState(false);
 
   useEffect(() => {
     // Video starts immediately on load
@@ -250,6 +281,7 @@ export default function CamiHome() {
         style={{ opacity: showText1 ? 1 : 0, transition: "opacity 0.5s ease", transitionDelay: showText1 ? "200ms" : "0ms" }}
       >
         <button
+          onClick={() => setLoginOpen(true)}
           className="text-sm font-medium px-4 py-2 rounded-full"
           style={{ background: "rgba(255,255,255,0.18)", backdropFilter: "blur(12px)", color: "white" }}
         >
@@ -350,6 +382,8 @@ export default function CamiHome() {
           <NotificationSequence />
         </div>
       )}
+
+      <LoginDrawer open={loginOpen} onClose={() => setLoginOpen(false)} />
 
       {/* ── Social pill — desktop only ── */}
       <div
