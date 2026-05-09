@@ -17,7 +17,16 @@ export function initStudio(studioId: string) {
   posthog.capture("$pageview");
 }
 
-export function identifyUser(userId: string, props?: Record<string, unknown>) {
+// Allowlisted properties — keep this narrow so PII (email, name, phone, address)
+// can never accidentally land in PostHog. If a new field is needed for analytics
+// segmentation, add it here only if it is NOT personally identifying.
+type SafeIdentifyProps = {
+  studio_role?: "owner" | "manager" | "instructor" | "member";
+  has_active_membership?: boolean;
+  account_age_days?: number;
+};
+
+export function identifyUser(userId: string, props?: SafeIdentifyProps) {
   if (key) posthog.identify(userId, props);
 }
 

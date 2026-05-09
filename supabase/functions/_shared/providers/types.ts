@@ -56,6 +56,13 @@ export interface CanonicalWebhookEvent {
   refunded_amount?: number;
   failure_code?: string;
   failure_message?: string;
+  // Multi-tenant identification:
+  //  - connect_account_id: set when the event came from a connected account (Stripe Connect).
+  //    Used to look up studio via studio_payment_providers.provider_account_id.
+  //  - metadata: passed through from the original session/payment so the webhook
+  //    can recover studio_id when no Connect account is involved.
+  connect_account_id?: string;
+  metadata?: Record<string, string>;
   raw: Record<string, unknown>;
 }
 

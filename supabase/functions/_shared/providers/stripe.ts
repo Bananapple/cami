@@ -121,6 +121,9 @@ export class StripeProvider implements PaymentProviderAdapter {
     }
 
     const raw = event as unknown as Record<string, unknown>;
+    // event.account is set on Connect events, identifying which connected
+    // account the event originated from. Used for studio resolution downstream.
+    const connect_account_id = (event.account as string | undefined) ?? undefined;
 
     switch (event.type) {
       case "checkout.session.completed": {
@@ -132,6 +135,8 @@ export class StripeProvider implements PaymentProviderAdapter {
           provider_payment_id: session.payment_intent as string | undefined,
           provider_subscription_id: session.subscription as string | undefined,
           amount: session.amount_total ?? undefined,
+          connect_account_id,
+          metadata: (session.metadata as Record<string, string> | null) ?? undefined,
           raw,
         };
       }
@@ -141,6 +146,8 @@ export class StripeProvider implements PaymentProviderAdapter {
           type: "payment.cancelled",
           provider_event_id: event.id,
           provider_session_id: session.id,
+          connect_account_id,
+          metadata: (session.metadata as Record<string, string> | null) ?? undefined,
           raw,
         };
       }
@@ -153,6 +160,8 @@ export class StripeProvider implements PaymentProviderAdapter {
           provider_payment_id: pi.id,
           failure_code: lastErr?.code ?? undefined,
           failure_message: lastErr?.message ?? undefined,
+          connect_account_id,
+          metadata: (pi.metadata as Record<string, string> | null) ?? undefined,
           raw,
         };
       }
@@ -165,6 +174,8 @@ export class StripeProvider implements PaymentProviderAdapter {
           provider_event_id: event.id,
           provider_payment_id: charge.payment_intent as string | undefined,
           refunded_amount: refunded,
+          connect_account_id,
+          metadata: (charge.metadata as Record<string, string> | null) ?? undefined,
           raw,
         };
       }
@@ -174,13 +185,16 @@ export class StripeProvider implements PaymentProviderAdapter {
         // checkout.session.completed already creates the membership.
         const invoice = event.data.object as Stripe.Invoice;
         if (invoice.billing_reason === "subscription_create") {
-          return { type: "unknown", provider_event_id: event.id, raw };
+          return { type: "unknown", provider_event_id: event.id, connect_account_id, raw };
         }
         return {
           type: "subscription.renewed",
           provider_event_id: event.id,
           provider_subscription_id: invoice.subscription as string | undefined,
           amount: invoice.amount_paid ?? undefined,
+          connect_account_id,
+          // Subscription events don't carry our metadata directly — webhook handler
+          // looks up studio_id via the membership's provider_subscription_id.
           raw,
         };
       }
@@ -190,11 +204,12 @@ export class StripeProvider implements PaymentProviderAdapter {
           type: "subscription.cancelled",
           provider_event_id: event.id,
           provider_subscription_id: sub.id,
+          connect_account_id,
           raw,
         };
       }
       default:
-        return { type: "unknown", provider_event_id: event.id, raw };
+        return { type: "unknown", provider_event_id: event.id, connect_account_id, raw };
     }
   }
 

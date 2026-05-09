@@ -1,11 +1,15 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { corsHeaders } from "../_shared/cors.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 const FROM_EMAIL = Deno.env.get("FROM_EMAIL") ?? "onboarding@resend.dev";
-const APP_URL = Deno.env.get("APP_URL") ?? "https://brie-alpha.vercel.app";
+// APP_URL fallback intentionally empty — brie-alpha.vercel.app no longer exists.
+// Per-studio URL is read from studios.app_url; this env var is only used as the
+// final fallback when that column is null.
+const APP_URL = Deno.env.get("APP_URL") ?? "";
 
 // Valid studio_role values — must match the DB enum
 const VALID_ROLES = ["owner", "manager", "instructor", "member"] as const;
@@ -13,20 +17,14 @@ type StudioRole = typeof VALID_ROLES[number];
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, {
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-studio-slug",
-        "Access-Control-Allow-Methods": "POST",
-      },
-    });
+    return new Response(null, { headers: corsHeaders(req) });
   }
 
   try {
     // --- Auth: require a valid Supabase JWT ---
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
-      return json({ error: "Missing authorization header" }, 401);
+      return json(req, { error: "Missing authorization header" }, 401);
     }
     const jwt = authHeader.slice(7);
 
@@ -34,7 +32,7 @@ Deno.serve(async (req) => {
       global: { headers: { Authorization: `Bearer ${jwt}` } },
     });
     const { data: { user }, error: authErr } = await userClient.auth.getUser();
-    if (authErr || !user) return json({ error: "Unauthorized" }, 401);
+    if (authErr || !user) return json(req, { error: "Unauthorized" }, 401);
 
     const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
@@ -45,7 +43,7 @@ Deno.serve(async (req) => {
     try {
       body = await req.json();
     } catch {
-      return json({ error: "Invalid JSON" }, 400);
+      return json(req, { error: "Invalid JSON" }, 400);
     }
     const {
       user_id,
@@ -55,8 +53,8 @@ Deno.serve(async (req) => {
       role: roleInput,
     } = body ?? {};
 
-    if (!studio_id) return json({ error: "studio_id is required" }, 400);
-    if (!user_id && !emailInput) return json({ error: "user_id or email is required" }, 400);
+    if (!studio_id) return json(req, { error: "studio_id is required" }, 400);
+    if (!user_id && !emailInput) return json(req, { error: "user_id or email is required" }, 400);
 
     // Validate role — default to 'member'
     const memberRole: StudioRole =
@@ -72,7 +70,7 @@ Deno.serve(async (req) => {
       .in("role", ["owner", "manager"])
       .maybeSingle();
 
-    if (!callerMember) return json({ error: "Forbidden" }, 403);
+    if (!callerMember) return json(req, { error: "Forbidden" }, 403);
 
     // --- Resolve member email + name ---
     let memberEmail: string;
@@ -88,10 +86,10 @@ Deno.serve(async (req) => {
         .eq("user_id", user_id)
         .maybeSingle();
 
-      if (!memberRow) return json({ error: "Member not found in this studio" }, 404);
+      if (!memberRow) return json(req, { error: "Member not found in this studio" }, 404);
 
       const { data: { user: memberAuthUser } } = await admin.auth.admin.getUserById(user_id);
-      if (!memberAuthUser?.email) return json({ error: "Member has no email address" }, 422);
+      if (!memberAuthUser?.email) return json(req, { error: "Member has no email address" }, 422);
 
       memberEmail = memberAuthUser.email;
       memberName = (memberRow.profiles as any)?.full_name ?? nameInput ?? memberEmail;
@@ -128,14 +126,16 @@ Deno.serve(async (req) => {
     // If the user doesn't exist yet, the studio_members row will be created
     // when they sign up via the auth trigger (or on first booking for members).
 
-    // --- Fetch studio name ---
+    // --- Fetch studio name + canonical URL + sender email ---
     const { data: studio } = await admin
       .from("studios")
-      .select("name, slug")
+      .select("name, slug, app_url, from_email")
       .eq("id", studio_id)
       .single();
 
     const studioName = (studio as any)?.name ?? "Your Studio";
+    const studioAppUrl: string = (studio as any)?.app_url ?? APP_URL;
+    const studioFromEmail: string = (studio as any)?.from_email ?? FROM_EMAIL;
 
     // --- Idempotency: log before sending ---
     const idempotencyKey = resolvedUserId
@@ -152,21 +152,21 @@ Deno.serve(async (req) => {
     });
 
     if (logErr?.code === "23505") {
-      return json({ sent: true });
+      return json(req, { sent: true });
     }
     if (logErr) {
       console.error("notification_log insert error:", logErr);
-      return json({ error: "Failed to log notification" }, 500);
+      return json(req, { error: "Failed to log notification" }, 500);
     }
 
     if (!RESEND_API_KEY) {
       console.warn("RESEND_API_KEY not set — skipping invite email");
-      return json({ sent: false });
+      return json(req, { sent: false });
     }
 
     // --- Email copy varies by role ---
     const isStaffInvite = memberRole === "manager" || memberRole === "instructor";
-    const manageUrl = `${APP_URL}/manage`;
+    const manageUrl = `${studioAppUrl}/manage`;
 
     const html = isStaffInvite ? `
 <!DOCTYPE html>
@@ -175,15 +175,15 @@ Deno.serve(async (req) => {
 <body style="font-family:Georgia,serif;background:#fafaf8;margin:0;padding:0;">
   <div style="max-width:560px;margin:40px auto;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e5e5e3;">
     <div style="background:#1a1a18;padding:32px 40px;">
-      <h1 style="color:#f5f0e8;font-size:22px;margin:0;letter-spacing:0.02em;">${studioName}</h1>
+      <h1 style="color:#f5f0e8;font-size:22px;margin:0;letter-spacing:0.02em;">${esc(studioName)}</h1>
     </div>
     <div style="padding:40px;">
       <h2 style="font-size:20px;color:#1a1a18;margin:0 0 8px;">You've been added as ${memberRole === "manager" ? "a manager" : "an instructor"}</h2>
       <p style="color:#6b6b63;font-size:15px;margin:0 0 24px;">
-        Hi ${memberName}, you now have staff access to <strong>${studioName}</strong>.
+        Hi ${esc(memberName)}, you now have staff access to <strong>${esc(studioName)}</strong>.
       </p>
       <div style="margin-bottom:24px;text-align:center;">
-        <a href="${manageUrl}"
+        <a href="${esc(manageUrl)}"
            style="display:inline-block;background:#1a1a18;color:#f5f0e8;text-decoration:none;padding:14px 32px;border-radius:8px;font-family:Inter,sans-serif;font-size:14px;font-weight:500;letter-spacing:0.08em;text-transform:uppercase;">
           Open studio dashboard →
         </a>
@@ -201,15 +201,15 @@ Deno.serve(async (req) => {
 <body style="font-family:Georgia,serif;background:#fafaf8;margin:0;padding:0;">
   <div style="max-width:560px;margin:40px auto;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e5e5e3;">
     <div style="background:#1a1a18;padding:32px 40px;">
-      <h1 style="color:#f5f0e8;font-size:22px;margin:0;letter-spacing:0.02em;">${studioName}</h1>
+      <h1 style="color:#f5f0e8;font-size:22px;margin:0;letter-spacing:0.02em;">${esc(studioName)}</h1>
     </div>
     <div style="padding:40px;">
-      <h2 style="font-size:20px;color:#1a1a18;margin:0 0 8px;">Welcome to ${studioName}</h2>
+      <h2 style="font-size:20px;color:#1a1a18;margin:0 0 8px;">Welcome to ${esc(studioName)}</h2>
       <p style="color:#6b6b63;font-size:15px;margin:0 0 24px;">
-        Hi ${memberName}, you've been added as a member of <strong>${studioName}</strong>.
+        Hi ${esc(memberName)}, you've been added as a member of <strong>${esc(studioName)}</strong>.
       </p>
       <div style="margin-bottom:24px;text-align:center;">
-        <a href="${APP_URL}"
+        <a href="${esc(studioAppUrl)}"
            style="display:inline-block;background:#1a1a18;color:#f5f0e8;text-decoration:none;padding:14px 32px;border-radius:8px;font-family:Inter,sans-serif;font-size:14px;font-weight:500;letter-spacing:0.08em;text-transform:uppercase;">
           Book a class →
         </a>
@@ -233,7 +233,7 @@ Deno.serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from: FROM_EMAIL,
+        from: studioFromEmail,
         to: [memberEmail],
         subject: isStaffInvite
           ? `You've been added to ${studioName}`
@@ -249,22 +249,28 @@ Deno.serve(async (req) => {
         .from("notification_log")
         .update({ error: errText })
         .eq("idempotency_key", idempotencyKey);
-      return json({ sent: false, error: "Email delivery failed" }, 502);
+      return json(req, { sent: false, error: "Email delivery failed" }, 502);
     }
 
-    return json({ sent: true });
+    return json(req, { sent: true });
   } catch (err) {
     console.error("invite-member error:", err);
-    return json({ error: `Internal server error: ${err}` }, 500);
+    return json(req, { error: "Internal server error" }, 500);
   }
 });
 
-function json(body: unknown, status = 200) {
+function json(req: Request, body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: {
-      "Content-Type": "application/json",
-      "Access-Control-Allow-Origin": "*",
-    },
+    headers: { ...corsHeaders(req), "Content-Type": "application/json" },
   });
+}
+
+function esc(s: string): string {
+  return String(s ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }

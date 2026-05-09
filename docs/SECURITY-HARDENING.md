@@ -71,3 +71,22 @@ This means webhook replays (Stripe retries on timeout, etc.) are silently dedupl
 ### Duplicate bookings in live DB
 
 Adding `UNIQUE(user_id, class_instance_id)` required cleaning 5 duplicate pairs from the live DB first. The cleanup kept the booking with the highest `id` (assumed most recent / correct) and deleted the others. All duplicates were for the same user in a sandbox/test environment — no real money involved.
+
+---
+
+## Follow-up hardening (2026-05-09)
+
+A second pass closed remaining gaps surfaced after the original 28-finding audit. Migrations + edge function refactors land on branch `security-fixes`.
+
+| Migration | Change |
+|---|---|
+| `0030_revoke_definer_executes.sql` | REVOKE default EXECUTE on `SECURITY DEFINER` RPCs from `anon`/`authenticated`; only callers that need the function are GRANTed |
+| `0031_internal_auth_and_rls_tightening.sql` | Internal-auth helpers + studio-scoped RLS across membership / booking / payment tables |
+| `0032_webhook_studio_scoping.sql` | Webhook ingestion + `payment_webhook_events` scoped by `studio_id` so cross-studio replay is rejected |
+| `0033_studio_visibility_and_from_email.sql` | Adds `studios.app_url` + `studios.from_email`; edge functions read per-studio values instead of global env vars |
+
+Edge function plumbing alongside these migrations:
+- Shared CORS module at `supabase/functions/_shared/cors.ts` — every function imports the same allow-list / preflight handler.
+- Per-studio URL/email plumbing across 11 functions; global `APP_URL` / `FROM_EMAIL` env vars are now fallbacks, not the source of truth.
+- HTML-escape (`esc()`) helper adopted in 6 email-sending functions to prevent injection via user-controlled studio/member strings.
+- `get-analytics` UUID-validates `studio_id` before any query.

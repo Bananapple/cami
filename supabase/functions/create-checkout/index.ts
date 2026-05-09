@@ -1,32 +1,36 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { getProvider } from "../_shared/providers/index.ts";
+import { corsHeaders } from "../_shared/cors.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const APP_URL = Deno.env.get("APP_URL") ?? "https://brie-alpha.vercel.app";
+const APP_URL = Deno.env.get("APP_URL") ?? "";
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 const FROM_EMAIL = Deno.env.get("FROM_EMAIL") ?? "onboarding@resend.dev";
 
 // Allowed origins for return_url to prevent open redirect attacks.
-const ALLOWED_ORIGINS = [APP_URL].map((u) => new URL(u).origin);
+// APP_URL may be a comma-separated list to support multiple studios on
+// separate Vercel deployments (e.g. brie-hd7s.vercel.app, cami-foo.vercel.app).
+// The first entry is also used as the default return_url base when the caller
+// doesn't supply one.
+const ALLOWED_ORIGINS: string[] = APP_URL
+  ? APP_URL.split(",").map((u) => {
+      try { return new URL(u.trim()).origin; } catch { return ""; }
+    }).filter(Boolean)
+  : [];
+const DEFAULT_APP_ORIGIN: string | undefined = ALLOWED_ORIGINS[0];
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, {
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-studio-slug",
-        "Access-Control-Allow-Methods": "POST",
-      },
-    });
+    return new Response(null, { headers: corsHeaders(req) });
   }
 
   try {
     // --- Auth: require a valid Supabase JWT ---
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
-      return json({ error: "Missing authorization header" }, 401);
+      return json(req, { error: "Missing authorization header" }, 401);
     }
     const jwt = authHeader.slice(7);
 
@@ -35,7 +39,7 @@ Deno.serve(async (req) => {
       global: { headers: { Authorization: `Bearer ${jwt}` } },
     });
     const { data: { user }, error: authError } = await userClient.auth.getUser();
-    if (authError || !user) return json({ error: "Unauthorized" }, 401);
+    if (authError || !user) return json(req, { error: "Unauthorized" }, 401);
 
     // Service-role client for writing (bypasses RLS — used only for inserts we control)
     const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
@@ -44,10 +48,10 @@ Deno.serve(async (req) => {
     // Accepts either { class_instance_id } (book a class) or { product_id } (buy a membership/clip card)
     const { class_instance_id, product_id, return_url, discount_code } = await req.json();
     if (!class_instance_id && !product_id) {
-      return json({ error: "Either class_instance_id or product_id is required" }, 400);
+      return json(req, { error: "Either class_instance_id or product_id is required" }, 400);
     }
     if (class_instance_id && product_id) {
-      return json({ error: "Cannot specify both class_instance_id and product_id" }, 400);
+      return json(req, { error: "Cannot specify both class_instance_id and product_id" }, 400);
     }
 
     // --- Validate return_url to prevent open redirect ---
@@ -56,11 +60,11 @@ Deno.serve(async (req) => {
       try {
         parsed = new URL(return_url);
       } catch {
-        return json({ error: "Invalid return_url" }, 400);
+        return json(req, { error: "Invalid return_url" }, 400);
       }
       const isLocalhost = parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1";
       if (!ALLOWED_ORIGINS.includes(parsed.origin) && !isLocalhost) {
-        return json({ error: "Invalid return_url" }, 400);
+        return json(req, { error: "Invalid return_url" }, 400);
       }
     }
 
@@ -73,6 +77,10 @@ Deno.serve(async (req) => {
     let resolvedClassInstance: { id: string; studio_id: string; max_capacity: number; price: number } | null = null;
     let resolvedProductId: string | null = null;
     let recurring: { interval: "month"; interval_count: number } | undefined;
+    // Per-studio canonical URL (from studios.app_url). Used as the redirect
+    // base when the caller doesn't pass return_url. Falls back to env-var
+    // default when null. The validation allowlist still comes from the env var.
+    let studioAppUrl: string | null = null;
 
     if (class_instance_id) {
       // --- Class booking path ---
@@ -82,7 +90,7 @@ Deno.serve(async (req) => {
         .eq("id", class_instance_id)
         .eq("status", "scheduled")
         .single();
-      if (instanceErr || !instance) return json({ error: "Class not found or not schedulable" }, 404);
+      if (instanceErr || !instance) return json(req, { error: "Class not found or not schedulable" }, 404);
       const className = (instance as any).class_templates?.name ?? "Class";
 
       // Capacity check: count pending + confirmed bookings (UNIQUE constraint is the hard stop)
@@ -92,17 +100,18 @@ Deno.serve(async (req) => {
         .eq("class_instance_id", class_instance_id)
         .in("status", ["pending", "confirmed"]);
       if (instance.max_capacity > 0 && (bookingCount ?? 0) >= instance.max_capacity) {
-        return json({ error: "This class is fully booked" }, 409);
+        return json(req, { error: "This class is fully booked" }, 409);
       }
 
       const { data: studio } = await adminClient
         .from("studios")
-        .select("currency")
+        .select("currency, app_url")
         .eq("id", instance.studio_id)
         .single();
 
       studioId = instance.studio_id;
       currency = (studio as any)?.currency ?? "NOK";
+      studioAppUrl = (studio as any)?.app_url ?? null;
       amountMinor = Math.round(instance.price * 100);
       description = className;
       resolvedClassInstance = { id: instance.id, studio_id: instance.studio_id, max_capacity: instance.max_capacity, price: instance.price };
@@ -144,11 +153,11 @@ Deno.serve(async (req) => {
           const message = creditErr.code === "23505"
             ? "You already have a booking for this class."
             : creditErr.message ?? "Booking failed";
-          return json({ error: message }, 409);
+          return json(req, { error: message }, 409);
         }
         // Send confirmation email (best-effort — don't fail the booking if email fails)
         await sendCreditBookingEmail(adminClient, bookingId as string, user, studioId).catch(console.error);
-        return json({ booking_id: bookingId, free: true });
+        return json(req, { booking_id: bookingId, free: true });
       }
     } else {
       // --- Product purchase path ---
@@ -157,13 +166,13 @@ Deno.serve(async (req) => {
         .select("id, studio_id, name, type, price_minor, currency, requires_contact, is_active, billing_interval")
         .eq("id", product_id)
         .single();
-      if (productErr || !product) return json({ error: "Product not found" }, 404);
-      if (!product.is_active) return json({ error: "Product is not available" }, 400);
+      if (productErr || !product) return json(req, { error: "Product not found" }, 404);
+      if (!product.is_active) return json(req, { error: "Product is not available" }, 400);
       if (product.requires_contact) {
-        return json({ error: "This product requires a personal consultation — please contact the studio" }, 400);
+        return json(req, { error: "This product requires a personal consultation — please contact the studio" }, 400);
       }
       if (product.type === "drop_in") {
-        return json({ error: "Drop-in classes must be booked from the schedule" }, 400);
+        return json(req, { error: "Drop-in classes must be booked from the schedule" }, 400);
       }
 
       studioId = product.studio_id;
@@ -172,6 +181,14 @@ Deno.serve(async (req) => {
       description = product.name;
       resolvedProductId = product.id;
       extraMetadata = { product_id: product.id, product_type: product.type };
+
+      // Look up per-studio canonical URL for the redirect default
+      const { data: studioRow } = await adminClient
+        .from("studios")
+        .select("app_url")
+        .eq("id", product.studio_id)
+        .single();
+      studioAppUrl = (studioRow as any)?.app_url ?? null;
 
       // Recurring subscription: pass interval so the adapter switches to subscription mode
       if (product.billing_interval === "month") {
@@ -298,7 +315,7 @@ Deno.serve(async (req) => {
       .not("onboarded_at", "is", null)
       .maybeSingle();
     if (providerErr || !providerRow) {
-      return json({ error: "This studio is not configured for online payment" }, 402);
+      return json(req, { error: "This studio is not configured for online payment" }, 402);
     }
 
     const adapter = getProvider(providerRow.provider as any);
@@ -318,7 +335,7 @@ Deno.serve(async (req) => {
       })
       .select("id")
       .single();
-    if (paymentErr || !payment) return json({ error: "Failed to create payment record" }, 500);
+    if (paymentErr || !payment) return json(req, { error: "Failed to create payment record" }, 500);
 
     // --- Record discount redemption (trigger auto-increments times_redeemed) ---
     if (resolvedDiscountCodeId && discountMinor > 0) {
@@ -370,15 +387,15 @@ Deno.serve(async (req) => {
               bookingId = replaced.id;
             } else {
               await adminClient.from("payments").update({ status: "failed" }).eq("id", payment.id);
-              return json({ error: "Failed to create booking record" }, 500);
+              return json(req, { error: "Failed to create booking record" }, 500);
             }
           } else {
             await adminClient.from("payments").update({ status: "failed" }).eq("id", payment.id);
-            return json({ error: "You already have a booking for this class." }, 409);
+            return json(req, { error: "You already have a booking for this class." }, 409);
           }
         } else {
           await adminClient.from("payments").update({ status: "failed" }).eq("id", payment.id);
-          return json({ error: "Failed to create booking record" }, 500);
+          return json(req, { error: "Failed to create booking record" }, 500);
         }
       } else {
         bookingId = booking.id;
@@ -386,7 +403,7 @@ Deno.serve(async (req) => {
     }
 
     // --- Call provider adapter to create hosted checkout session ---
-    const base = return_url ?? APP_URL;
+    const base = return_url ?? studioAppUrl ?? DEFAULT_APP_ORIGIN;
     const successQs = bookingId
       ? `payment_id=${payment.id}&booking_id=${bookingId}&status=success`
       : `payment_id=${payment.id}&status=success`;
@@ -418,7 +435,7 @@ Deno.serve(async (req) => {
       if (bookingId) {
         await adminClient.from("bookings").update({ status: "payment_failed" }).eq("id", bookingId);
       }
-      return json({ error: `Payment provider error: ${err}` }, 502);
+      return json(req, { error: `Payment provider error: ${err}` }, 502);
     }
 
     // --- Update payments row with provider IDs and checkout URL ---
@@ -431,24 +448,21 @@ Deno.serve(async (req) => {
       })
       .eq("id", payment.id);
 
-    return json({
+    return json(req, {
       checkout_url: checkoutResult.checkout_url,
       payment_id: payment.id,
       booking_id: bookingId,
     });
   } catch (err) {
     console.error("create-checkout error:", err);
-    return json({ error: "Internal server error" }, 500);
+    return json(req, { error: "Internal server error" }, 500);
   }
 });
 
-function json(body: unknown, status = 200) {
+function json(req: Request, body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: {
-      "Content-Type": "application/json",
-      "Access-Control-Allow-Origin": "*",
-    },
+    headers: { ...corsHeaders(req), "Content-Type": "application/json" },
   });
 }
 
@@ -472,7 +486,7 @@ async function sendCreditBookingEmail(
         locations ( name )
       )
     `).eq("id", bookingId).single(),
-    admin.from("studios").select("name").eq("id", studioId).single(),
+    admin.from("studios").select("name, from_email").eq("id", studioId).single(),
   ]);
   if (!booking) return;
 
@@ -495,6 +509,7 @@ async function sendCreditBookingEmail(
   const instructor = ci.instructors?.display_name ?? "";
   const location = ci.locations?.name ?? "";
   const studioName = (studio as any)?.name ?? "Yoga Studio";
+  const studioFromEmail: string = (studio as any)?.from_email ?? FROM_EMAIL;
 
   const dateStr = startsAt.toLocaleDateString("nb-NO", {
     weekday: "long", year: "numeric", month: "long", day: "numeric",
@@ -523,7 +538,7 @@ async function sendCreditBookingEmail(
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      from: FROM_EMAIL,
+      from: studioFromEmail,
       to: [user.email],
       subject: `Booking confirmed — ${className}`,
       html,
