@@ -29,13 +29,14 @@ const Dashboard = () => {
   const { user, isAuthenticated, loading, signOut } = useAuth();
   const { profile } = useProfile();
   const { bookings, cancelBooking, error: bookingsError } = useBookings();
-  const { membership } = useMembership();
+  const { membership, cancelMembership } = useMembership();
   const { studioMember } = useStudioMember();
   const { waitlist, leave: leaveWaitlist } = useWaitlist();
   const studioCtx = useStudioContext();
   const studioTz = studioCtx?.studio?.timezone ?? "Europe/Oslo";
   const [bookingOpen, setBookingOpen] = useState(false);
   const [cancelTarget, setCancelTarget] = useState<{ id: string; startsAt: string; hasMembership: boolean } | null>(null);
+  const [cancelMembershipOpen, setCancelMembershipOpen] = useState(false);
 
   if (loading) {
     return (
@@ -52,6 +53,22 @@ const Dashboard = () => {
   const handleLogout = async () => {
     await signOut();
     toast("Logged out successfully.");
+  };
+
+  const handleCancelMembership = async () => {
+    if (!membership) return;
+    try {
+      const result = await cancelMembership.mutateAsync(membership.id);
+      setCancelMembershipOpen(false);
+      const endDate = result?.ends_at
+        ? new Date(result.ends_at).toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" })
+        : null;
+      toast(endDate
+        ? `Cancellation scheduled. You'll have access until ${endDate}.`
+        : "Cancellation scheduled.");
+    } catch (err: any) {
+      toast(err?.message ?? "Failed to cancel membership.");
+    }
   };
 
   const handleCancelBooking = async () => {
@@ -303,7 +320,10 @@ const Dashboard = () => {
             <div className="bg-card rounded-xl p-6 space-y-4">
               <h2 className="text-lg font-serif text-foreground">Membership</h2>
 
-              {membership ? (
+              {membership ? (() => {
+                // cancel_scheduled_at is freshly added in 0035 — types regenerate post-merge
+                const cancelScheduled = !!(membership as any).cancel_scheduled_at;
+                return (
                 <div className="space-y-3">
                   <p className="text-sm font-serif text-foreground">{membership.plan_name}</p>
                   <div className="space-y-2 text-xs text-muted-foreground font-sans">
@@ -311,15 +331,29 @@ const Dashboard = () => {
                       <p>◈ {membership.credits_remaining} credit{membership.credits_remaining !== 1 ? "s" : ""} remaining</p>
                     )}
                     {membership.valid_until && (
-                      <p>◷ Valid until {new Date(membership.valid_until).toLocaleDateString("nb-NO", { day: "numeric", month: "long", year: "numeric" })}</p>
+                      <p>
+                        ◷ {cancelScheduled ? "Access until" : "Valid until"}{" "}
+                        {new Date(membership.valid_until).toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" })}
+                      </p>
                     )}
-                    {membership.renewal_days && (
+                    {membership.renewal_days && !cancelScheduled && (
                       <p>↻ Renews every {membership.renewal_days} days</p>
                     )}
-                    <p>✕ Cancel anytime easily from your account</p>
+                    {cancelScheduled && (
+                      <p>⏳ Cancellation scheduled — won't renew at end of period</p>
+                    )}
                   </div>
+                  {membership.provider_subscription_id && !cancelScheduled && (
+                    <button
+                      onClick={() => setCancelMembershipOpen(true)}
+                      className="w-full text-center border border-border rounded-lg py-2.5 text-xs font-sans text-foreground/70 hover:text-foreground hover:bg-background/50 transition-all"
+                    >
+                      Cancel Membership
+                    </button>
+                  )}
                 </div>
-              ) : (
+                );
+              })() : (
                 <div className="space-y-3">
                   <p className="text-sm text-muted-foreground font-serif">
                     No active membership. Become a member for the best rates.
@@ -409,6 +443,38 @@ const Dashboard = () => {
               className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
             >
               Cancel Booking
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Cancel membership confirmation dialog */}
+      <AlertDialog open={cancelMembershipOpen} onOpenChange={setCancelMembershipOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel your membership?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {membership?.valid_until ? (
+                <>
+                  You'll keep full access until{" "}
+                  <strong>
+                    {new Date(membership.valid_until).toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" })}
+                  </strong>
+                  . After that, your membership won't renew and no further charges will be made.
+                </>
+              ) : (
+                "Your membership won't renew. You'll keep access through the end of your current paid period."
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep Membership</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleCancelMembership}
+              disabled={cancelMembership.isPending}
+              className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+            >
+              {cancelMembership.isPending ? "Cancelling…" : "Cancel Membership"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

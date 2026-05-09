@@ -77,9 +77,18 @@ export interface RefundResult {
   refunded_amount: number;
 }
 
+export interface CancelSubscriptionParams {
+  provider_subscription_id: string;
+  provider_account_id?: string | null;  // Stripe Connect acct_xxx; null = platform account
+}
+
 export interface PaymentProviderAdapter {
   readonly name: PaymentProvider;
   createCheckoutSession(params: CreateCheckoutParams): Promise<CheckoutResult>;
   parseWebhookEvent(payload: string, signature: string): Promise<CanonicalWebhookEvent>;
   issueRefund(params: RefundParams): Promise<RefundResult>;
+  // Schedules the subscription to cancel at the end of the current paid period.
+  // The provider continues to honour the subscription until then; webhook
+  // (subscription.cancelled) fires at period end and finalises the membership row.
+  cancelSubscriptionAtPeriodEnd(params: CancelSubscriptionParams): Promise<void>;
 }
