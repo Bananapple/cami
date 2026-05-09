@@ -4,6 +4,59 @@ Deferred work captured during /plan-eng-review on 2026-04-15.
 
 ---
 
+## Deferred 2026-05-09 (security audit + multi-tenant readiness session)
+
+A pre-launch CSO-mode audit + customer-readiness pass shipped 14 audit findings + 4 webhook-audit items + 2 customer-readiness items. The items below were intentionally deferred — they are real but not exploitable on the current single-tenant Brie deployment, OR require operational context (a real second customer, design/UX decisions) to land cleanly.
+
+### Architectural — heycami.studio split (DEFERRED, requires UX decision)
+
+**What:** Today the codebase is a single React app where every Vercel deployment renders the same routes — customer booking flow at `/`, manage UI at `/manage`. When deployed to `heycami.studio` (the platform marketing site), this means hitting `heycami.studio/manage/schedule` renders the yoga manage UI showing brie-demo data. Confusing and architecturally wrong: heycami is the platform, not a yoga studio.
+
+**Two options:**
+- **A. Two codebases:** split the platform marketing site (heycami.studio) into its own repo/codebase. Studio app stays one deployable. Cleanest, biggest effort.
+- **B. One codebase, hostname-gated routes:** in `App.tsx`, gate the studio routes by `window.location.hostname`. If host is `heycami.studio`, render only marketing pages and refuse to mount StudioProvider/booking/manage. Smaller change, slightly less clean.
+
+**Sub-question (separate decision):** the "Log in" button on heycami.studio — should staff log in centrally there (and get routed to their studio's `/manage`), or should they log in directly on their studio's site? Centralized auth is better UX for multi-studio operators, harder to build (~couple hours of routing + studio-picker UI).
+
+**Why deferred:** Both options require design + product decisions before code. Doesn't block real-customer onboarding because the staff workflow is "go directly to your studio's URL."
+
+**When to land:** Before public Cami marketing launch (you don't want demo prospects discovering broken yoga routes by URL-guessing).
+
+### Audit #16 — `profiles_staff_read` cross-studio leak
+
+**What:** RLS policy `profiles_staff_read` lets staff of any studio read full profile rows (name, email, phone, marketing opt-ins) of any user who shares ANY studio with them. If user X belongs to Studio A AND Studio B, both A's and B's staff can see X's PII.
+
+**Why deferred:** With Brie + Cami both same-operator (you), this is intentional. With unrelated tenants, it's a real PII leak.
+
+**Fix when landing:** Either column-restrict the staff-read policy, or expose a staff-facing view that excludes phone/marketing opt-ins.
+
+**When to land:** Before tenant 2 (any non-related customer).
+
+### Webhook audit #1 — per-studio webhook secrets (alternative architecture, OPTIONAL)
+
+**What:** Today the platform has one `STRIPE_WEBHOOK_SECRET`. The audit's recommendation was per-studio secrets stored in `studio_payment_providers.config['webhook_secret']`. Each customer registers their own webhook in Stripe.
+
+**Why deferred:** With Stripe Connect (now fully wired in `payment-webhook` per migration 0032), one platform-level webhook handles ALL connected accounts via `event.account` scoping. This is Stripe's recommended pattern for marketplaces. Per-studio secrets is a redundant alternative.
+
+**When to land:** Don't, unless you decide to switch away from Connect.
+
+### Webhook audit #6 — studio_id in URL path (defense-in-depth, OPTIONAL)
+
+**What:** Webhook URL pattern is `/payment-webhook/<provider>`. Audit suggested `/payment-webhook/<studio_id>/<provider>`.
+
+**Why deferred:** Now that the handler resolves studio from `event.account` and validates payment lookups by studio (migration 0032), URL-level scoping is redundant defense-in-depth.
+
+**When to land:** Don't, unless an incident reveals a need.
+
+### Frontend bugs found in passing (separate work, not security)
+
+- **AuthCallback hardcoded background defaults to Cami styling** — `src/pages/AuthCallback.tsx`. Should pull from StudioContext like everything else.
+- **StaffGate cross-studio "Back to dashboard" UX** — `src/manage/components/StaffGate.tsx`. The denial page sends users to `/dashboard` regardless of whether they have ANY relationship to the current studio. Should branch: customer of this studio → `/dashboard`; no relationship → "Sign out" button.
+- **`/manage/schedule` save doesn't dispatch network request** — verified in DevTools Network tab during smoke test 4 on 2026-05-09. Click Save fires no PATCH request; only the page-load GET appears. Time edits silently don't persist. Pre-existing.
+- **Owner-promotion path required manual SQL** — ✅ Resolved (`scripts/promote-owner.ts`).
+
+---
+
 ## ~~Refund / cancellation policy~~ — ✅ DONE (2026-04-24)
 
 **Implemented:** `issue-refund` Edge Function repurposed as a combined cancel+refund endpoint. Takes `{ booking_id }`. Accessible by the booking owner OR studio staff. Always cancels the booking first, then conditionally refunds based on:
