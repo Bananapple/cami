@@ -26,11 +26,11 @@ export function icsDataUrl(o: {
   location?: string;
   description?: string;
 }): string {
-  const uid = `booking-${Date.now()}@briestudio`;
+  const uid = `booking-${Date.now()}@heycami.studio`;
   const lines = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
-    "PRODID:-//Brie Studio//EN",
+    "PRODID:-//Cami//EN",
     "BEGIN:VEVENT",
     `UID:${uid}`,
     `DTSTART:${fmtIso(o.startsAt)}`,
