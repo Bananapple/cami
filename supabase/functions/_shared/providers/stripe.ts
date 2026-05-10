@@ -7,6 +7,7 @@ import type {
   CanonicalWebhookEvent,
   RefundParams,
   RefundResult,
+  CancelSubscriptionParams,
 } from "./types.ts";
 
 const SECRET_KEY = Deno.env.get("STRIPE_SECRET_KEY") ?? "";
@@ -224,5 +225,14 @@ export class StripeProvider implements PaymentProviderAdapter {
       provider_refund_id: refund.id,
       refunded_amount: refund.amount,
     };
+  }
+
+  async cancelSubscriptionAtPeriodEnd(params: CancelSubscriptionParams): Promise<void> {
+    const opts = params.provider_account_id ? { stripeAccount: params.provider_account_id } : undefined;
+    await this.stripe.subscriptions.update(
+      params.provider_subscription_id,
+      { cancel_at_period_end: true },
+      opts,
+    );
   }
 }
