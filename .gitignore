@@ -32,3 +32,6 @@ supabase/.temp/
 *.sln
 *.sw?
 .gstack/
+
+# Claude Code worktree scratch space — never tracked in this repo
+.claude/worktrees/
