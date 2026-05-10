@@ -233,10 +233,9 @@ function ExpandedTemplate({
   }, [template.id]);
 
   const save = async () => {
-    console.log("[debug:save] entered, pending=", pending);
     setPending(true);
     try {
-      const patch = {
+      await updateTemplate.mutateAsync({
         id: template.id,
         name: draft.name.trim(),
         description: draft.description.trim() || null,
@@ -245,17 +244,12 @@ function ExpandedTemplate({
         default_max_capacity: Number(draft.default_max_capacity),
         default_price: Number(draft.default_price),
         default_instructor_id: draft.default_instructor_id || null,
-      };
-      console.log("[debug:save] calling mutateAsync with patch:", patch);
-      const result = await updateTemplate.mutateAsync(patch);
-      console.log("[debug:save] mutateAsync resolved, result=", result);
+      });
       toast.success("Saved");
       onClose();
     } catch (e: any) {
-      console.log("[debug:save] caught error:", e);
-      toast.error(e?.message ?? "Failed to save");
+      toast.error(e.message ?? "Failed to save");
     } finally {
-      console.log("[debug:save] finally block, setting pending=false");
       setPending(false);
     }
   };
@@ -707,7 +701,7 @@ function NewTimeChip({
         autoFocus
         style={chipInputStyle}
       />
-      <CircleSave ariaLabel="Add" onClick={() => onSave(time)} />
+      <CircleAdd ariaLabel="Add" onClick={() => onSave(time)} />
       <button type="button" onClick={onCancel} style={chipCancelButtonStyle}>
         Cancel
       </button>
@@ -768,8 +762,24 @@ const chipCancelButtonStyle: React.CSSProperties = {
   cursor: "pointer",
 };
 
-// ── Action button (square with rounded corners, matches time input shape) ──
+// ── Action buttons (square with rounded corners, match time input shape) ──
+// CircleSave commits an in-progress edit (checkmark); CircleAdd creates a
+// new time slot (plus). Same visual chrome, distinct icons so users don't
+// confuse "save my edit" with "add another time".
 function CircleSave({ onClick, ariaLabel }: { onClick: () => void; ariaLabel: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={ariaLabel}
+      style={squareButtonStyle("primary")}
+    >
+      <CheckIcon />
+    </button>
+  );
+}
+
+function CircleAdd({ onClick, ariaLabel }: { onClick: () => void; ariaLabel: string }) {
   return (
     <button
       type="button"
@@ -816,6 +826,14 @@ function PlusIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.75" strokeLinecap="round">
       <path d="M12 5v14M5 12h14" />
+    </svg>
+  );
+}
+
+function CheckIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20 6L9 17l-5-5" />
     </svg>
   );
 }

@@ -50,11 +50,7 @@ export function useClassTemplates() {
 
   const updateTemplate = useMutation({
     mutationFn: async ({ id, ...patch }: Partial<ClassTemplate> & { id: string }) => {
-      console.log("[debug:updateTemplate.mutationFn] id=", id, "patch=", patch);
-      const builder = supabase.from("class_templates").update(patch).eq("id", id);
-      console.log("[debug:updateTemplate.mutationFn] about to await supabase call");
-      const { data, error, status, statusText } = await builder;
-      console.log("[debug:updateTemplate.mutationFn] supabase returned", { data, error, status, statusText });
+      const { error } = await supabase.from("class_templates").update(patch).eq("id", id);
       if (error) throw error;
     },
     onSuccess: invalidate,
