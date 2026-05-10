@@ -55,14 +55,19 @@ const Dashboard = () => {
     toast("Logged out successfully.");
   };
 
+  // valid_until is a Postgres DATE (calendar date, no time). Parsing it with
+  // new Date() gives UTC midnight, which displays as the previous day in
+  // timezones west of UTC. Force UTC interpretation so the displayed calendar
+  // date matches what's stored.
+  const formatCalendarDate = (date: string) =>
+    new Date(date).toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
+
   const handleCancelMembership = async () => {
     if (!membership) return;
     try {
       const result = await cancelMembership.mutateAsync(membership.id);
       setCancelMembershipOpen(false);
-      const endDate = result?.ends_at
-        ? new Date(result.ends_at).toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" })
-        : null;
+      const endDate = result?.ends_at ? formatCalendarDate(result.ends_at) : null;
       toast(endDate
         ? `Cancellation scheduled. You'll have access until ${endDate}.`
         : "Cancellation scheduled.");
@@ -333,7 +338,7 @@ const Dashboard = () => {
                     {membership.valid_until && (
                       <p>
                         ◷ {cancelScheduled ? "Access until" : "Valid until"}{" "}
-                        {new Date(membership.valid_until).toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" })}
+                        {formatCalendarDate(membership.valid_until)}
                       </p>
                     )}
                     {membership.renewal_days && !cancelScheduled && (
@@ -457,9 +462,7 @@ const Dashboard = () => {
               {membership?.valid_until ? (
                 <>
                   You'll keep full access until{" "}
-                  <strong>
-                    {new Date(membership.valid_until).toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" })}
-                  </strong>
+                  <strong>{formatCalendarDate(membership.valid_until)}</strong>
                   . After that, your membership won't renew and no further charges will be made.
                 </>
               ) : (
