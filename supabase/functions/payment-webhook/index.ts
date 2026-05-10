@@ -302,11 +302,13 @@ async function sendBookingConfirmation(admin: ReturnType<typeof createClient>, p
     // Fetch these first — needed for the idempotency log INSERT (recipient is NOT NULL).
     const [{ data: { user } }, { data: studio }] = await Promise.all([
       admin.auth.admin.getUserById(booking.user_id),
-      admin.from("studios").select("name, from_email").eq("id", booking.studio_id).single(),
+      admin.from("studios").select("name, from_email, locale, timezone").eq("id", booking.studio_id).single(),
     ]);
     if (!user?.email) return;
     const studioName = (studio as any)?.name ?? "Yoga Studio";
     const studioFromEmail: string = (studio as any)?.from_email ?? FROM_EMAIL;
+    const locale: string = (studio as any)?.locale ?? "nb-NO";
+    const timezone: string = (studio as any)?.timezone ?? "Europe/Oslo";
 
     // Idempotency: INSERT the log row BEFORE sending.
     // The UNIQUE constraint on idempotency_key is the atomic lock — the first
@@ -337,12 +339,12 @@ async function sendBookingConfirmation(admin: ReturnType<typeof createClient>, p
     const location = ci.locations?.name ?? "";
     const duration = ci.class_templates?.default_duration_minutes ?? 60;
 
-    const dateStr = startsAt.toLocaleDateString("nb-NO", {
+    const dateStr = startsAt.toLocaleDateString(locale, {
       weekday: "long", year: "numeric", month: "long", day: "numeric",
-      timeZone: "Europe/Oslo",
+      timeZone: timezone,
     });
-    const timeStr = startsAt.toLocaleTimeString("nb-NO", {
-      hour: "2-digit", minute: "2-digit", timeZone: "Europe/Oslo",
+    const timeStr = startsAt.toLocaleTimeString(locale, {
+      hour: "2-digit", minute: "2-digit", timeZone: timezone,
     });
 
     const endsAt = new Date(startsAt.getTime() + duration * 60_000);
@@ -395,7 +397,7 @@ async function sendMembershipConfirmation(admin: ReturnType<typeof createClient>
       .select(`
         id, user_id, studio_id, plan_name, credits_remaining, valid_until,
         products ( type, billing_interval, commitment_months, price_minor, currency ),
-        studios ( name, from_email )
+        studios ( name, from_email, locale, timezone )
       `)
       .eq("id", membershipId)
       .single();
@@ -420,10 +422,22 @@ async function sendMembershipConfirmation(admin: ReturnType<typeof createClient>
     const product = membership.products as any;
     const studioName = (membership.studios as any)?.name ?? "Yoga Studio";
     const studioFromEmail: string = (membership.studios as any)?.from_email ?? FROM_EMAIL;
+    const locale: string = (membership.studios as any)?.locale ?? "nb-NO";
     const isSubscription = product?.billing_interval === "month";
     const isClipCard = product?.type === "clip_card";
-    const priceNOK = product?.price_minor ? (product.price_minor / 100).toLocaleString("nb-NO") : null;
+
+    // Currency: locale controls formatting (symbol placement, decimal separators);
+    // products.currency is the canonical currency code passed through to Intl.NumberFormat.
     const currency = product?.currency ?? "NOK";
+    const priceFormatted = product?.price_minor
+      ? new Intl.NumberFormat(locale, { style: "currency", currency }).format(product.price_minor / 100)
+      : null;
+
+    // valid_until is a Postgres DATE — interpret in UTC so the displayed
+    // calendar date matches what's stored regardless of viewer locale.
+    const validUntilFormatted = membership.valid_until
+      ? new Date(membership.valid_until).toLocaleDateString(locale, { year: "numeric", month: "long", day: "numeric", timeZone: "UTC" })
+      : null;
 
     const html = buildMembershipEmail({
       studioName,
@@ -431,10 +445,9 @@ async function sendMembershipConfirmation(admin: ReturnType<typeof createClient>
       isSubscription,
       isClipCard,
       credits: membership.credits_remaining,
-      validUntil: membership.valid_until,
+      validUntilFormatted,
       commitmentMonths: product?.commitment_months ?? null,
-      priceNOK,
-      currency,
+      priceFormatted,
     });
 
     const res = await fetch("https://api.resend.com/emails", {
@@ -469,10 +482,9 @@ function buildMembershipEmail(p: {
   isSubscription: boolean;
   isClipCard: boolean;
   credits: number | null;
-  validUntil: string | null;
+  validUntilFormatted: string | null;
   commitmentMonths: number | null;
-  priceNOK: string | null;
-  currency: string;
+  priceFormatted: string | null;
 }): string {
   const renewalLine = p.commitmentMonths
     ? `12-month commitment · Renews monthly`
@@ -480,19 +492,15 @@ function buildMembershipEmail(p: {
       ? `Renews monthly · Cancel anytime`
       : null;
 
-  const validLine = p.validUntil
-    ? new Date(p.validUntil).toLocaleDateString("nb-NO", { year: "numeric", month: "long", day: "numeric" })
-    : null;
-
   const rows = [
     p.isClipCard && p.credits !== null
       ? { label: "Credits", value: `${p.credits} classes` }
       : null,
-    validLine
-      ? { label: p.isSubscription ? "First renewal" : "Valid until", value: validLine }
+    p.validUntilFormatted
+      ? { label: p.isSubscription ? "First renewal" : "Valid until", value: p.validUntilFormatted }
       : null,
     renewalLine ? { label: "Billing", value: renewalLine } : null,
-    p.priceNOK ? { label: "Amount paid", value: `${p.currency} ${p.priceNOK}` } : null,
+    p.priceFormatted ? { label: "Amount paid", value: p.priceFormatted } : null,
   ].filter(Boolean) as { label: string; value: string }[];
 
   return `<!DOCTYPE html>
