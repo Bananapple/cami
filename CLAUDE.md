@@ -136,6 +136,8 @@ All user-facing hooks (`useBookings`, `useMembership`, `usePaymentMethods`, `use
 - `0009_drop_legacy_sessions.sql` — drops legacy `sessions` table and stale columns
 - `0010_products_and_membership_purchase.sql` — `products` table + RLS + seed data; `payments.product_id`; `memberships.product_id`; `activate_membership()`, `renew_membership_by_subscription()`, `cancel_membership_by_subscription()` RPCs
 - `0011_book_with_credit.sql` — `bookings.membership_id`; `book_with_credit()` RPC (atomic credit booking); `return_credit()` RPC (atomic credit return on cancellation)
+- `0027_expire_stale_pending_bookings.sql` — `expire_stale_pending_bookings()` sweeper cancels `pending` bookings >30min old where payment is still `requires_action`; pg_cron scheduled every 5min; coordinates with Stripe `expires_at = now+30min` so Stripe can't accept payment after sweep
+- `0029_atomic_credit_cancel.sql` — `cancel_credit_booking(p_booking_id, p_return_credit)` RPC; atomically cancels booking and optionally returns credit in one transaction; replaces the two-step approach in `issue-refund` that could leave users without their credit on crash
 - `0030_revoke_definer_executes.sql` — REVOKEs default EXECUTE on `SECURITY DEFINER` RPCs from `anon`/`authenticated`; only callers that explicitly need the function get GRANTed
 - `0031_internal_auth_and_rls_tightening.sql` — internal-auth helpers + studio-scoped RLS tightening across membership / booking / payment tables
 - `0032_webhook_studio_scoping.sql` — webhook ingestion + `payment_webhook_events` are scoped by `studio_id`; cross-studio replay is rejected
@@ -201,7 +203,7 @@ STRIPE_SECRET_KEY
 STRIPE_WEBHOOK_SECRET
 RESEND_API_KEY
 FROM_EMAIL          # e.g. booking@yogabrie.no — defaults to onboarding@resend.dev if unset
-APP_URL             # e.g. https://brie-alpha.vercel.app — used to validate return_url in create-checkout
+APP_URL             # e.g. https://brie-hd7s.vercel.app — used to validate return_url in create-checkout
 ```
 
 Copy `.env.example` → `.env` per studio deployment. Never commit `.env` (gitignored).
@@ -210,8 +212,8 @@ Copy `.env.example` → `.env` per studio deployment. Never commit `.env` (gitig
 
 ## Deployment (YogaBrie / First Studio)
 
-- **Live URL:** https://brie-alpha.vercel.app
-- **Platform:** Vercel (connected to GitHub repo `Bananapple/brie`, auto-deploys on push to `main`)
+- **Live URL:** https://brie-hd7s.vercel.app
+- **Platform:** Vercel (connected to GitHub repo `Bananapple/cami`, auto-deploys on push to `main`)
 - **Supabase project ref:** `xskqpxfjhhxontirezjd` (eu-north-1)
 - **Schedule:** Seeded — 15 class slots migrated to `class_templates` + `schedule_rules`; 90-day `class_instances` window materialized
 

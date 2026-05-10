@@ -6,9 +6,8 @@ const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 const FROM_EMAIL = Deno.env.get("FROM_EMAIL") ?? "onboarding@resend.dev";
-// APP_URL fallback intentionally empty — brie-alpha.vercel.app no longer exists.
-// Per-studio URL is read from studios.app_url; this env var is only used as the
-// final fallback when that column is null.
+// Per-studio URL is read from studios.app_url; this env var is only used as
+// the final fallback when that column is null.
 const APP_URL = Deno.env.get("APP_URL") ?? "";
 
 // Valid studio_role values — must match the DB enum
@@ -98,10 +97,23 @@ Deno.serve(async (req) => {
       memberEmail = emailInput.trim();
       memberName = nameInput?.trim() ?? memberEmail;
 
-      // Try to find existing auth user by email
-      const { data: { users } } = await admin.auth.admin.listUsers({ perPage: 1000 });
-      const existing = users?.find((u: any) => u.email === memberEmail);
-      resolvedUserId = existing?.id ?? null;
+      // Find existing auth user by email. Paginate so we don't silently miss
+      // past 1000 — beyond that limit, a returning user looks like a new
+      // signup, the studio_members upsert is skipped, and the role grant
+      // silently fails. Cap at 100 pages (100k users) as a safety net.
+      const targetEmail = memberEmail.toLowerCase();
+      let page = 1;
+      while (page <= 100) {
+        const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 1000 });
+        if (error) break;
+        const found = data.users?.find((u: any) => u.email?.toLowerCase() === targetEmail);
+        if (found) {
+          resolvedUserId = found.id;
+          break;
+        }
+        if (!data.users || data.users.length < 1000) break;
+        page++;
+      }
     }
 
     // --- Upsert studio_members row with the correct role ---
