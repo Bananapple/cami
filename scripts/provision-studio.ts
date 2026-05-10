@@ -42,6 +42,7 @@ type Args = {
   primaryColor: string;
   currency: string;
   timezone: string;
+  locale: string;
   address: string;
   appUrl: string;
   fromEmail: string;
@@ -67,6 +68,7 @@ function parseArgs(argv: string[]): Args {
     primaryColor: flags["primary-color"] ?? "#000000",
     currency: flags["currency"] ?? "NOK",
     timezone: flags["timezone"] ?? "Europe/Oslo",
+    locale: flags["locale"] ?? "nb-NO",
     address: flags["address"] ?? "",
     appUrl: flags["app-url"],
     fromEmail: flags["from-email"] ?? "",
@@ -118,6 +120,7 @@ async function main() {
       primary_color: args.primaryColor,
       currency: args.currency,
       timezone: args.timezone,
+      locale: args.locale,
       address: args.address,
       app_url: args.appUrl,
       from_email: args.fromEmail || null,
@@ -228,6 +231,7 @@ Optional:
   --primary-color=<hex>         default #000000
   --currency=<ISO-4217>         default NOK
   --timezone=<IANA-tz>          default Europe/Oslo
+  --locale=<BCP-47>             default nb-NO  (e.g. en-US, en-GB, sv-SE)
   --address=<text>              default ""
   --from-email=<email>          default null (uses platform fallback until set)
 

@@ -487,7 +487,7 @@ async function sendCreditBookingEmail(
         locations ( name )
       )
     `).eq("id", bookingId).single(),
-    admin.from("studios").select("name, from_email").eq("id", studioId).single(),
+    admin.from("studios").select("name, from_email, locale, timezone").eq("id", studioId).single(),
   ]);
   if (!booking) return;
 
@@ -511,13 +511,15 @@ async function sendCreditBookingEmail(
   const location = ci.locations?.name ?? "";
   const studioName = (studio as any)?.name ?? "Yoga Studio";
   const studioFromEmail: string = (studio as any)?.from_email ?? FROM_EMAIL;
+  const locale: string = (studio as any)?.locale ?? "nb-NO";
+  const timezone: string = (studio as any)?.timezone ?? "Europe/Oslo";
 
-  const dateStr = startsAt.toLocaleDateString("nb-NO", {
+  const dateStr = startsAt.toLocaleDateString(locale, {
     weekday: "long", year: "numeric", month: "long", day: "numeric",
-    timeZone: "Europe/Oslo",
+    timeZone: timezone,
   });
-  const timeStr = startsAt.toLocaleTimeString("nb-NO", {
-    hour: "2-digit", minute: "2-digit", timeZone: "Europe/Oslo",
+  const timeStr = startsAt.toLocaleTimeString(locale, {
+    hour: "2-digit", minute: "2-digit", timeZone: timezone,
   });
 
   const endsAt = new Date(startsAt.getTime() + duration * 60_000);
