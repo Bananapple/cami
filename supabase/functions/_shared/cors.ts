@@ -7,11 +7,14 @@
 //
 // Behavior:
 //   - Browser request from an allowlisted origin → echo that origin
-//   - Browser request from any other origin → return null (browser blocks)
+//   - Browser request from any other origin → return the first allowlisted
+//     origin as a placeholder (browser sees the mismatch and blocks)
 //   - Non-browser caller (no Origin header, e.g. Stripe webhook, curl) →
-//     CORS doesn't apply, returns the first allowlisted origin as the placeholder
-//   - APP_URL unset or empty → safe degraded mode, returns "*" so legitimate
-//     callers aren't broken in dev environments. Production should always set APP_URL.
+//     CORS doesn't apply, returns the first allowlisted origin as a placeholder
+//   - APP_URL unset on Supabase Edge runtime → throw at module load, refuse
+//     to start. Production must always have APP_URL set.
+//   - APP_URL unset locally (`supabase functions serve`) → degrade to "*" so
+//     dev/sandbox still works.
 //
 // Note on threat model:
 //   With Bearer JWT auth (not cookies), CORS provides defense-in-depth, not
@@ -25,6 +28,19 @@ const ALLOWED_ORIGINS: string[] = APP_URL
       try { return new URL(u.trim()).origin; } catch { return ""; }
     }).filter(Boolean)
   : [];
+
+// Supabase Edge runs on Deno Deploy, which sets DENO_DEPLOYMENT_ID. Local
+// `supabase functions serve` does not set this var, so dev keeps the `*`
+// fallback in corsHeaders() below for ergonomics. Production refuses to start
+// with an empty allowlist — fail loud rather than fail open.
+const IS_SUPABASE_EDGE = !!Deno.env.get("DENO_DEPLOYMENT_ID");
+if (IS_SUPABASE_EDGE && ALLOWED_ORIGINS.length === 0) {
+  throw new Error(
+    "CORS misconfigured: APP_URL env var is empty on Supabase Edge runtime. " +
+    "Set APP_URL to a comma-separated list of allowed origins via " +
+    "`supabase secrets set APP_URL=\"https://your-studio.com,https://another.com\"`."
+  );
+}
 
 const STANDARD_HEADERS = {
   "Access-Control-Allow-Headers":
