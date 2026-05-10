@@ -233,9 +233,10 @@ function ExpandedTemplate({
   }, [template.id]);
 
   const save = async () => {
+    console.log("[debug:save] entered, pending=", pending);
     setPending(true);
     try {
-      await updateTemplate.mutateAsync({
+      const patch = {
         id: template.id,
         name: draft.name.trim(),
         description: draft.description.trim() || null,
@@ -244,12 +245,17 @@ function ExpandedTemplate({
         default_max_capacity: Number(draft.default_max_capacity),
         default_price: Number(draft.default_price),
         default_instructor_id: draft.default_instructor_id || null,
-      });
+      };
+      console.log("[debug:save] calling mutateAsync with patch:", patch);
+      const result = await updateTemplate.mutateAsync(patch);
+      console.log("[debug:save] mutateAsync resolved, result=", result);
       toast.success("Saved");
       onClose();
     } catch (e: any) {
-      toast.error(e.message ?? "Failed to save");
+      console.log("[debug:save] caught error:", e);
+      toast.error(e?.message ?? "Failed to save");
     } finally {
+      console.log("[debug:save] finally block, setting pending=false");
       setPending(false);
     }
   };
