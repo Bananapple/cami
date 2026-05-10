@@ -74,8 +74,9 @@ Deno.serve(async (req) => {
 
     // --- Cancel at provider ---
     const adapter = getProvider(membership.provider as any);
+    let cancelResult;
     try {
-      await adapter.cancelSubscriptionAtPeriodEnd({
+      cancelResult = await adapter.cancelSubscriptionAtPeriodEnd({
         provider_subscription_id: membership.provider_subscription_id,
         provider_account_id: providerRow?.provider_account_id ?? null,
       });
@@ -84,9 +85,14 @@ Deno.serve(async (req) => {
       return json(req, { error: "Could not cancel with payment provider", detail: String(err) }, 502);
     }
 
-    // --- Stamp cancel_scheduled_at ---
+    // --- Snap valid_until to provider's actual period end + stamp cancel_scheduled_at ---
+    // Renewal flow keeps its 3-day grace; cancellation snaps to the provider's truth
+    // so the UI's "Access until <date>" matches what the provider shows.
+    const validUntil = new Date(cancelResult.current_period_end * 1000).toISOString().slice(0, 10);
+
     const { error: rpcErr } = await admin.rpc("request_membership_cancellation", {
       p_membership_id: membership_id,
+      p_valid_until: validUntil,
     });
     if (rpcErr) {
       // Provider already accepted the cancel; surface but don't fail loudly —
@@ -94,7 +100,7 @@ Deno.serve(async (req) => {
       console.error("request_membership_cancellation RPC failed:", rpcErr);
     }
 
-    return json(req, { scheduled: true, ends_at: membership.valid_until });
+    return json(req, { scheduled: true, ends_at: validUntil });
   } catch (err) {
     console.error("cancel-membership error:", err);
     return json(req, { error: "Internal server error" }, 500);

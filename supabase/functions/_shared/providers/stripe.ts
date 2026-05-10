@@ -8,6 +8,7 @@ import type {
   RefundParams,
   RefundResult,
   CancelSubscriptionParams,
+  CancelSubscriptionResult,
 } from "./types.ts";
 
 const SECRET_KEY = Deno.env.get("STRIPE_SECRET_KEY") ?? "";
@@ -227,12 +228,13 @@ export class StripeProvider implements PaymentProviderAdapter {
     };
   }
 
-  async cancelSubscriptionAtPeriodEnd(params: CancelSubscriptionParams): Promise<void> {
+  async cancelSubscriptionAtPeriodEnd(params: CancelSubscriptionParams): Promise<CancelSubscriptionResult> {
     const opts = params.provider_account_id ? { stripeAccount: params.provider_account_id } : undefined;
-    await this.stripe.subscriptions.update(
+    const sub = await this.stripe.subscriptions.update(
       params.provider_subscription_id,
       { cancel_at_period_end: true },
       opts,
     );
+    return { current_period_end: sub.current_period_end };
   }
 }

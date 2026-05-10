@@ -82,6 +82,13 @@ export interface CancelSubscriptionParams {
   provider_account_id?: string | null;  // Stripe Connect acct_xxx; null = platform account
 }
 
+export interface CancelSubscriptionResult {
+  // Unix timestamp (seconds) when the provider will actually stop the subscription.
+  // The Edge Function snaps memberships.valid_until to this date so the UI shows
+  // the same end date the provider does — no grace-period drift on cancellation.
+  current_period_end: number;
+}
+
 export interface PaymentProviderAdapter {
   readonly name: PaymentProvider;
   createCheckoutSession(params: CreateCheckoutParams): Promise<CheckoutResult>;
@@ -90,5 +97,5 @@ export interface PaymentProviderAdapter {
   // Schedules the subscription to cancel at the end of the current paid period.
   // The provider continues to honour the subscription until then; webhook
   // (subscription.cancelled) fires at period end and finalises the membership row.
-  cancelSubscriptionAtPeriodEnd(params: CancelSubscriptionParams): Promise<void>;
+  cancelSubscriptionAtPeriodEnd(params: CancelSubscriptionParams): Promise<CancelSubscriptionResult>;
 }

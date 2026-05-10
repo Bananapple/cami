@@ -20,6 +20,7 @@ import type {
   RefundParams,
   RefundResult,
   CancelSubscriptionParams,
+  CancelSubscriptionResult,
 } from "./types.ts";
 
 const CHECKOUT_BASE = "https://checkout-api.frisbii.com/v1";
@@ -238,7 +239,7 @@ export class FrisbiiProvider implements PaymentProviderAdapter {
     };
   }
 
-  async cancelSubscriptionAtPeriodEnd(_params: CancelSubscriptionParams): Promise<void> {
+  async cancelSubscriptionAtPeriodEnd(_params: CancelSubscriptionParams): Promise<CancelSubscriptionResult> {
     // Frisbii subscription checkout is not yet implemented (see createCheckoutSession),
     // so there shouldn't be any Frisbii-backed memberships in production. If one
     // appears, surface it loudly rather than silently no-op.
