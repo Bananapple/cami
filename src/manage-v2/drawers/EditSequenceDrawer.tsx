@@ -701,7 +701,7 @@ function NewTimeChip({
         autoFocus
         style={chipInputStyle}
       />
-      <CircleSave ariaLabel="Add" onClick={() => onSave(time)} />
+      <CircleAdd ariaLabel="Add" onClick={() => onSave(time)} />
       <button type="button" onClick={onCancel} style={chipCancelButtonStyle}>
         Cancel
       </button>
@@ -762,8 +762,24 @@ const chipCancelButtonStyle: React.CSSProperties = {
   cursor: "pointer",
 };
 
-// ── Action button (square with rounded corners, matches time input shape) ──
+// ── Action buttons (square with rounded corners, match time input shape) ──
+// CircleSave commits an in-progress edit (checkmark); CircleAdd creates a
+// new time slot (plus). Same visual chrome, distinct icons so users don't
+// confuse "save my edit" with "add another time".
 function CircleSave({ onClick, ariaLabel }: { onClick: () => void; ariaLabel: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={ariaLabel}
+      style={squareButtonStyle("primary")}
+    >
+      <CheckIcon />
+    </button>
+  );
+}
+
+function CircleAdd({ onClick, ariaLabel }: { onClick: () => void; ariaLabel: string }) {
   return (
     <button
       type="button"
@@ -810,6 +826,14 @@ function PlusIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.75" strokeLinecap="round">
       <path d="M12 5v14M5 12h14" />
+    </svg>
+  );
+}
+
+function CheckIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20 6L9 17l-5-5" />
     </svg>
   );
 }
