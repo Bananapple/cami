@@ -77,6 +77,35 @@ Architecture assessment conducted 2026-04-23. v2 cutover completed 2026-04-24 �
 
 To activate for a studio: set `FRISBII_API_KEY` + `FRISBII_WEBHOOK_SECRET` secrets; insert `studio_payment_providers` row with `provider='frisbii'`; set webhook URL to `.../payment-webhook/frisbii`.
 
+### Vipps / MobilePay Adapter — PLANNED (one-time only)
+
+**Scope decision**: ship the **ePayment API** (one-time charges) only. Skip the **Recurring API** for v1 — Norwegian yoga sells far more drop-ins and clip cards than auto-renewing memberships, and Recurring has an awkward shape (see "deferred" below). Subscription products continue to route to Stripe.
+
+**Checkout UX**: two-button stack in `BookingSheet`. Vipps button on top (brand-colored, official assets from [Vipps branding guidelines](https://developer.vippsmobilepay.com/docs/common-topics/branding-guidelines/)), "or pay by card" divider, Stripe-hosted Card / Apple Pay below. Vipps button renders only when (a) studio has Vipps enrolled in `studio_payment_providers` and (b) product is one-off (`drop_in | clip_card | addon | private`). Subscription products show only the Stripe button.
+
+**Architectural changes:**
+- `create-checkout` accepts optional `provider?: "stripe" | "vipps" | "frisbii"` field; defaults to studio's primary provider when omitted (preserves today's behavior). Validates: provider is enrolled for the studio + provider supports the product type (Vipps rejects `subscription` products).
+- `StudioContext` exposes `enabled_providers: string[]` so `BookingSheet` knows which buttons to render.
+- `useStudioProviders()` hook (or studio context field) queries `studio_payment_providers` filtered by `is_active=true` and `onboarded_at IS NOT NULL`.
+
+**Verified Vipps API details** (from developer.vippsmobilepay.com, fetched 2026-05-10):
+- **Auth**: OAuth2 token from `POST /accesstoken/get` with headers `client_id`, `client_secret`, `Ocp-Apim-Subscription-Key`, `Merchant-Serial-Number`. Subsequent calls require `Authorization: Bearer {token}` + `Ocp-Apim-Subscription-Key` + `Merchant-Serial-Number`. Cache the token (~1h TTL) in module scope.
+- **Create payment**: `POST /epayment/v1/payments`. Body uses `amount: { value: <minor units>, currency: "NOK" }`, `reference` (merchant-generated, 8–64 chars matching `^[a-zA-Z0-9-]{8,64}$`, unique per MSN — store on `payments.provider_session_id` *before* redirect), `paymentMethod`, `customer.phoneNumber` (E.164, optional), `returnUrl`, `userFlow: "WEB_REDIRECT"`, optional `metadata` (max 5 KV pairs, must include `payment_id`), `paymentDescription` (3–100 chars). Response includes `redirectUrl` → use as `checkout_url`.
+- **Capture / cancel / refund**: separate endpoints. ePayment authorize+capture is a two-step flow — adapter must chain authorize callback → `/capture` for immediate-capture semantics.
+- **Webhooks**: register via `POST /webhooks/v1/webhooks` (returns `id` + `secret`). Signature verification is **Azure API Management style** — recompute HMAC-SHA256 over `Host`, `x-ms-date`, `x-ms-content-sha256`, request URI using the registration secret; compare to `Authorization` header. Not Stripe-style raw-body HMAC.
+- **Event names** (note plural `epayments` in event name even though endpoint path is singular `/epayment/v1/`): `epayments.payment.created.v1`, `.authorized.v1`, `.captured.v1`, `.refunded.v1`, `.cancelled.v1`, `.aborted.v1`, `.expired.v1`, `.terminated.v1`. Map to `CanonicalEventType` in `parseWebhookEvent`.
+- **Webhook payload top-level fields**: `msn`, `reference`, `pspReference`, `name`, `amount`, `timestamp`, `idempotencyKey`, `success`. Reference is the lookup key into `payments.provider_session_id`.
+
+**Same code serves MobilePay (Denmark / Finland)**: Vipps and MobilePay merged in 2022 into "Vipps MobilePay" — both share the ePayment API. Danish/Finnish studios get a "Pay with MobilePay" button using the same adapter; only the brand asset differs.
+
+**Apple Pay caveat for the Stripe button**: Apple Pay shows up automatically inside Stripe Checkout but requires per-domain verification in the Stripe dashboard (upload of `/.well-known/apple-developer-merchantid-domain-association`). One-time setup per studio domain — flag this in the new-customer checklist.
+
+**Effort estimate**: adapter ~3–4 days; routing + two-button UI ~1 day. **~4–5 days total.**
+
+To activate for a studio (when shipped): register a webhook (`POST /webhooks/v1/webhooks`) and store the returned secret as `VIPPS_WEBHOOK_SECRET_<studio_slug>`; set `VIPPS_CLIENT_ID`, `VIPPS_CLIENT_SECRET`, `VIPPS_SUBSCRIPTION_KEY`; insert `studio_payment_providers` row with `provider='vipps'` + the studio's MSN as `provider_account_id`.
+
+**Deferred — Vipps Recurring (subscriptions)**: meaningfully different shape from Stripe. Endpoints are `/recurring/v3/agreements/...`; agreement IDs are `agr_xxx`; charges are `chr_xxx`. **There is no `cancel_at_period_end` flag** — `PATCH {status: "STOPPED"}` cancels any DUE/PENDING/RESERVED charges immediately, so honoring the current paid period requires either (a) merchant-driven charge cron + omit-next-charge to fake period-end semantics, or (b) immediate stop + locally-honored `valid_until`. Single agreement-stopped webhook (`recurring.agreement-stopped.v1`) with an `actor` field. Revisit if/when Norwegian customers explicitly ask for native Vipps subscriptions.
+
 ### ✅ Staff product management UI — LIVE (2026-05-02)
 Products CRUD lives in StudioView → Products section.
 
