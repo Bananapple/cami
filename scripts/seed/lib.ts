@@ -78,6 +78,25 @@ export async function templateByName(name: TemplateName) {
   return t;
 }
 
+// Fallback instructor for templates where default_instructor_id is NULL
+// (some templates can lose their default if edited via the manage UI). Cached
+// per script run.
+let _fallbackInstructor: string | null = null;
+export async function getFallbackInstructorId(): Promise<string> {
+  if (_fallbackInstructor) return _fallbackInstructor;
+  const { id: studioId } = await getStudio();
+  const { data, error } = await admin
+    .from("instructors")
+    .select("id")
+    .eq("studio_id", studioId)
+    .eq("is_active", true)
+    .limit(1)
+    .single();
+  if (error || !data) throw new Error(`No active instructors on ${TEST_STUDIO_SLUG}`);
+  _fallbackInstructor = data.id;
+  return data.id;
+}
+
 let _location: { id: string } | null = null;
 export async function getLocation() {
   if (_location) return _location;
@@ -225,6 +244,8 @@ export async function insertPastClassInstance(opts: {
   const startsAt = localStudioTimeToUtc(startLocal, timezone);
   const endsAt = new Date(startsAt.getTime() + tpl.default_duration_minutes * 60_000);
 
+  const instructorId = tpl.default_instructor_id ?? (await getFallbackInstructorId());
+
   const { data, error } = await admin
     .from("class_instances")
     .insert({
@@ -232,7 +253,7 @@ export async function insertPastClassInstance(opts: {
       template_id: tpl.id,
       rule_id: null,
       location_id: loc.id,
-      instructor_id: tpl.default_instructor_id,
+      instructor_id: instructorId,
       starts_at: startsAt.toISOString(),
       ends_at: endsAt.toISOString(),
       price: tpl.default_price,
