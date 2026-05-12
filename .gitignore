@@ -41,3 +41,4 @@ supabase/.temp/
 .context/
 .hermes/
 skills-lock.json
+.env.local

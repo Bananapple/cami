@@ -208,19 +208,40 @@ export async function ensureMembership(persona: Persona, userId: string): Promis
     credits_remaining: creditsRemaining,
     valid_until: validUntil,
   };
-  const { data, error } = await admin
+  // True find-then-update-or-insert. The memberships table has no UNIQUE
+  // constraint on (studio_id, user_id, product_id), so a naive upsert with
+  // onConflict silently falls back to plain INSERT and creates duplicates
+  // on every script run. Lookup explicitly and route to update or insert.
+  const { data: existing, error: lookupErr } = await admin
     .from("memberships")
-    .upsert(row, { onConflict: "studio_id,user_id,product_id" })
+    .select("id")
+    .eq("studio_id", studioId)
+    .eq("user_id", userId)
+    .eq("product_id", product.id)
+    .maybeSingle();
+  if (lookupErr && (lookupErr as any).code !== "PGRST116") throw lookupErr;
+
+  if (existing) {
+    const { error: updErr } = await admin
+      .from("memberships")
+      .update({
+        status: row.status,
+        plan_name: row.plan_name,
+        credits_remaining: row.credits_remaining,
+        valid_until: row.valid_until,
+      })
+      .eq("id", existing.id);
+    if (updErr) throw updErr;
+    return existing.id;
+  }
+
+  const { data: inserted, error: insErr } = await admin
+    .from("memberships")
+    .insert(row)
     .select("id")
     .single();
-  if (error) {
-    // The memberships table doesn't have a unique constraint on (studio,user,product)
-    // in every schema version — fall back to insert if upsert fails on conflict spec.
-    const ins = await admin.from("memberships").insert(row).select("id").single();
-    if (ins.error) throw ins.error;
-    return ins.data.id;
-  }
-  return data.id;
+  if (insErr || !inserted) throw insErr ?? new Error("insert returned no row");
+  return inserted.id;
 }
 
 // ── Class instance + booking helpers ───────────────────────────────────
