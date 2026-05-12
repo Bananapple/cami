@@ -59,13 +59,43 @@ Then capture the new `studios.id` for the steps below.
    VITE_SUPABASE_URL              = https://xskqpxfjhhxontirezjd.supabase.co
    VITE_SUPABASE_PUBLISHABLE_KEY  = <anon key from Supabase>
    VITE_STUDIO_SLUG               = fooyoga
+   VITE_POSTHOG_KEY               = <PostHog project API token>
    ```
+   `VITE_STUDIO_SLUG` is a **slug**, not a URL — value is the `studios.slug` column (e.g. `fooyoga`). Vercel's placeholder text shows `https://api.example.com`; ignore it. If the slug is wrong, every booking/payment/membership in those first hours is attributed to the wrong tenant and untangling means cancelling Stripe subs + manual row migration. Don't skip the verification in step 2.5.
+
+   `VITE_POSTHOG_KEY` is the PostHog project's public API token (`phc_…`). Without it the SDK never initializes and analytics is silently 0.
 3. Deploy — do **not** "Redeploy from cache" after setting env vars
 4. Connect the customer's custom domain in Vercel → Settings → Domains
 
 ---
 
-## 3. Supabase — auth redirect URL
+## 2.5. Verify tenant resolution BEFORE announcing the URL
+
+Before sending the deployment link to the customer, confirm the slug resolves to the correct studio:
+
+1. Visit the deployment in an incognito window.
+2. Open DevTools → **Network** → reload → click any request to `*.supabase.co/rest/v1/...` → **Headers** → look at request header `x-studio-slug`. It must equal the slug you set (e.g. `fooyoga`).
+3. Confirm the page shows the **right studio name and branding**. If it shows another studio (or "default"), the env var is wrong.
+4. Run a single test booking with the Stripe test card. Then check:
+   ```sql
+   SELECT studio_id, status FROM bookings ORDER BY created_at DESC LIMIT 1;
+   SELECT id, slug FROM studios WHERE id = '<studio_id from above>';
+   ```
+   The slug returned must match what you set.
+
+Only proceed to step 3 once this passes. Real money flowing to the wrong tenant is hard to clean up — see the brie-demo cleanup in `git log` for context.
+
+---
+
+## 3. PostHog — append authorized URL
+
+PostHog → Project Settings → **Authorized URLs** → add the new customer's production URL (and the `*.vercel.app` URL until they connect their domain). Without this, the toolbar/heatmaps won't attach to their domain, and web-analytics treats their traffic as external.
+
+If multiple studios share one PostHog project, also confirm `test_account_filters` doesn't exclude the new studio's `$host`.
+
+---
+
+## 4. Supabase — auth redirect URL
 
 Authentication → URL Configuration → Redirect URLs → add:
 
@@ -80,7 +110,7 @@ This is required for SSO popups to close correctly. Without it, OAuth bounces to
 
 ---
 
-## 4. Edge Function secrets — append to APP_URL allowlist
+## 5. Edge Function secrets — append to APP_URL allowlist
 
 `APP_URL` is a comma-separated list used for two things: CORS allow-origin echo, and `return_url` validation in `create-checkout`. **Append** the new origin, don't replace:
 
@@ -100,7 +130,7 @@ You only need to redeploy `create-checkout` — the other Edge Functions read th
 
 ---
 
-## 5. Stripe — connect the customer's account
+## 6. Stripe — connect the customer's account
 
 Use **Stripe Connect** (NOT separate Stripe accounts per studio):
 
@@ -120,7 +150,7 @@ If you don't yet have Connect set up at the platform level (sandbox testing), yo
 
 ---
 
-## 6. Resend — verify the customer's sending domain
+## 7. Resend — verify the customer's sending domain
 
 1. Resend Dashboard → **Domains** → Add domain (e.g. `fooyoga.no`)
 2. Customer adds the DKIM/SPF DNS records Resend shows
@@ -131,7 +161,7 @@ If `studios.from_email` is null OR the domain isn't verified yet, all their emai
 
 ---
 
-## 7. Owner promotion
+## 8. Owner promotion
 
 The customer signs up on their site (`https://fooyoga.no`) via OTP. This creates an `auth.users` row + auto-upserts a `studio_members` row with `role='member'` (per the `create-checkout` function on first booking, or via direct sign-up flow).
 
@@ -158,7 +188,7 @@ They may need to sign out + back in (or wait ~5 min for React Query cache) to se
 
 ---
 
-## 8. Smoke-test the new deployment
+## 9. Smoke-test the new deployment
 
 - [ ] **Home page** loads with their branding and colors
 - [ ] **OTP sign-in** works (check spam if email doesn't arrive)
@@ -169,6 +199,7 @@ They may need to sign out + back in (or wait ~5 min for React Query cache) to se
 - [ ] **`/manage`** loads when signed in as the owner; gives "Not authorised" when signed in as a regular member
 - [ ] **Membership purchase** with the same test card creates an active membership row
 - [ ] **Cancel a paid booking** issues a Stripe refund (visible in the customer's Stripe Connect dashboard)
+- [ ] **PostHog event** for the test pageview shows up in the project's Live Events view, with `studio_id` = the new studio's UUID
 
 ---
 
@@ -199,4 +230,4 @@ END $$;
 ```
 
 > Pre-flight: dump `studios`, `bookings`, `payments` for that studio if you want a backup.
-> Don't forget to also remove the customer's URL from `APP_URL` secret + delete their Vercel project.
+> Don't forget to also: remove the customer's URL from `APP_URL` secret, delete their Vercel project, and remove their domain from PostHog Authorized URLs.

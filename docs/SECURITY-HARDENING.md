@@ -44,6 +44,20 @@ Three findings from the original audit were deferred as genuinely out of scope f
 
 ---
 
+## Follow-up findings (post-audit)
+
+| # | Area | Severity | Discovered | Fix |
+|---|---|---|---|---|
+| 29 | Cross-tenant attribution via `create-checkout` — service role bypasses RLS, so a stale tab or hand-crafted request could submit a `product_id` belonging to a different studio than the frontend was scoped to; `studio_id` was derived from `product.studio_id` without cross-checking the request | High | 2026-05-11 (in prod — yogabrie member purchased "Monthly Unlimited" but membership row landed on brie-demo) | Added `validateStudioMatch(req, adminClient, studioId)` helper in `supabase/functions/create-checkout/index.ts`. Compares `x-studio-slug` request header against the resolved `studio_id`; returns 400 if header absent/empty, 403 on mismatch. Called immediately after `studioId` is resolved in both the class-booking and product-purchase branches so the credit-booking early-return path is also protected. PR #9, 2026-05-12. |
+
+**Open defense-in-depth track** (deferred to next sprint, not yet implemented):
+- RLS audit — every tenanted table, every policy, every service-role edge function call (`issue-refund`, `validate-discount`, `cancel-membership`, `get-analytics`)
+- Extract `validateStudioMatch` pattern as a shared helper applied across all edge functions that accept user-controlled tenant IDs
+- Integration tests that explicitly attempt cross-tenant operations and verify they fail
+- PG-level belt: set `app.current_studio_id` as a Postgres session variable per request, consumed by RLS policies — stricter than the current per-policy header reads
+
+---
+
 ## Key architectural decisions
 
 ### RLS: anon reads via header, not hardcoded IDs

@@ -35,3 +35,9 @@ supabase/.temp/
 
 # Claude Code worktree scratch space — never tracked in this repo
 .claude/worktrees/
+
+# Agent / skill manager state — per-machine, never commit
+.agents/
+.context/
+.hermes/
+skills-lock.json

@@ -24,7 +24,7 @@ This is a **multi-tenant SaaS platform** for yoga studios in Scandinavia, Europe
 - **Clients view** (2026-05-02): `/manage/clients` — full member list via `member_activity_summary` DB view (`0015`); segment filters (New/One-timer/Regular/Lapsing/Inactive/No plan) with counts; real-time search; MemberDrawer shows past bookings, membership status, and "sell package" copy-link flow
 - **Discount codes + referral program** (2026-05-02): `discount_codes` table + staff UI; `validate-discount` Edge Function; referral links per member via `studio_members.referral_code`; `referrals` table; first-timer discount applied in `create-checkout`
 
-**Security hardening (2026-04-30):** 28-finding audit implemented — see `docs/SECURITY-HARDENING.md`.
+**Security hardening (2026-04-30):** 28-finding audit implemented — see `docs/SECURITY-HARDENING.md`. Post-audit follow-up #29 (2026-05-12, PR #9): cross-tenant guard in `create-checkout` after a stale-tab attribution bug landed a yogabrie membership on brie-demo in prod.
 
 **Design system:** Manager UI uses three labelling primitives (`StateBadge`, `CategoryChip`, `Count`) defined in `src/manage-v2/components/Badge.tsx`. Booking state and membership health always route through mapping functions in `src/manage-v2/lib/bookingStatus.ts` and `src/manage-v2/lib/planHealth.ts` — never hardcode tone/label inline. Full reference: `docs/DESIGN-SYSTEM.md`.
 
@@ -110,6 +110,7 @@ All user-facing hooks (`useBookings`, `useMembership`, `usePaymentMethods`, `use
 - `return_url` is validated against `ALLOWED_ORIGINS` + localhost (dev) to prevent open redirects.
 - Accepts `{ class_instance_id }` (book a class) OR `{ product_id }` (buy a membership/clip card).
 - Currency and studio name are read from `studios.currency` / `studios.name` — nothing hardcoded.
+- **Cross-tenant guard:** `validateStudioMatch()` compares the `x-studio-slug` request header against the resolved `studio_id` (derived from `product.studio_id` or `class_instance.studio_id`). Returns 400 if the header is absent or empty, 403 on mismatch. Called immediately after `studioId` is resolved in both branches so the credit-booking early-return is also protected. Closes a stale-tab attribution bug surfaced in prod on 2026-05-11 (see `docs/SECURITY-HARDENING.md` follow-up #29).
 
 **Legacy (decommissioned)**: was `date → confirm → auth → payment → addCard → success` with an insecure client-side `StripeCardForm` that wrote card details directly to the DB.
 
