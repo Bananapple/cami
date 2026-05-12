@@ -36,6 +36,10 @@ import {
 import { PERSONAS } from "./personas";
 
 const DRY_RUN = process.argv.includes("--dry-run");
+// --force: nuke existing seed class_instances + bookings for each persona
+// before backfilling. Without this flag, personas that already have any
+// confirmed bookings are skipped (true idempotent re-run, no duplication).
+const FORCE = process.argv.includes("--force");
 
 async function main() {
   console.log(`\n=== seed/setup → ${TEST_STUDIO_SLUG} ===`);
@@ -62,6 +66,43 @@ async function main() {
     await ensureStudioMember(persona, userId);
     const membershipId = await ensureMembership(persona, userId);
     console.log(`  studio_member upserted, membership=${membershipId ?? "—"}`);
+
+    // Idempotency guard: skip backfill if the user already has any confirmed
+    // bookings, unless --force was passed. Without this guard, each re-run
+    // would create a new set of class_instances (fresh UUIDs) and double
+    // the booking history — which breaks personas like one_timer.
+    const { count: existingBookings } = await admin
+      .from("bookings")
+      .select("id", { count: "exact", head: true })
+      .eq("studio_id", studio.id)
+      .eq("user_id", userId)
+      .eq("status", "confirmed");
+
+    if ((existingBookings ?? 0) > 0 && !FORCE) {
+      console.log(`  history: ${existingBookings} existing bookings — skipping (pass --force to rebuild)`);
+      continue;
+    }
+
+    if (FORCE && (existingBookings ?? 0) > 0) {
+      console.log(`  --force: wiping ${existingBookings} existing seed bookings + their class_instances…`);
+      // Delete bookings first (FK on class_instance_id).
+      await admin
+        .from("bookings")
+        .delete()
+        .eq("studio_id", studio.id)
+        .eq("user_id", userId)
+        .eq("status", "confirmed");
+      // Delete class_instances that were [seed]-tagged for this user. We can't
+      // filter by user_id directly (class_instances aren't user-scoped); we
+      // rely on the [seed] notes marker and the fact that booked_count would
+      // now be 0 since we just deleted the bookings.
+      await admin
+        .from("class_instances")
+        .delete()
+        .eq("studio_id", studio.id)
+        .eq("notes", "[seed] backfilled for audience-model test data")
+        .eq("booked_count", 0);
+    }
 
     // Backfill historical bookings.
     const { totalBookings: count, oldestDaysAgo, newestDaysAgo, oneTimer } = persona.history;

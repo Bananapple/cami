@@ -18,6 +18,14 @@ on:
         options:
           - "true"
           - "false"
+      force:
+        description: "Force-rebuild: wipe existing seed bookings/instances per persona, then backfill fresh"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
 
 jobs:
   setup:
@@ -42,8 +50,7 @@ jobs:
           TEST_USER_PASSWORD: ${{ secrets.SEED_TEST_USER_PASSWORD }}
           TEST_STUDIO_SLUG: ${{ vars.SEED_TEST_STUDIO_SLUG || 'brie-demo' }}
         run: |
-          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
-            bun run scripts/seed/setup.ts --dry-run
-          else
-            bun run scripts/seed/setup.ts
-          fi
+          ARGS=""
+          [ "${{ github.event.inputs.dry_run }}" = "true" ] && ARGS="$ARGS --dry-run"
+          [ "${{ github.event.inputs.force }}" = "true" ] && ARGS="$ARGS --force"
+          bun run scripts/seed/setup.ts $ARGS
