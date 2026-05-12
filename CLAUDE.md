@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is a **multi-tenant SaaS platform** for yoga studios in Scandinavia, Europe and the US. A single Supabase project serves all studios, with every tenanted table scoped by `studio_id` and RLS enforcing isolation. The owner sells websites + booking engines as a flat monthly SaaS fee. Student payments flow directly to each studio (no marketplace layer) via a **provider-agnostic adapter pattern** — Stripe Checkout in MVP, Frisbii next (Brie already uses it), Vipps later for Norwegian market fit. Adding a provider is an adapter file + one enum value; no schema changes.
 
-**Architectural state**: YogaBrie (`xskqpxfjhhxontirezjd`, eu-north-1) has completed the v2 cutover as of 2026-04-24. The multi-tenant schema is live. The legacy `sessions` table and `session_id`/`session_date` columns on `bookings` are still present but inert — drop them once rollback confidence is established. The migration SQL is in `supabase/migrations-v2/` and the execution record is in `docs/MIGRATION-MULTITENANT.md`.
+**Architectural state**: YogaBrie (`xskqpxfjhhxontirezjd`, eu-north-1) has completed the v2 cutover as of 2026-04-24. The multi-tenant schema is live. The legacy `sessions` table and `session_id`/`session_date` columns on `bookings` are still present but inert — drop them once rollback confidence is established. Full migration record: `docs/MIGRATION-MULTITENANT.md`.
 
 **Live features (as of 2026-05-02):**
 - Passwordless email OTP auth
@@ -130,20 +130,20 @@ All user-facing hooks (`useBookings`, `useMembership`, `usePaymentMethods`, `use
 | `memberships` | Subscription plans |
 | `studio_config` | Per-deployment branding (one row) |
 
-**v2 migrations (in `supabase/migrations-v2/`):**
-- `0001–0007` — initial v2 schema, multi-tenant tables, RLS, functions (see `docs/MIGRATION-MULTITENANT.md`)
-- `0008_security_hardening.sql` — RLS scoping, atomic payment functions, duplicate-booking constraint
-- `0009_drop_legacy_sessions.sql` — drops legacy `sessions` table and stale columns
-- `0010_products_and_membership_purchase.sql` — `products` table + RLS + seed data; `payments.product_id`; `memberships.product_id`; `activate_membership()`, `renew_membership_by_subscription()`, `cancel_membership_by_subscription()` RPCs
-- `0011_book_with_credit.sql` — `bookings.membership_id`; `book_with_credit()` RPC (atomic credit booking); `return_credit()` RPC (atomic credit return on cancellation)
-- `0027_expire_stale_pending_bookings.sql` — `expire_stale_pending_bookings()` sweeper cancels `pending` bookings >30min old where payment is still `requires_action`; pg_cron scheduled every 5min; coordinates with Stripe `expires_at = now+30min` so Stripe can't accept payment after sweep
-- `0029_atomic_credit_cancel.sql` — `cancel_credit_booking(p_booking_id, p_return_credit)` RPC; atomically cancels booking and optionally returns credit in one transaction; replaces the two-step approach in `issue-refund` that could leave users without their credit on crash
-- `0030_revoke_definer_executes.sql` — REVOKEs default EXECUTE on `SECURITY DEFINER` RPCs from `anon`/`authenticated`; only callers that explicitly need the function get GRANTed
-- `0031_internal_auth_and_rls_tightening.sql` — internal-auth helpers + studio-scoped RLS tightening across membership / booking / payment tables
-- `0032_webhook_studio_scoping.sql` — webhook ingestion + `payment_webhook_events` are scoped by `studio_id`; cross-studio replay is rejected
-- `0033_studio_visibility_and_from_email.sql` — adds `studios.app_url` and `studios.from_email`; edge functions read these per-studio instead of relying on global `APP_URL` / `FROM_EMAIL` env vars
+**v2 migrations (in `supabase/migrations/`, timestamps `20260417000001–20260417000041`):**
+- `000001–000007` — initial v2 schema, multi-tenant tables, RLS, functions (see `docs/MIGRATION-MULTITENANT.md`)
+- `000008_security_hardening` — RLS scoping, atomic payment functions, duplicate-booking constraint
+- `000009_drop_legacy_sessions` — drops legacy `sessions` table and stale columns
+- `000010_products_and_membership_purchase` — `products` table + RLS + seed data; `activate_membership()`, `renew_membership_by_subscription()`, `cancel_membership_by_subscription()` RPCs
+- `000011_book_with_credit` — `book_with_credit()` RPC (atomic credit booking); `return_credit()` RPC
+- `000031_expire_stale_pending_bookings` — `expire_stale_pending_bookings()` sweeper; pg_cron every 5min
+- `000033_atomic_credit_cancel` — `cancel_credit_booking()` RPC; atomically cancels booking + optionally returns credit
+- `000034_revoke_definer_executes` — REVOKEs EXECUTE on `SECURITY DEFINER` RPCs from `anon`/`authenticated`
+- `000035_internal_auth_and_rls_tightening` — internal-auth helpers + studio-scoped RLS tightening
+- `000036_webhook_studio_scoping` — webhook ingestion scoped by `studio_id`; cross-studio replay rejected
+- `000037_studio_visibility_and_from_email` — adds `studios.app_url` and `studios.from_email`
 
-**Applying migrations:** The Supabase CLI only looks in `supabase/migrations/` — `supabase db push` will NOT pick up files in `migrations-v2/`. Apply these by copy-pasting the SQL file into the Supabase SQL Editor (Dashboard → SQL Editor → New query).
+**Applying migrations:** All migrations are in `supabase/migrations/` and tracked in `schema_migrations`. Write new migration files there with the next timestamp; apply via the Supabase MCP `execute_sql` tool (Claude can do this directly) or `supabase db push --project-ref xskqpxfjhhxontirezjd`.
 
 **v2 (live as of 2026-04-24)** — full design in `docs/MIGRATION-MULTITENANT.md`:
 
