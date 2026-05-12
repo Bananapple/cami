@@ -111,6 +111,8 @@ Deno.serve(async (req) => {
         .single();
 
       studioId = instance.studio_id;
+      const guardErr = await validateStudioMatch(req, adminClient, studioId);
+      if (guardErr) return guardErr;
       currency = (studio as any)?.currency ?? "NOK";
       studioAppUrl = (studio as any)?.app_url ?? null;
       amountMinor = Math.round(instance.price * 100);
@@ -177,6 +179,8 @@ Deno.serve(async (req) => {
       }
 
       studioId = product.studio_id;
+      const guardErr = await validateStudioMatch(req, adminClient, studioId);
+      if (guardErr) return guardErr;
       currency = product.currency;
       amountMinor = product.price_minor;
       description = product.name;
@@ -459,6 +463,33 @@ Deno.serve(async (req) => {
     return json(req, { error: "Internal server error" }, 500);
   }
 });
+
+// Cross-tenant guard: reject if the request's x-studio-slug header doesn't
+// resolve to the studio the requested resource belongs to. Called immediately
+// after studioId is resolved in both the class-booking and product-purchase
+// branches so the credit-booking early-return is also protected. Header is
+// required — supabase-js sets it globally on every call from client.ts; a
+// missing or empty header indicates a non-browser caller or hand-crafted
+// request and is rejected to make the contract explicit.
+async function validateStudioMatch(
+  req: Request,
+  adminClient: any,
+  studioId: string,
+): Promise<Response | null> {
+  const slugHeader = req.headers.get("x-studio-slug")?.trim();
+  if (!slugHeader) {
+    return json(req, { error: "x-studio-slug header is required" }, 400);
+  }
+  const { data: hdrStudio } = await adminClient
+    .from("studios")
+    .select("id")
+    .eq("slug", slugHeader)
+    .maybeSingle();
+  if (!hdrStudio || hdrStudio.id !== studioId) {
+    return json(req, { error: "This item belongs to a different studio. Reload the page and try again." }, 403);
+  }
+  return null;
+}
 
 function json(req: Request, body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
