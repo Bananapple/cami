@@ -56,8 +56,8 @@ A pre-launch CSO-mode audit + customer-readiness pass shipped 14 audit findings 
 
 ### Frontend bugs found in passing (separate work, not security)
 
-- **AuthCallback hardcoded background defaults to Cami styling** — `src/pages/AuthCallback.tsx`. Should pull from StudioContext like everything else.
-- **StaffGate cross-studio "Back to dashboard" UX** — `src/manage/components/StaffGate.tsx`. The denial page sends users to `/dashboard` regardless of whether they have ANY relationship to the current studio. Should branch: customer of this studio → `/dashboard`; no relationship → "Sign out" button.
+- ~~**AuthCallback hardcoded background defaults to Cami styling**~~ — ✅ Non-issue. No per-studio CSS variable injection exists anywhere in the app (`StudioProvider` never calls `setProperty`). All pages use the same default shadcn theme. AuthCallback uses `bg-background` CSS variable like everything else — nothing to change until per-studio theming is built.
+- ~~**StaffGate cross-studio "Back to dashboard" UX**~~ — ✅ Already implemented. `hasRelationship = studioMember != null` drives the branch: customer → "Back to dashboard" link; no relationship → "Sign out" button.
 - ~~**`/manage/schedule` save doesn't dispatch network request**~~ — ✅ Fixed (2026-05-10, PR #8). Root cause: time chip's inline Save button used a `+` icon (same as Add), causing users to click the wrong save. Split into `CircleSave` (checkmark) and `CircleAdd` (plus) in `EditSequenceDrawer`. The underlying `updateRule.mutate` path was never broken.
 - **Owner-promotion path required manual SQL** — ✅ Resolved (`scripts/promote-owner.ts`).
 
