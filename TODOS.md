@@ -34,15 +34,9 @@ A pre-launch CSO-mode audit + customer-readiness pass shipped 14 audit findings 
 
 **When to land:** Before public Cami marketing launch (you don't want demo prospects discovering broken yoga routes by URL-guessing).
 
-### Audit #16 — `profiles_staff_read` cross-studio leak
+### ~~Audit #16 — `profiles_staff_read` cross-studio leak~~ — ✅ DONE (2026-05-13, migration 0042)
 
-**What:** RLS policy `profiles_staff_read` lets staff of any studio read full profile rows (name, email, phone, marketing opt-ins) of any user who shares ANY studio with them. If user X belongs to Studio A AND Studio B, both A's and B's staff can see X's PII.
-
-**Why deferred:** With Brie + Cami both same-operator (you), this is intentional. With unrelated tenants, it's a real PII leak.
-
-**Fix when landing:** Either column-restrict the staff-read policy, or expose a staff-facing view that excludes phone/marketing opt-ins.
-
-**When to land:** Before tenant 2 (any non-related customer).
+Policy now joins through `studios` and requires `s.slug` to match the `x-studio-slug` request header. Staff can only read profiles of members in the studio they're currently operating in — cross-operator PII leak closed.
 
 ### Webhook audit #1 — per-studio webhook secrets (alternative architecture, OPTIONAL)
 
@@ -72,10 +66,10 @@ A pre-launch CSO-mode audit + customer-readiness pass shipped 14 audit findings 
 - **137 ESLint warnings in `src/`** — all pre-existing, none added during the 2026-05-09 session. Breakdown: ~80% `react-refresh/only-export-components` (HMR optimization, non-functional), ~15% `react-hooks/exhaustive-deps` (real bugs hiding here), ~5% scattered. Run `npm run lint -- --fix` for auto-fixable ones first, then walk the exhaustive-deps cases manually. Worth a focused session.
 - **Test coverage thin** — 4 test files for a multi-thousand-line codebase. Untested critical paths: BookingSheet (membership detection, promo code, waitlist), all Edge Functions, all manage hooks. Worth scoping before public launch.
 
-### Findings raised during /ship pre-landing review of security-fixes (2026-05-09)
+### ~~Findings raised during /ship pre-landing review of security-fixes (2026-05-09)~~ — ✅ DONE
 
-- **CORS fallback to `*` when `APP_URL` unset** — `supabase/functions/_shared/cors.ts:45`. The header comment calls this "safe degraded mode" for dev. Bearer JWT auth (not cookies) limits damage, but a misconfigured prod deploy would advertise CORS to all origins. Fix is ~10 lines: throw at module load when `APP_URL` is unset and `DENO_DEPLOYMENT_ID` is set (i.e. running on Supabase, not local). **Land in `fix/post-audit-cleanup` branch.**
-- **`invite-member` listUsers caps at perPage: 1000** — `supabase/functions/invite-member/index.ts:102`. Past 1000 auth users, an existing-user lookup-by-email returns null, so the studio_members upsert is skipped — invite still mails OK but role grant silently fails. Fine at current scale (1 studio, <100 users). Fix is the pagination loop pattern from `scripts/promote-owner.ts:58-71`. **Land before crossing 1000 auth users platform-wide, or as part of post-audit cleanup if convenient.**
+- ~~**CORS fallback to `*` when `APP_URL` unset**~~ — ✅ Already implemented in `_shared/cors.ts` (throws at module load on Supabase Edge if `ALLOWED_ORIGINS` is empty).
+- ~~**`invite-member` listUsers caps at perPage: 1000**~~ — ✅ Pagination loop already implemented in `invite-member/index.ts` (caps at 100 pages / 100k users).
 
 ---
 
