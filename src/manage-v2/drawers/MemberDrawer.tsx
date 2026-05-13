@@ -8,7 +8,6 @@ import { EmptyState } from "../components/EmptyState";
 import { useMember } from "@/manage/hooks/useMember";
 import { useMemberBookings, type MemberBooking } from "@/manage/hooks/useMemberBookings";
 import { useNotificationLog, templateLabel } from "@/manage/hooks/useNotificationLog";
-import { useSetMemberStatus } from "@/manage/hooks/useDeactivateMember";
 import {
   useClientsView,
   frequencyTier,
@@ -19,10 +18,8 @@ import {
 import { toast } from "sonner";
 import { useStudioContext } from "@/context/StudioContext";
 import { formatDate, formatTime } from "@/lib/timezone";
-import { getPlanHealth } from "../lib/planHealth";
 import { bookingBadge } from "../lib/bookingStatus";
 import { EditMemberDrawer } from "./EditMemberDrawer";
-import { ConfirmModal } from "../components/ConfirmModal";
 import { SendMessageModal } from "../components/SendMessageModal";
 import { SectionEyebrow } from "../components/SectionEyebrow";
 import { supabase } from "@/integrations/supabase/client";
@@ -40,9 +37,7 @@ export function MemberDrawerV2({
 }) {
   const [tab, setTab] = useState<Tab>("overview");
   const [editOpen, setEditOpen] = useState(false);
-  const [confirmDeactivate, setConfirmDeactivate] = useState(false);
   const [msgOpen, setMsgOpen] = useState(false);
-  const setStatus = useSetMemberStatus();
   const studioCtx = useStudioContext();
   const studioTz = studioCtx?.studio?.timezone ?? "Europe/Oslo";
   const studioId = studioCtx?.studio?.id ?? "";
@@ -84,15 +79,6 @@ export function MemberDrawerV2({
 
   if (!userId) return null;
 
-  const planHealth = member
-    ? getPlanHealth({
-        status: member.status,
-        membership_id: member.membership?.id ?? null,
-        credits_remaining: member.membership?.credits_remaining ?? null,
-        valid_until: member.membership?.valid_until ?? null,
-      })
-    : { tone: "neutral" as const, label: "Loading…" };
-
   const initials = (member?.full_name ?? "?")
     .split(" ")
     .map((s) => s[0])
@@ -108,13 +94,6 @@ export function MemberDrawerV2({
       title={isLoading ? "Loading…" : member?.full_name ?? "Member"}
       subtitle={member?.email ?? undefined}
       headerLead={<div className="sm-av-lg">{initials}</div>}
-      headerMeta={
-        member ? (
-          <>
-            <StateBadge tone={planHealth.tone}>{planHealth.label}</StateBadge>
-          </>
-        ) : undefined
-      }
       tabs={[
         { id: "overview", label: "Overview" },
         { id: "activity", label: "Activity", count: bookings.length },
@@ -127,14 +106,6 @@ export function MemberDrawerV2({
       actions={
         member && (
           <>
-            <Button
-              variant={member.is_active ? "danger" : "secondary"}
-              style={{ marginRight: "auto" }}
-              disabled={setStatus.isPending}
-              onClick={() => setConfirmDeactivate(true)}
-            >
-              {setStatus.isPending ? "Saving…" : member.is_active ? "Deactivate" : "Reactivate"}
-            </Button>
             <Button variant="ghost" onClick={() => setMsgOpen(true)}>Send message</Button>
             <Button variant="primary" onClick={() => setEditOpen(true)}>Edit member</Button>
           </>
@@ -325,34 +296,6 @@ export function MemberDrawerV2({
       onClose={() => setMsgOpen(false)}
     />
 
-    {member && (
-      <ConfirmModal
-        open={confirmDeactivate}
-        title={member.is_active ? `Deactivate ${member.full_name}?` : `Reactivate ${member.full_name}?`}
-        message={
-          member.is_active
-            ? "They won't be able to book classes. Existing bookings are kept."
-            : "They'll be able to book classes again."
-        }
-        confirmLabel={member.is_active ? "Deactivate" : "Reactivate"}
-        variant={member.is_active ? "danger" : "primary"}
-        loading={setStatus.isPending}
-        onCancel={() => setConfirmDeactivate(false)}
-        onConfirm={async () => {
-          const reactivating = !member.is_active;
-          try {
-            await setStatus.mutateAsync({
-              user_id: member.user_id,
-              status: reactivating ? "active" : "inactive",
-            });
-            toast.success(`${reactivating ? "Reactivated" : "Deactivated"} ${member.full_name}`);
-            setConfirmDeactivate(false);
-          } catch (e) {
-            toast.error(e instanceof Error ? e.message : "Failed to update member");
-          }
-        }}
-      />
-    )}
     </>
   );
 }
