@@ -61,6 +61,20 @@ A pre-launch CSO-mode audit + customer-readiness pass shipped 14 audit findings 
 - ~~**`/manage/schedule` save doesn't dispatch network request**~~ — ✅ Fixed (2026-05-10, PR #8). Root cause: time chip's inline Save button used a `+` icon (same as Add), causing users to click the wrong save. Split into `CircleSave` (checkmark) and `CircleAdd` (plus) in `EditSequenceDrawer`. The underlying `updateRule.mutate` path was never broken.
 - **Owner-promotion path required manual SQL** — ✅ Resolved (`scripts/promote-owner.ts`).
 
+### Remove "smart audiences" / lifecycle segments from Clients view
+
+The segment filter pills (New, Regular, One-timer, Lapsing, Inactive, No plan), plan health badge per row, and audience KV chips in the member drawer are overkill before real customer data exists. Decision: strip the whole layer, revisit once studios are live with real usage patterns.
+
+**What to remove:**
+- Lifecycle filter pills + segment counts from `ClientsScreen`
+- Plan health `StateBadge` from each client row (`getPlanHealth` call in `MemberRow`)
+- `getPlanHealth` function from `planHealth.ts` (unused after above)
+- `inSegment`, `SEGMENTS`, `frequencyTier`, `FREQUENCY_LABELS`, `TIME_LABELS`, `PLAN_LABELS`, `SegmentKey`, `inTag`, `TagFilter` from `useClientsView`
+- Frequency tier + time affinity KV rows from member drawer Overview tab
+- Plan/frequency/time `CategoryChip` cluster in drawer Overview tab
+
+**What stays:** client list rows (name, email, last visit, visit count), all drawer tabs (Activity, Billing, Notes, Insights), segment config in `studios` table (harmless to leave in schema).
+
 ### Tech debt found in passing
 
 - **137 ESLint warnings in `src/`** — all pre-existing, none added during the 2026-05-09 session. Breakdown: ~80% `react-refresh/only-export-components` (HMR optimization, non-functional), ~15% `react-hooks/exhaustive-deps` (real bugs hiding here), ~5% scattered. Run `npm run lint -- --fix` for auto-fixable ones first, then walk the exhaustive-deps cases manually. Worth a focused session.
