@@ -1,8 +1,10 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
+import { validateStudioMatch } from "../_shared/guard.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const POSTHOG_SECRET_KEY = Deno.env.get("POSTHOG_SECRET_KEY");
 const POSTHOG_PROJECT_ID = Deno.env.get("POSTHOG_PROJECT_ID") ?? "undefined";
 const POSTHOG_HOST = "https://us.posthog.com";
@@ -29,6 +31,8 @@ Deno.serve(async (req) => {
     const { data: { user }, error: authError } = await userClient.auth.getUser();
     if (authError || !user) return json(req, { error: "Unauthorized" }, 401);
 
+    const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
     const { studio_id, period = "day" } = await req.json();
     if (!studio_id) return json(req, { error: "studio_id required" }, 400);
     // studio_id is interpolated into HogQL queries below — reject anything
@@ -36,6 +40,10 @@ Deno.serve(async (req) => {
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(studio_id)) {
       return json(req, { error: "studio_id must be a UUID" }, 400);
     }
+
+    // --- Cross-tenant guard ---
+    const guardErr = await validateStudioMatch(req, admin, studio_id);
+    if (guardErr) return guardErr;
 
     // --- Verify caller is admin for this studio ---
     const { data: member, error: memberError } = await userClient

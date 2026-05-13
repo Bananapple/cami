@@ -1,6 +1,7 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { getProvider } from "../_shared/providers/index.ts";
 import { corsHeaders } from "../_shared/cors.ts";
+import { validateStudioMatch } from "../_shared/guard.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -40,6 +41,10 @@ Deno.serve(async (req) => {
       .eq("id", booking_id)
       .single();
     if (bookingErr || !booking) return json(req, { error: "Booking not found" }, 404);
+
+    // --- Cross-tenant guard ---
+    const guardErr = await validateStudioMatch(req, admin, booking.studio_id);
+    if (guardErr) return guardErr;
 
     // --- Authorization: user owns booking OR is staff ---
     const isOwner = booking.user_id === user.id;
