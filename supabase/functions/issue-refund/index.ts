@@ -1,6 +1,7 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { getProvider } from "../_shared/providers/index.ts";
 import { corsHeaders } from "../_shared/cors.ts";
+import { validateStudioMatch } from "../_shared/guard.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -54,6 +55,10 @@ Deno.serve(async (req) => {
         .maybeSingle();
       if (!member) return json(req, { error: "Forbidden" }, 403);
     }
+
+    // --- Cross-tenant guard (after auth: prevents studio-enumeration via booking IDs) ---
+    const guardErr = await validateStudioMatch(req, admin, booking.studio_id);
+    if (guardErr) return guardErr;
 
     // --- Guard: already cancelled ---
     if (booking.status === "cancelled") {

@@ -1,8 +1,10 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
+import { validateStudioMatch } from "../_shared/guard.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const POSTHOG_SECRET_KEY = Deno.env.get("POSTHOG_SECRET_KEY");
 const POSTHOG_PROJECT_ID = Deno.env.get("POSTHOG_PROJECT_ID") ?? "undefined";
 const POSTHOG_HOST = "https://us.posthog.com";
@@ -29,6 +31,8 @@ Deno.serve(async (req) => {
     const { data: { user }, error: authError } = await userClient.auth.getUser();
     if (authError || !user) return json(req, { error: "Unauthorized" }, 401);
 
+    const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
     const { studio_id, period = "day" } = await req.json();
     if (!studio_id) return json(req, { error: "studio_id required" }, 400);
     // studio_id is interpolated into HogQL queries below — reject anything
@@ -48,6 +52,11 @@ Deno.serve(async (req) => {
     if (memberError || !member || !["owner", "manager"].includes(member.role)) {
       return json(req, { error: "Forbidden" }, 403);
     }
+
+    // --- Cross-tenant guard (after role check: studio_id is user-supplied, so guard
+    //     runs as a belt-and-suspenders stale-tab check, not primary protection) ---
+    const guardErr = await validateStudioMatch(req, admin, studio_id);
+    if (guardErr) return guardErr;
 
     // --- Query PostHog ---
     if (!POSTHOG_SECRET_KEY) {

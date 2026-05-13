@@ -1,5 +1,6 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
+import { validateStudioMatch } from "../_shared/guard.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -35,6 +36,10 @@ Deno.serve(async (req) => {
     if (!instance) return json(req, { valid: false, label: "Class not found" });
 
     const studioId = instance.studio_id;
+
+    // --- Cross-tenant guard ---
+    const guardErr = await validateStudioMatch(req, admin, studioId);
+    if (guardErr) return guardErr;
     const originalMinor = Math.round(instance.price * 100);
     let discountMinor = 0;
     let label = "";

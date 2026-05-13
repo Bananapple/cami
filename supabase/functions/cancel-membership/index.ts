@@ -16,6 +16,7 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { getProvider } from "../_shared/providers/index.ts";
 import { corsHeaders } from "../_shared/cors.ts";
+import { validateStudioMatch } from "../_shared/guard.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -53,6 +54,10 @@ Deno.serve(async (req) => {
     if (mErr || !membership) return json(req, { error: "Membership not found" }, 404);
 
     if (membership.user_id !== user.id) return json(req, { error: "Forbidden" }, 403);
+
+    // --- Cross-tenant guard (after ownership check: prevents studio-enumeration via membership IDs) ---
+    const guardErr = await validateStudioMatch(req, admin, membership.studio_id);
+    if (guardErr) return guardErr;
     if (membership.status !== "active") return json(req, { error: "Membership is not active" }, 409);
     if (membership.cancel_scheduled_at) {
       return json(req, { scheduled: true, ends_at: membership.valid_until, already: true });
