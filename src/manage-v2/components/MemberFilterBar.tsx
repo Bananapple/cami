@@ -1,64 +1,18 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { SectionEyebrow } from "./SectionEyebrow";
-import {
-  SEGMENTS,
-  TAG_LABELS,
-  PLAN_LABELS,
-  TIME_LABELS,
-  FREQUENCY_LABELS,
-  tagValueLabel,
-  type SegmentKey,
-  type TagKey,
-  type TagFilter,
-  type ClientsFilter,
-  type MemberSummary,
-  type FrequencyTier,
-} from "@/manage/hooks/useClientsView";
-
-// Inline command-bar that replaces the search + lifecycle-pill row on the
-// Clients page. Pills live INSIDE the input. Click a pill to remove it (no X
-// icon by design — hover tint signals affordance). Backspace at empty input
-// removes the trailing pill. Free-text + every pill AND-combine.
-//
-// Hand-rolled (not shadcn's Command) to match the v2 visual treatment used by
-// CommandPalette.tsx — warm cream surface, Inter medium, action-soft tint on
-// hover, no dark scrim.
-
-type Suggestion =
-  | { kind: "member"; member: MemberSummary }
-  | { kind: "lifecycle"; key: SegmentKey; label: string; count: number }
-  | { kind: "tag"; tag: TagFilter; label: string; count: number };
-
-type Section = { heading: string; items: Suggestion[] };
-
-const FREQUENCY_ORDER: FrequencyTier[] = ["devotee", "regular", "casual", "none"];
-const TIME_ORDER = ["morning", "midday", "evening"];
-const PLAN_ORDER = ["subscription", "clip_card", "drop_in", "private", "addon"];
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { type ClientsFilter, type MemberSummary } from "@/manage/hooks/useClientsView";
 
 export function MemberFilterBar({
   filter,
   onChange,
   members,
-  segmentCounts,
-  tagCounts,
-  classNames,
   filtered,
   onSelectMember,
-  onRemoveTag,
-  onPopPill,
-  onSetLifecycle,
 }: {
   filter: ClientsFilter;
   onChange: (next: ClientsFilter) => void;
   members: MemberSummary[];
-  segmentCounts: Record<SegmentKey, number>;
-  tagCounts: Record<TagKey, Record<string, number>>;
-  classNames: Record<string, string>;
-  filtered: MemberSummary[]; // member matches that already respect active filters
+  filtered: MemberSummary[];
   onSelectMember: (userId: string) => void;
-  onRemoveTag: (tag: TagFilter) => void;
-  onPopPill: () => void;
-  onSetLifecycle: (key: SegmentKey) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -68,100 +22,22 @@ export function MemberFilterBar({
   const text = filter.text;
   const q = text.trim().toLowerCase();
 
-  // Build suggestions on every input change. Sections + items collapse when
-  // empty (auto-hide). Suggestions are filtered by the typed text.
-  const sections: Section[] = useMemo(() => {
-    const out: Section[] = [];
-    const matches = (label: string) => !q || label.toLowerCase().includes(q);
-
-    // Members — top 3 from already-filtered set if no text, otherwise top 3 by
-    // text match against full member list (so search reveals members the
-    // current pills would hide). Keep this short so tag sections stay above
-    // the fold in the suggestions panel.
-    const memberPool = q
-      ? members
-          .filter(
-            (m) =>
-              m.full_name?.toLowerCase().includes(q) ||
-              m.email?.toLowerCase().includes(q) ||
-              m.phone_number?.toLowerCase().includes(q),
-          )
-          .slice(0, 3)
-      : filtered.slice(0, 3);
-
-    if (memberPool.length > 0) {
-      out.push({
-        heading: "Members",
-        items: memberPool.map((m) => ({ kind: "member", member: m })),
-      });
-    }
-
-    // Lifecycle — exclude active + 'all' + zero-count.
-    const lifecycleItems: Suggestion[] = SEGMENTS
-      .filter((s) => s.key !== "all" && s.key !== filter.lifecycle)
-      .filter((s) => (segmentCounts[s.key] ?? 0) > 0)
-      .filter((s) => matches(s.label))
-      .map((s) => ({
-        kind: "lifecycle" as const,
-        key: s.key,
-        label: s.label,
-        count: segmentCounts[s.key] ?? 0,
-      }));
-    if (lifecycleItems.length > 0) out.push({ heading: "Lifecycle", items: lifecycleItems });
-
-    // Tags — Plan / Frequency / Source / Time / Class.
-    const tagSection = (
-      key: TagKey,
-      heading: string,
-      orderedValues: string[] | null,
-      labelOf: (v: string) => string,
-    ): Section | null => {
-      const valuesObj = tagCounts[key] ?? {};
-      const values = Object.keys(valuesObj);
-      if (orderedValues) values.sort((a, b) => orderedValues.indexOf(a) - orderedValues.indexOf(b));
-      else values.sort((a, b) => labelOf(a).localeCompare(labelOf(b)));
-
-      const items: Suggestion[] = values
-        .filter((v) => (valuesObj[v] ?? 0) > 0)
-        .filter((v) => !filter.tags.some((t) => t.key === key && t.value === v))
-        .filter((v) => matches(labelOf(v)))
-        .map((v) => ({
-          kind: "tag" as const,
-          tag: { key, value: v },
-          label: labelOf(v),
-          count: valuesObj[v] ?? 0,
-        }));
-      return items.length > 0 ? { heading, items } : null;
-    };
-
-    const plan = tagSection("plan", "Plan", PLAN_ORDER, (v) => PLAN_LABELS[v] ?? v);
-    if (plan) out.push(plan);
-
-    const freq = tagSection("frequency", "Frequency", FREQUENCY_ORDER, (v) => FREQUENCY_LABELS[v as FrequencyTier] ?? v);
-    if (freq) out.push(freq);
-
-    const src = tagSection("source", "Source", null, (v) =>
-      v.replace(/[_-]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
-    );
-    if (src) out.push(src);
-
-    const time = tagSection("time", "Time", TIME_ORDER, (v) => TIME_LABELS[v] ?? v);
-    if (time) out.push(time);
-
-    const cls = tagSection("class", "Class", null, (v) => classNames[v] ?? v);
-    if (cls) out.push(cls);
-
-    return out;
-  }, [q, members, filtered, segmentCounts, tagCounts, filter, classNames]);
-
-  // Flatten for keyboard nav.
-  const flat = useMemo(() => sections.flatMap((s) => s.items), [sections]);
+  // Top 3 member matches for the suggestion panel.
+  const suggestions = q
+    ? members
+        .filter(
+          (m) =>
+            m.full_name?.toLowerCase().includes(q) ||
+            m.email?.toLowerCase().includes(q) ||
+            m.phone_number?.toLowerCase().includes(q),
+        )
+        .slice(0, 5)
+    : filtered.slice(0, 5);
 
   useEffect(() => {
     setActiveIndex(0);
-  }, [q, filter]);
+  }, [q]);
 
-  // Close on outside click.
   useEffect(() => {
     if (!open) return;
     const onClick = (e: MouseEvent) => {
@@ -172,39 +48,13 @@ export function MemberFilterBar({
     return () => document.removeEventListener("mousedown", onClick);
   }, [open]);
 
-  const activate = (sug: Suggestion) => {
-    // Single source of truth: drive state through onChange only. The hook's
-    // convenience setters (onAddTag/onSetLifecycle) duplicate this work and
-    // were previously called in tandem, which made it ambiguous which path
-    // owns the update.
-    if (sug.kind === "member") {
-      onSelectMember(sug.member.user_id);
-      onChange({ ...filter, text: "" });
-      setOpen(false);
-      return;
-    }
-    if (sug.kind === "lifecycle") {
-      onChange({ ...filter, text: "", lifecycle: sug.key });
-      return;
-    }
-    if (sug.kind === "tag") {
-      const exists = filter.tags.some(
-        (t) => t.key === sug.tag.key && t.value === sug.tag.value,
-      );
-      onChange({
-        ...filter,
-        text: "",
-        tags: exists ? filter.tags : [...filter.tags, sug.tag],
-      });
-    }
+  const activate = (member: MemberSummary) => {
+    onSelectMember(member.user_id);
+    onChange({ text: "" });
+    setOpen(false);
   };
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Backspace" && text === "") {
-      e.preventDefault();
-      onPopPill();
-      return;
-    }
     if (e.key === "Escape") {
       e.preventDefault();
       setOpen(false);
@@ -213,7 +63,7 @@ export function MemberFilterBar({
     if (e.key === "ArrowDown") {
       e.preventDefault();
       setOpen(true);
-      setActiveIndex((i) => Math.min(i + 1, flat.length - 1));
+      setActiveIndex((i) => Math.min(i + 1, suggestions.length - 1));
       return;
     }
     if (e.key === "ArrowUp") {
@@ -222,27 +72,16 @@ export function MemberFilterBar({
       return;
     }
     if (e.key === "Enter") {
-      const sug = flat[activeIndex];
-      if (sug) {
+      const m = suggestions[activeIndex];
+      if (m) {
         e.preventDefault();
-        activate(sug);
+        activate(m);
       }
     }
   };
 
-  const lifecyclePill =
-    filter.lifecycle !== "all"
-      ? SEGMENTS.find((s) => s.key === filter.lifecycle)
-      : null;
-
-  const placeholder =
-    filter.lifecycle === "all" && filter.tags.length === 0
-      ? "Search or filter members…"
-      : "";
-
   return (
     <div ref={containerRef} style={{ position: "relative", marginBottom: 12 }}>
-      {/* Input + pills */}
       <div
         onClick={() => {
           inputRef.current?.focus();
@@ -250,7 +89,6 @@ export function MemberFilterBar({
         }}
         style={{
           display: "flex",
-          flexWrap: "wrap",
           alignItems: "center",
           gap: 6,
           minHeight: 36,
@@ -262,30 +100,16 @@ export function MemberFilterBar({
         }}
       >
         <SearchIcon />
-        {lifecyclePill && (
-          <Pill onClick={() => onSetLifecycle("all")}>{lifecyclePill.label}</Pill>
-        )}
-        {filter.tags.map((t) => (
-          <Pill key={`${t.key}:${t.value}`} onClick={() => onRemoveTag(t)}>
-            <span style={{ color: "var(--ink-muted)", marginRight: 4 }}>
-              {TAG_LABELS[t.key]}:
-            </span>
-            {t.key === "class"
-              ? classNames[t.value] ?? t.value
-              : tagValueLabel(t.key, t.value)}
-          </Pill>
-        ))}
         <input
           ref={inputRef}
           type="text"
           value={text}
           onFocus={() => setOpen(true)}
-          onChange={(e) => onChange({ ...filter, text: e.target.value })}
+          onChange={(e) => onChange({ text: e.target.value })}
           onKeyDown={onKeyDown}
-          placeholder={placeholder}
+          placeholder="Search members…"
           style={{
             flex: 1,
-            minWidth: 120,
             border: 0,
             outline: "none",
             background: "transparent",
@@ -297,8 +121,7 @@ export function MemberFilterBar({
         />
       </div>
 
-      {/* Suggestions panel */}
-      {open && (
+      {open && suggestions.length > 0 && (
         <div
           role="listbox"
           style={{
@@ -316,135 +139,91 @@ export function MemberFilterBar({
             padding: "6px 0",
           }}
         >
-          {flat.length === 0 && (
-            <p
-              style={{
-                margin: 0,
-                padding: "16px 16px",
-                fontSize: 13,
-                color: "var(--ink-muted)",
-                textAlign: "center",
-              }}
-            >
-              {q ? `No matches for "${q}".` : "No suggestions."}
-            </p>
-          )}
-          {(() => {
-            let runningIndex = -1;
-            return sections.map((sec) => (
-              <div key={sec.heading} style={{ padding: "6px 0" }}>
-                <SectionEyebrow style={{ padding: "6px 14px 4px" }}>
-                  {sec.heading}
-                </SectionEyebrow>
-                {sec.items.map((item) => {
-                  runningIndex += 1;
-                  const isActive = runningIndex === activeIndex;
-                  const myIndex = runningIndex;
-                  return (
-                    <button
-                      key={suggestionKey(item)}
-                      type="button"
-                      onMouseEnter={() => setActiveIndex(myIndex)}
-                      onClick={() => activate(item)}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 10,
-                        width: "100%",
-                        padding: "8px 14px",
-                        border: 0,
-                        background: isActive ? "var(--action-soft)" : "transparent",
-                        cursor: "pointer",
-                        textAlign: "left",
-                        fontFamily: "inherit",
-                      }}
-                    >
-                      <SuggestionRow item={item} classNames={classNames} />
-                    </button>
-                  );
-                })}
-              </div>
-            ));
-          })()}
+          {suggestions.map((member, idx) => {
+            const isActive = idx === activeIndex;
+            const initials = (member.full_name ?? "?")
+              .split(" ")
+              .map((s) => s[0])
+              .join("")
+              .slice(0, 2)
+              .toUpperCase();
+            return (
+              <button
+                key={member.user_id}
+                type="button"
+                onMouseEnter={() => setActiveIndex(idx)}
+                onClick={() => activate(member)}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  width: "100%",
+                  padding: "8px 14px",
+                  border: 0,
+                  background: isActive ? "var(--action-soft)" : "transparent",
+                  cursor: "pointer",
+                  textAlign: "left",
+                  fontFamily: "inherit",
+                }}
+              >
+                <span
+                  style={{
+                    width: 26,
+                    height: 26,
+                    borderRadius: "50%",
+                    background: "var(--surface-2)",
+                    border: "1px solid var(--line)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: 10.5,
+                    color: "var(--ink-soft)",
+                    fontWeight: 500,
+                    flexShrink: 0,
+                  }}
+                >
+                  {initials}
+                </span>
+                <span style={{ minWidth: 0, flex: 1 }}>
+                  <span style={{ display: "block", fontSize: 13.5, fontWeight: 500, color: "var(--ink)" }}>
+                    {member.full_name}
+                  </span>
+                  {member.email && (
+                    <span style={{ display: "block", fontSize: 12, color: "var(--ink-muted)" }}>
+                      {member.email}
+                    </span>
+                  )}
+                </span>
+              </button>
+            );
+          })}
         </div>
       )}
     </div>
   );
 }
 
-function suggestionKey(s: Suggestion): string {
-  if (s.kind === "member") return `member:${s.member.user_id}`;
-  if (s.kind === "lifecycle") return `lifecycle:${s.key}`;
-  return `tag:${s.tag.key}:${s.tag.value}`;
-}
-
-function SuggestionRow({
-  item,
-  classNames,
-}: {
-  item: Suggestion;
-  classNames: Record<string, string>;
-}) {
-  if (item.kind === "member") {
-    const initials = (item.member.full_name ?? "?")
-      .split(" ")
-      .map((s) => s[0])
-      .join("")
-      .slice(0, 2)
-      .toUpperCase();
-    return (
-      <>
-        <span
-          style={{
-            width: 26,
-            height: 26,
-            borderRadius: "50%",
-            background: "var(--surface-2)",
-            border: "1px solid var(--line)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: 10.5,
-            color: "var(--ink-soft)",
-            fontWeight: 500,
-            flexShrink: 0,
-          }}
-        >
-          {initials}
-        </span>
-        <span style={{ minWidth: 0, flex: 1 }}>
-          <span style={{ display: "block", fontSize: 13.5, fontWeight: 500, color: "var(--ink)" }}>
-            {item.member.full_name}
-          </span>
-          {item.member.email && (
-            <span style={{ display: "block", fontSize: 12, color: "var(--ink-muted)" }}>
-              {item.member.email}
-            </span>
-          )}
-        </span>
-      </>
-    );
-  }
-
-  const heading =
-    item.kind === "lifecycle" ? "Lifecycle" : TAG_LABELS[item.tag.key];
-
+function SearchIcon() {
   return (
-    <>
-      <span style={{ minWidth: 0, flex: 1 }}>
-        <span style={{ display: "block", fontSize: 13.5, color: "var(--ink)" }}>
-          <span style={{ color: "var(--ink-muted)", marginRight: 6 }}>{heading}:</span>
-          {item.label}
-        </span>
-      </span>
-      <span style={{ fontSize: 12, color: "var(--ink-muted)", fontVariantNumeric: "tabular-nums" }}>
-        {item.count}
-      </span>
-    </>
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      style={{ color: "var(--ink-muted)", flexShrink: 0 }}
+    >
+      <circle cx="7" cy="7" r="4" />
+      <path d="M10 10l3.5 3.5" />
+    </svg>
   );
 }
 
-function Pill({ children, onClick }: { children: ReactNode; onClick: () => void }) {
+// Keep Pill exported in case it's used elsewhere
+export function Pill({ children, onClick }: { children: ReactNode; onClick: () => void }) {
   const [hover, setHover] = useState(false);
   return (
     <button
@@ -472,24 +251,5 @@ function Pill({ children, onClick }: { children: ReactNode; onClick: () => void 
     >
       {children}
     </button>
-  );
-}
-
-function SearchIcon() {
-  return (
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      style={{ color: "var(--ink-muted)", flexShrink: 0 }}
-    >
-      <circle cx="7" cy="7" r="4" />
-      <path d="M10 10l3.5 3.5" />
-    </svg>
   );
 }

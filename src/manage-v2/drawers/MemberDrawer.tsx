@@ -1,20 +1,14 @@
 import { useState, useMemo } from "react";
 import { Drawer, DrawerSection } from "../components/Drawer";
 import { Button } from "../components/Button";
-import { StateBadge, CategoryChip, Count } from "../components/Badge";
+import { StateBadge, CategoryChip } from "../components/Badge";
 import { Stat, StatGrid } from "../components/Stat";
 import { Row } from "../components/Row";
 import { EmptyState } from "../components/EmptyState";
 import { useMember } from "@/manage/hooks/useMember";
 import { useMemberBookings, type MemberBooking } from "@/manage/hooks/useMemberBookings";
 import { useNotificationLog, templateLabel } from "@/manage/hooks/useNotificationLog";
-import {
-  useClientsView,
-  frequencyTier,
-  PLAN_LABELS,
-  FREQUENCY_LABELS,
-  TIME_LABELS,
-} from "@/manage/hooks/useClientsView";
+import { useClientsView } from "@/manage/hooks/useClientsView";
 import { toast } from "sonner";
 import { useStudioContext } from "@/context/StudioContext";
 import { formatDate, formatTime } from "@/lib/timezone";
@@ -71,7 +65,7 @@ export function MemberDrawerV2({
 
   // Audience-model summary row (member_activity_summary view, post-0024).
   // Reuses the cached useClientsView query — no extra fetch.
-  const { members: allMembers, config: segmentConfig } = useClientsView();
+  const { members: allMembers } = useClientsView();
   const summary = useMemo(
     () => (userId ? allMembers.find((m) => m.user_id === userId) ?? null : null),
     [userId, allMembers],
@@ -123,28 +117,8 @@ export function MemberDrawerV2({
               <Stat label="No-shows" value={ytdStats.noShows} tone={ytdStats.noShows > 0 ? "warn" : "default"} />
               <Stat label="Spend" value={`${currency} ${fmt(ytdStats.spend)}`} />
             </StatGrid>
-            <div style={{ marginTop: 8, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div style={{ marginTop: 8 }}>
               <span style={{ fontSize: 11.5, color: "var(--ink-faint)" }}>this year</span>
-              {summary && (
-                <div style={{ display: "flex", gap: 4 }}>
-                  {summary.plan_type && (
-                    <CategoryChip variant="plan">
-                      {PLAN_LABELS[summary.plan_type] ?? summary.plan_type}
-                    </CategoryChip>
-                  )}
-                  {(() => {
-                    const tier = frequencyTier(summary, segmentConfig);
-                    return tier !== "none" ? (
-                      <CategoryChip variant="frequency">{FREQUENCY_LABELS[tier]}</CategoryChip>
-                    ) : null;
-                  })()}
-                  {summary.top_time_bucket && (
-                    <CategoryChip variant="time">
-                      {TIME_LABELS[summary.top_time_bucket] ?? summary.top_time_bucket}
-                    </CategoryChip>
-                  )}
-                </div>
-              )}
             </div>
           </DrawerSection>
 
@@ -194,19 +168,6 @@ export function MemberDrawerV2({
                   : "—"
               }
             />
-            {summary && (
-              <>
-                <KV
-                  label="Frequency"
-                  value={frequencyTier(summary, segmentConfig) === "none" ? "Inactive" : FREQUENCY_LABELS[frequencyTier(summary, segmentConfig)]}
-                  hint={`${summary.bookings_last_30d} booking${summary.bookings_last_30d === 1 ? "" : "s"} · last 30 days`}
-                />
-                <KV
-                  label="Time affinity"
-                  value={summary.top_time_bucket ? TIME_LABELS[summary.top_time_bucket] ?? summary.top_time_bucket : "—"}
-                />
-              </>
-            )}
           </DrawerSection>
 
           <DrawerSection title="Recent bookings" flush>

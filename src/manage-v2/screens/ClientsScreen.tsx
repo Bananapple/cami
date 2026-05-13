@@ -1,126 +1,27 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useMemo, useState } from "react";
 import { PageHeader } from "../shell/PageHeader";
 import { Row, RowList } from "../components/Row";
-import { StateBadge, Count } from "../components/Badge";
+import { Count } from "../components/Badge";
 import { EmptyState } from "../components/EmptyState";
 import { AvatarCircle } from "../components/AvatarCircle";
 import { LoadingPlaceholder } from "../components/LoadingPlaceholder";
 import { MemberFilterBar } from "../components/MemberFilterBar";
-import {
-  useClientsView,
-  type SegmentKey,
-  type MemberSummary,
-  type TagFilter,
-  type TagKey,
-} from "@/manage/hooks/useClientsView";
-import { getPlanHealth } from "../lib/planHealth";
+import { useClientsView, type MemberSummary } from "@/manage/hooks/useClientsView";
 import { MemberDrawerV2 } from "../drawers/MemberDrawer";
 import { AddClientDrawer } from "../drawers/AddClientDrawer";
-import { SegmentConfigDrawer } from "../drawers/SegmentConfigDrawer";
-import { useMyStudioRole } from "@/manage/hooks/useMyStudioRole";
-
-const TAG_KEYS: TagKey[] = ["plan", "frequency", "source", "time", "class"];
-
-export function parseTagsParam(s: string | null): TagFilter[] {
-  if (!s) return [];
-  return s
-    .split(",")
-    .map((p) => p.trim())
-    .filter(Boolean)
-    .map((p) => {
-      const [k, ...rest] = p.split(":");
-      const key = k as TagKey;
-      const value = rest.join(":");
-      if (!TAG_KEYS.includes(key) || !value) return null;
-      return { key, value };
-    })
-    .filter((t): t is TagFilter => t !== null);
-}
-
-export function serializeTags(tags: TagFilter[]): string {
-  return tags.map((t) => `${t.key}:${t.value}`).join(",");
-}
 
 export function ClientsScreen() {
-  // Read URL once on mount so useClientsView's initial filter matches deep-link
-  // state (⌘K → /manage/clients?lifecycle=regular). Subsequent URL changes are
-  // applied via the URL→filter effect below.
-  const initialFilter = useMemo(() => {
-    const params = new URLSearchParams(window.location.search);
-    return {
-      lifecycle: (params.get("lifecycle") as SegmentKey | null) ?? "all",
-      tags: parseTagsParam(params.get("tags")),
-      text: params.get("q") ?? "",
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const view = useClientsView(initialFilter);
-  const {
-    isLoading,
-    members,
-    filtered,
-    segmentCounts,
-    tagCounts,
-    classNames,
-    filter,
-    setFilter,
-    setLifecycle,
-    removeTag,
-    popLastPill,
-    config,
-  } = view;
-
-  const [searchParams, setSearchParams] = useSearchParams();
+  const { isLoading, members, filtered, filter, setFilter } = useClientsView();
 
   const [activeUserId, setActiveUserId] = useState<string | null>(null);
   const [addClientOpen, setAddClientOpen] = useState(false);
-  const [configOpen, setConfigOpen] = useState(false);
-  const { data: myRole } = useMyStudioRole();
-  // segment_config UPDATE is gated to owners by RLS (studios_owner_update).
-  // Don't show the Configure button to managers/instructors — they'd hit a
-  // generic RLS-denied toast on save. Fail-closed in the UI.
-  const canConfigureSegments = myRole === "owner";
 
-  // Apply external URL changes after mount (e.g. ⌘K palette navigation while
-  // the screen is already mounted). Initial mount is handled via initialFilter
-  // above; the firstRunRef guard suppresses a redundant setFilter on the very
-  // first effect pass.
-  const firstRunRef = useRef(true);
-  useEffect(() => {
-    if (firstRunRef.current) {
-      firstRunRef.current = false;
-      return;
-    }
-    const lifecycle = (searchParams.get("lifecycle") as SegmentKey | null) ?? "all";
-    const tags = parseTagsParam(searchParams.get("tags"));
-    const text = searchParams.get("q") ?? "";
-    setFilter({ lifecycle, tags, text });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams.toString()]);
-
-  // Mirror filter state back to URL so refresh / share-link preserves filters.
-  useEffect(() => {
-    const next = new URLSearchParams(searchParams);
-    if (filter.lifecycle !== "all") next.set("lifecycle", filter.lifecycle);
-    else next.delete("lifecycle");
-    if (filter.tags.length > 0) next.set("tags", serializeTags(filter.tags));
-    else next.delete("tags");
-    if (filter.text) next.set("q", filter.text);
-    else next.delete("q");
-    if (next.toString() !== searchParams.toString()) {
-      setSearchParams(next, { replace: true });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filter]);
-
-  const newThisMonth = members.filter((m) => {
+  const newThisMonth = useMemo(() => {
     const monthStart = new Date();
     monthStart.setDate(1);
     monthStart.setHours(0, 0, 0, 0);
-    return new Date(m.joined_at) >= monthStart;
-  }).length;
+    return members.filter((m) => new Date(m.joined_at) >= monthStart).length;
+  }, [members]);
 
   return (
     <>
@@ -132,24 +33,13 @@ export function ClientsScreen() {
             : `${members.length} member${members.length === 1 ? "" : "s"} · ${newThisMonth} new this month`
         }
         actions={
-          <>
-            {canConfigureSegments && (
-              <button
-                type="button"
-                onClick={() => setConfigOpen(true)}
-                className="sm-btn sm ghost"
-              >
-                Configure
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => setAddClientOpen(true)}
-              className="sm-btn sm ghost"
-            >
-              + Add client
-            </button>
-          </>
+          <button
+            type="button"
+            onClick={() => setAddClientOpen(true)}
+            className="sm-btn sm ghost"
+          >
+            + Add client
+          </button>
         }
       />
 
@@ -157,25 +47,19 @@ export function ClientsScreen() {
         filter={filter}
         onChange={setFilter}
         members={members}
-        segmentCounts={segmentCounts}
-        tagCounts={tagCounts}
-        classNames={classNames}
         filtered={filtered}
         onSelectMember={setActiveUserId}
-        onRemoveTag={removeTag}
-        onPopPill={popLastPill}
-        onSetLifecycle={setLifecycle}
       />
 
       <RowList>
         {isLoading && <LoadingPlaceholder text="Loading members…" />}
         {!isLoading && filtered.length === 0 && (
           <EmptyState
-            title={filter.text ? "No matches" : "No members in this view"}
+            title={filter.text ? "No matches" : "No members yet"}
             hint={
               filter.text
                 ? `Nothing matches "${filter.text}".`
-                : "Remove a filter pill to widen the search."
+                : "Add a client or wait for the first booking."
             }
           />
         )}
@@ -196,8 +80,6 @@ export function ClientsScreen() {
       />
 
       <AddClientDrawer open={addClientOpen} onClose={() => setAddClientOpen(false)} />
-
-      <SegmentConfigDrawer open={configOpen} onClose={() => setConfigOpen(false)} />
     </>
   );
 }
@@ -219,8 +101,6 @@ function MemberRow({
     .slice(0, 2)
     .toUpperCase();
 
-  const planHealth = getPlanHealth(member);
-
   const lastVisit = member.last_booking_at ? relativeDate(member.last_booking_at) : "never";
 
   return (
@@ -233,19 +113,14 @@ function MemberRow({
           <span className="sm-hide-mobile"> · last visit {lastVisit}</span>
         </>
       }
-      trail={
-        <>
-          <Count value={member.total_sessions} label="visits" />
-          <StateBadge tone={planHealth.tone}>{planHealth.label}</StateBadge>
-        </>
-      }
+      trail={<Count value={member.total_sessions} label="visits" />}
       selected={selected}
       onSelect={onClick}
     />
   );
 }
 
-// ── Relative date helper (e.g. "3 days ago") ───────────────────────
+// ── Relative date helper ───────────────────────────────────────────
 function relativeDate(iso: string): string {
   const ms = Date.now() - new Date(iso).getTime();
   const days = Math.floor(ms / (24 * 60 * 60 * 1000));
