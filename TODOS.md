@@ -61,19 +61,9 @@ A pre-launch CSO-mode audit + customer-readiness pass shipped 14 audit findings 
 - ~~**`/manage/schedule` save doesn't dispatch network request**~~ — ✅ Fixed (2026-05-10, PR #8). Root cause: time chip's inline Save button used a `+` icon (same as Add), causing users to click the wrong save. Split into `CircleSave` (checkmark) and `CircleAdd` (plus) in `EditSequenceDrawer`. The underlying `updateRule.mutate` path was never broken.
 - **Owner-promotion path required manual SQL** — ✅ Resolved (`scripts/promote-owner.ts`).
 
-### Remove "smart audiences" / lifecycle segments from Clients view
+### ~~Remove "smart audiences" / lifecycle segments from Clients view~~ — ✅ DONE (2026-05-13, branch fix/ui-cleanup-and-schedule-badge)
 
-The segment filter pills (New, Regular, One-timer, Lapsing, Inactive, No plan), plan health badge per row, and audience KV chips in the member drawer are overkill before real customer data exists. Decision: strip the whole layer, revisit once studios are live with real usage patterns.
-
-**What to remove:**
-- Lifecycle filter pills + segment counts from `ClientsScreen`
-- Plan health `StateBadge` from each client row (`getPlanHealth` call in `MemberRow`)
-- `getPlanHealth` function from `planHealth.ts` (unused after above)
-- `inSegment`, `SEGMENTS`, `frequencyTier`, `FREQUENCY_LABELS`, `TIME_LABELS`, `PLAN_LABELS`, `SegmentKey`, `inTag`, `TagFilter` from `useClientsView`
-- Frequency tier + time affinity KV rows from member drawer Overview tab
-- Plan/frequency/time `CategoryChip` cluster in drawer Overview tab
-
-**What stays:** client list rows (name, email, last visit, visit count), all drawer tabs (Activity, Billing, Notes, Insights), segment config in `studios` table (harmless to leave in schema).
+Stripped lifecycle filter pills, plan health badges, frequency/time KV rows, and audience chips from the Clients and Member views. `useClientsView` now returns a simple member list + text filter. `planHealth.ts` deleted. Schedule "Confirmed" badge renamed "Scheduled". Command palette Segments section removed. 3 test files deleted (tested removed logic).
 
 ### Tech debt found in passing
 
