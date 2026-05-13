@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SlidersHorizontal, Plus } from "lucide-react";
 import { PageHeader } from "../shell/PageHeader";
 import { Button } from "../components/Button";
@@ -7,7 +7,7 @@ import { StateBadge, CategoryChip, Count } from "../components/Badge";
 import { EmptyState } from "../components/EmptyState";
 import { useSchedule, type ScheduleClass } from "@/manage/hooks/useSchedule";
 import { useStudioContext } from "@/context/StudioContext";
-import { formatTime } from "@/lib/timezone";
+import { formatDate, formatTime } from "@/lib/timezone";
 import { ClassDrawerV2 } from "../drawers/ClassDrawer";
 import { MemberDrawerV2 } from "../drawers/MemberDrawer";
 import { AddOneOffClassDrawer } from "../drawers/AddOneOffClassDrawer";
@@ -27,11 +27,12 @@ export function ScheduleScreen() {
 
   const todayKey = useMemo(() => dayKey(new Date(), studioTz), [studioTz]);
   const [selectedDateKey, setSelectedDateKey] = useState(todayKey);
+  // Ref copy so scroll handler always sees the latest value without re-registering
+  const selectedDateRef = useRef(selectedDateKey);
+  selectedDateRef.current = selectedDateKey;
 
-  const dayClasses = useMemo(
-    () => (classes ?? []).filter((c) => dayKey(new Date(c.starts_at), studioTz) === selectedDateKey),
-    [classes, selectedDateKey, studioTz],
-  );
+  // All days with classes, grouped (continuous scroll — no day filter)
+  const grouped = useMemo(() => groupByDay(classes ?? [], studioTz), [classes, studioTz]);
 
   const activeClass = activeClassId
     ? (classes ?? []).find((c) => c.id === activeClassId) ?? null
@@ -39,6 +40,53 @@ export function ScheduleScreen() {
   const editingClass = editClassId
     ? (classes ?? []).find((c) => c.id === editClassId) ?? null
     : null;
+
+  // Refs for each day-section header so we can scroll-to and observe
+  const dayGroupRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const stickyRef = useRef<HTMLDivElement>(null);
+  // Suppress observer while a programmatic scroll is in flight
+  const clickScrollingRef = useRef(false);
+
+  // ── Scroll → chip: track which day is at the top of the viewport ──
+  useEffect(() => {
+    const container = document.querySelector(".sm-content") as HTMLElement | null;
+    if (!container) return;
+
+    const onScroll = () => {
+      if (clickScrollingRef.current) return;
+      const stripBottom =
+        container.getBoundingClientRect().top + (stickyRef.current?.offsetHeight ?? 90) + 12;
+
+      // Find the last day header whose top edge is at or above the trigger line
+      let active: string | null = null;
+      for (const [key, el] of Object.entries(dayGroupRefs.current)) {
+        if (!el) continue;
+        if (el.getBoundingClientRect().top <= stripBottom) active = key;
+      }
+      if (active && active !== selectedDateRef.current) {
+        setSelectedDateKey(active);
+      }
+    };
+
+    container.addEventListener("scroll", onScroll, { passive: true });
+    return () => container.removeEventListener("scroll", onScroll);
+  }, []); // register once; handler reads mutable refs
+
+  // ── Chip → scroll: smooth-scroll content to that day's section ────
+  const handleChipSelect = useCallback((key: string) => {
+    setSelectedDateKey(key);
+    const el = dayGroupRefs.current[key];
+    if (!el) return; // empty day — just highlight chip, no scroll
+
+    const container = document.querySelector(".sm-content") as HTMLElement | null;
+    if (!container) return;
+
+    clickScrollingRef.current = true;
+    const stripHeight = stickyRef.current?.offsetHeight ?? 90;
+    const delta = el.getBoundingClientRect().top - container.getBoundingClientRect().top - stripHeight - 8;
+    container.scrollTo({ top: container.scrollTop + delta, behavior: "smooth" });
+    setTimeout(() => { clickScrollingRef.current = false; }, 1000);
+  }, []);
 
   const selectedDateLabel = useMemo(() => {
     const [y, m, d] = selectedDateKey.split("-").map(Number);
@@ -73,35 +121,44 @@ export function ScheduleScreen() {
       />
 
       <ScheduleDateStrip
+        stickyRef={stickyRef}
         selectedDate={selectedDateKey}
-        onSelect={setSelectedDateKey}
+        onSelect={handleChipSelect}
         classes={classes ?? []}
         tz={studioTz}
         isLoading={isLoading}
       />
 
-      {!isLoading && dayClasses.length === 0 && (
+      {!isLoading && grouped.length === 0 && (
         <RowList>
           <EmptyState
-            title="No classes on this day"
-            hint="Select another day above or add a one-off event."
+            title="No classes scheduled in this window"
+            hint="Add a recurring schedule rule from Studio settings, or create a one-off event above."
           />
         </RowList>
       )}
 
-      {dayClasses.length > 0 && (
-        <RowList>
-          {dayClasses.map((c) => (
-            <ClassRow
-              key={c.id}
-              c={c}
-              tz={c.location_timezone ?? studioTz}
-              selected={activeClassId === c.id}
-              onClick={() => setActiveClassId(c.id)}
-            />
-          ))}
-        </RowList>
-      )}
+      {grouped.map(({ key, label, isToday, items }) => (
+        <DayGroup
+          key={key}
+          label={label}
+          isToday={isToday}
+          count={items.length}
+          sectionRef={(el) => { dayGroupRefs.current[key] = el; }}
+        >
+          <RowList>
+            {items.map((c) => (
+              <ClassRow
+                key={c.id}
+                c={c}
+                tz={c.location_timezone ?? studioTz}
+                selected={activeClassId === c.id}
+                onClick={() => setActiveClassId(c.id)}
+              />
+            ))}
+          </RowList>
+        </DayGroup>
+      ))}
 
       <ClassDrawerV2
         cls={activeClass}
@@ -113,13 +170,11 @@ export function ScheduleScreen() {
           setEditClassId(id);
         }}
       />
-
       <MemberDrawerV2
         userId={activeMemberId}
         open={!!activeMemberId}
         onClose={() => setActiveMemberId(null)}
       />
-
       <AddOneOffClassDrawer open={addClassOpen} onClose={() => setAddClassOpen(false)} />
       <EditClassDrawer
         cls={editingClass}
@@ -132,16 +187,15 @@ export function ScheduleScreen() {
 }
 
 // ── Horizontal date strip with fill-rate bars ──────────────────────
-// Sticky: stays frozen at top while the class list scrolls beneath.
-// Center-on-select: clicking a chip smooth-scrolls it to the center of
-// the strip — same pattern as the user booking flow DateStrip.
 function ScheduleDateStrip({
+  stickyRef,
   selectedDate,
   onSelect,
   classes,
   tz,
   isLoading,
 }: {
+  stickyRef: React.RefObject<HTMLDivElement>;
   selectedDate: string;
   onSelect: (key: string) => void;
   classes: ScheduleClass[];
@@ -164,7 +218,6 @@ function ScheduleDateStrip({
 
   const todayKey = useMemo(() => dayKey(new Date(), tz), [tz]);
 
-  // Aggregate fill rate per day from class data
   const fillMap = useMemo(() => {
     const map = new Map<string, { booked: number; capacity: number }>();
     for (const c of classes) {
@@ -178,29 +231,25 @@ function ScheduleDateStrip({
     return map;
   }, [classes, tz]);
 
-  // Center the selected chip in the strip.
-  // First call (mount): instant scroll to today.
-  // Subsequent calls (user clicks): smooth scroll.
+  // Center selected chip — instant on mount, smooth thereafter
   useEffect(() => {
     const btn = buttonRefs.current[selectedDate];
     const strip = stripRef.current;
     if (!btn || !strip) return;
-
     const behavior = mountedRef.current ? "smooth" : "instant";
     mountedRef.current = true;
-
     const stripRect = strip.getBoundingClientRect();
     const btnRect = btn.getBoundingClientRect();
-    const targetLeft =
+    const target =
       strip.scrollLeft +
       (btnRect.left + btnRect.width / 2) -
       (stripRect.left + stripRect.width / 2);
-
-    strip.scrollTo({ left: Math.max(0, targetLeft), behavior });
+    strip.scrollTo({ left: Math.max(0, target), behavior });
   }, [selectedDate]);
 
   return (
     <div
+      ref={stickyRef}
       style={{
         position: "sticky",
         top: 0,
@@ -209,20 +258,11 @@ function ScheduleDateStrip({
         paddingTop: 10,
         paddingBottom: 12,
         marginTop: -10,
-        // Subtle separator once the strip is stuck
         borderBottom: "1px solid var(--line-soft)",
         marginBottom: 16,
       }}
     >
-      <div
-        ref={stripRef}
-        className="sm-scrollbar-none"
-        style={{
-          display: "flex",
-          gap: 6,
-          overflowX: "auto",
-        }}
-      >
+      <div ref={stripRef} className="sm-scrollbar-none" style={{ display: "flex", gap: 6, overflowX: "auto" }}>
         {dates.map((d) => {
           const k = dayKey(d, tz);
           const isSelected = k === selectedDate;
@@ -232,7 +272,6 @@ function ScheduleDateStrip({
             fill && fill.capacity > 0
               ? Math.min(100, Math.round((fill.booked / fill.capacity) * 100))
               : null;
-
           const dayLabel = isToday
             ? "TODAY"
             : d.toLocaleDateString("en-US", { weekday: "short" }).toUpperCase().slice(0, 3);
@@ -259,61 +298,18 @@ function ScheduleDateStrip({
                 fontFamily: "inherit",
               }}
             >
-              <span
-                style={{
-                  fontSize: 9,
-                  fontWeight: 600,
-                  letterSpacing: "0.09em",
-                  lineHeight: 1.4,
-                  color: isSelected
-                    ? "var(--action-on)"
-                    : isToday
-                    ? "var(--action)"
-                    : "var(--ink-muted)",
-                }}
-              >
+              <span style={{ fontSize: 9, fontWeight: 600, letterSpacing: "0.09em", lineHeight: 1.4, color: isSelected ? "var(--action-on)" : isToday ? "var(--action)" : "var(--ink-muted)" }}>
                 {dayLabel}
               </span>
-              <span
-                style={{
-                  fontSize: 18,
-                  fontWeight: 600,
-                  lineHeight: 1.15,
-                  letterSpacing: "-0.01em",
-                  color: isSelected ? "var(--action-on)" : "var(--ink)",
-                }}
-              >
+              <span style={{ fontSize: 18, fontWeight: 600, lineHeight: 1.15, letterSpacing: "-0.01em", color: isSelected ? "var(--action-on)" : "var(--ink)" }}>
                 {d.getDate()}
               </span>
-              <span
-                style={{
-                  fontSize: 9,
-                  lineHeight: 1.4,
-                  color: isSelected ? "rgba(255,255,255,0.7)" : "var(--ink-muted)",
-                }}
-              >
+              <span style={{ fontSize: 9, lineHeight: 1.4, color: isSelected ? "rgba(255,255,255,0.7)" : "var(--ink-muted)" }}>
                 {d.toLocaleDateString("en-US", { month: "short" }).toUpperCase()}
               </span>
-              {/* Fill-rate bar */}
-              <div
-                style={{
-                  width: 36,
-                  height: 3,
-                  borderRadius: 2,
-                  marginTop: 5,
-                  background: isSelected ? "rgba(255,255,255,0.25)" : "var(--line)",
-                  overflow: "hidden",
-                }}
-              >
+              <div style={{ width: 36, height: 3, borderRadius: 2, marginTop: 5, background: isSelected ? "rgba(255,255,255,0.25)" : "var(--line)", overflow: "hidden" }}>
                 {!isLoading && fillPct !== null && (
-                  <div
-                    style={{
-                      height: "100%",
-                      width: `${fillPct}%`,
-                      background: isSelected ? "var(--action-on)" : "var(--action)",
-                      borderRadius: 2,
-                    }}
-                  />
+                  <div style={{ height: "100%", width: `${fillPct}%`, background: isSelected ? "var(--action-on)" : "var(--action)", borderRadius: 2 }} />
                 )}
               </div>
             </button>
@@ -324,7 +320,35 @@ function ScheduleDateStrip({
   );
 }
 
-// ── Row for a single class instance ────────────────────────────────
+// ── Day group header + class list ──────────────────────────────────
+function DayGroup({
+  label,
+  isToday,
+  count,
+  children,
+  sectionRef,
+}: {
+  label: string;
+  isToday: boolean;
+  count: number;
+  children: React.ReactNode;
+  sectionRef: (el: HTMLDivElement | null) => void;
+}) {
+  return (
+    <div className="sm-day">
+      <div ref={sectionRef} className="sm-day-head">
+        <span className="label">
+          {isToday && <span className="today">Today</span>}
+          {label}
+        </span>
+        <span className="count">{count} class{count === 1 ? "" : "es"}</span>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+// ── Row for a single class instance ───────────────────────────────
 function ClassRow({
   c,
   tz,
@@ -338,27 +362,21 @@ function ClassRow({
 }) {
   const isFull = c.booked_count >= c.max_capacity;
   const isCancelled = c.status === "cancelled";
-
   const { tone, label } = (() => {
     if (isCancelled) return { tone: "bad" as const, label: "Cancelled" };
     if (isFull) return { tone: "warn" as const, label: "Full" };
     return { tone: "good" as const, label: "Scheduled" };
   })();
-
-  const levelLabel = c.level ?? "All levels";
   const timeStr = formatTime(c.starts_at, tz);
   const durationMin = Math.max(
     1,
-    Math.round(
-      (new Date(c.ends_at).getTime() - new Date(c.starts_at).getTime()) / 60000,
-    ),
+    Math.round((new Date(c.ends_at).getTime() - new Date(c.starts_at).getTime()) / 60000),
   );
-
   return (
     <Row
       lead={timeStr}
       title={c.class_name}
-      titleSuffix={<CategoryChip variant="level">{levelLabel}</CategoryChip>}
+      titleSuffix={<CategoryChip variant="level">{c.level ?? "All levels"}</CategoryChip>}
       meta={`${c.instructor_name} · ${c.location_name} · ${durationMin} min`}
       trail={
         <div className="sm-trail-stack">
@@ -372,7 +390,27 @@ function ClassRow({
   );
 }
 
-// ── Day key: stable YYYY-MM-DD in studio timezone ──────────────────
+// ── Helpers ────────────────────────────────────────────────────────
+type DayBucket = { key: string; label: string; isToday: boolean; items: ScheduleClass[] };
+
+function groupByDay(classes: ScheduleClass[], tz: string): DayBucket[] {
+  const buckets = new Map<string, DayBucket>();
+  const todayK = dayKey(new Date(), tz);
+  for (const c of classes) {
+    const k = dayKey(new Date(c.starts_at), tz);
+    if (!buckets.has(k)) {
+      buckets.set(k, {
+        key: k,
+        label: formatDate(c.starts_at, tz, { weekday: "short", day: "numeric", month: "short" }),
+        isToday: k === todayK,
+        items: [],
+      });
+    }
+    buckets.get(k)!.items.push(c);
+  }
+  return Array.from(buckets.values());
+}
+
 function dayKey(d: Date, tz: string): string {
   return d.toLocaleDateString("en-CA", { timeZone: tz });
 }
