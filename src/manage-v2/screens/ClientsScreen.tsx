@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
+import { UserPlus } from "lucide-react";
 import { PageHeader } from "../shell/PageHeader";
+import { Button } from "../components/Button";
 import { Row, RowList } from "../components/Row";
 import { Count } from "../components/Badge";
 import { EmptyState } from "../components/EmptyState";
@@ -33,13 +35,13 @@ export function ClientsScreen() {
             : `${members.length} member${members.length === 1 ? "" : "s"} · ${newThisMonth} new this month`
         }
         actions={
-          <button
-            type="button"
+          <Button
+            variant="primary"
+            icon={<UserPlus size={13} />}
             onClick={() => setAddClientOpen(true)}
-            className="sm-btn sm ghost"
           >
-            + Add client
-          </button>
+            Add client
+          </Button>
         }
       />
 
