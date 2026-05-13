@@ -41,10 +41,6 @@ Deno.serve(async (req) => {
       return json(req, { error: "studio_id must be a UUID" }, 400);
     }
 
-    // --- Cross-tenant guard ---
-    const guardErr = await validateStudioMatch(req, admin, studio_id);
-    if (guardErr) return guardErr;
-
     // --- Verify caller is admin for this studio ---
     const { data: member, error: memberError } = await userClient
       .from("studio_members")
@@ -56,6 +52,11 @@ Deno.serve(async (req) => {
     if (memberError || !member || !["owner", "manager"].includes(member.role)) {
       return json(req, { error: "Forbidden" }, 403);
     }
+
+    // --- Cross-tenant guard (after role check: studio_id is user-supplied, so guard
+    //     runs as a belt-and-suspenders stale-tab check, not primary protection) ---
+    const guardErr = await validateStudioMatch(req, admin, studio_id);
+    if (guardErr) return guardErr;
 
     // --- Query PostHog ---
     if (!POSTHOG_SECRET_KEY) {

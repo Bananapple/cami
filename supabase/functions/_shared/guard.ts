@@ -20,7 +20,7 @@ export async function validateStudioMatch(
   client: any,
   studioId: string,
 ): Promise<Response | null> {
-  const slugHeader = req.headers.get("x-studio-slug")?.trim();
+  const slugHeader = req.headers.get("x-studio-slug")?.trim().toLowerCase();
   if (!slugHeader) {
     return json(req, { error: "x-studio-slug header is required" }, 400);
   }

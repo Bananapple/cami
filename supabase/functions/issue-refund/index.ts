@@ -42,10 +42,6 @@ Deno.serve(async (req) => {
       .single();
     if (bookingErr || !booking) return json(req, { error: "Booking not found" }, 404);
 
-    // --- Cross-tenant guard ---
-    const guardErr = await validateStudioMatch(req, admin, booking.studio_id);
-    if (guardErr) return guardErr;
-
     // --- Authorization: user owns booking OR is staff ---
     const isOwner = booking.user_id === user.id;
     if (!isOwner) {
@@ -59,6 +55,10 @@ Deno.serve(async (req) => {
         .maybeSingle();
       if (!member) return json(req, { error: "Forbidden" }, 403);
     }
+
+    // --- Cross-tenant guard (after auth: prevents studio-enumeration via booking IDs) ---
+    const guardErr = await validateStudioMatch(req, admin, booking.studio_id);
+    if (guardErr) return guardErr;
 
     // --- Guard: already cancelled ---
     if (booking.status === "cancelled") {

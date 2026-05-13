@@ -32,6 +32,18 @@ The cross-tenant-guard incident on 2026-05-12 (PR #9, merged as `e3e53dd`) revea
 
 **When to land:** Bundle with the defense-in-depth track below. Or sooner if any sign of broader exposure.
 
+### Defense-in-depth follow-ups from fix/cross-tenant-guard (remaining unguarded functions)
+
+Two edge functions accept `studio_id` directly from the request body and were NOT included in the fix/cross-tenant-guard PR. Both have role checks that prevent pure cross-tenant exploitation, but the stale-tab / confused-deputy scenario (wrong studio_id in body) is still possible:
+
+- `invite-member` — `studio_id` from request body; upserts `studio_members` row; role check uses `admin` scoped to supplied `studio_id`
+- `send-member-message` — `studio_id` from request body; sends email to members; role check uses `admin` scoped to supplied `studio_id`
+- `cancel-class-notify` — `studio_id` derived from DB via `class_instance_id` but no slug guard; stale-tab could trigger notification on wrong studio's class
+
+**Work:** Apply `validateStudioMatch` after the role check in each function (same pattern as `get-analytics`). `cancel-class-notify` can apply it after the class instance fetch.
+
+**When to land:** Next security pass.
+
 ### Defense-in-depth follow-ups from PR #9 (cross-tenant guard)
 
 PR #9 added `validateStudioMatch` inline in `create-checkout` only. The same class of bug exists across other edge functions that derive `studio_id` from a user-supplied resource without cross-checking the `x-studio-slug` header:
