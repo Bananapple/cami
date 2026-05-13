@@ -56,24 +56,14 @@ A pre-launch CSO-mode audit + customer-readiness pass shipped 14 audit findings 
 
 ### Frontend bugs found in passing (separate work, not security)
 
-- **AuthCallback hardcoded background defaults to Cami styling** — `src/pages/AuthCallback.tsx`. Should pull from StudioContext like everything else.
-- **StaffGate cross-studio "Back to dashboard" UX** — `src/manage/components/StaffGate.tsx`. The denial page sends users to `/dashboard` regardless of whether they have ANY relationship to the current studio. Should branch: customer of this studio → `/dashboard`; no relationship → "Sign out" button.
+- ~~**AuthCallback hardcoded background defaults to Cami styling**~~ — ✅ Non-issue. No per-studio CSS variable injection exists anywhere in the app (`StudioProvider` never calls `setProperty`). All pages use the same default shadcn theme. AuthCallback uses `bg-background` CSS variable like everything else — nothing to change until per-studio theming is built.
+- ~~**StaffGate cross-studio "Back to dashboard" UX**~~ — ✅ Already implemented. `hasRelationship = studioMember != null` drives the branch: customer → "Back to dashboard" link; no relationship → "Sign out" button.
 - ~~**`/manage/schedule` save doesn't dispatch network request**~~ — ✅ Fixed (2026-05-10, PR #8). Root cause: time chip's inline Save button used a `+` icon (same as Add), causing users to click the wrong save. Split into `CircleSave` (checkmark) and `CircleAdd` (plus) in `EditSequenceDrawer`. The underlying `updateRule.mutate` path was never broken.
 - **Owner-promotion path required manual SQL** — ✅ Resolved (`scripts/promote-owner.ts`).
 
-### Remove "smart audiences" / lifecycle segments from Clients view
+### ~~Remove "smart audiences" / lifecycle segments from Clients view~~ — ✅ DONE (2026-05-13, branch fix/ui-cleanup-and-schedule-badge)
 
-The segment filter pills (New, Regular, One-timer, Lapsing, Inactive, No plan), plan health badge per row, and audience KV chips in the member drawer are overkill before real customer data exists. Decision: strip the whole layer, revisit once studios are live with real usage patterns.
-
-**What to remove:**
-- Lifecycle filter pills + segment counts from `ClientsScreen`
-- Plan health `StateBadge` from each client row (`getPlanHealth` call in `MemberRow`)
-- `getPlanHealth` function from `planHealth.ts` (unused after above)
-- `inSegment`, `SEGMENTS`, `frequencyTier`, `FREQUENCY_LABELS`, `TIME_LABELS`, `PLAN_LABELS`, `SegmentKey`, `inTag`, `TagFilter` from `useClientsView`
-- Frequency tier + time affinity KV rows from member drawer Overview tab
-- Plan/frequency/time `CategoryChip` cluster in drawer Overview tab
-
-**What stays:** client list rows (name, email, last visit, visit count), all drawer tabs (Activity, Billing, Notes, Insights), segment config in `studios` table (harmless to leave in schema).
+Stripped lifecycle filter pills, plan health badges, frequency/time KV rows, and audience chips from the Clients and Member views. `useClientsView` now returns a simple member list + text filter. `planHealth.ts` deleted. Schedule "Confirmed" badge renamed "Scheduled". Command palette Segments section removed. 3 test files deleted (tested removed logic).
 
 ### Tech debt found in passing
 
@@ -121,26 +111,9 @@ Retired with the v2 multi-tenant cutover. All studios now share one Supabase pro
 
 ---
 
-## Shop / Membership purchasing
+## ~~Shop / Membership purchasing~~ — ✅ DONE (Phase 1A 2026-04-30 + success toast 2026-05-13)
 
-**What:** The `/joinnow` page currently shows all 7 products with prices but has no purchase flow. Students can browse but must contact the studio to actually buy. Wire the `create-checkout` Edge Function redirect flow to each product's CTA — same pattern as class bookings, different line items.
-
-**Why:** Conversion drops when there's no buy button. The provider-agnostic `create-checkout` flow (decided 2026-04-23) handles single-class bookings *and* memberships/clip cards through the same Edge Function — the hosted checkout page (Stripe Checkout for MVP, Frisbii/Vipps via the same adapter interface) accepts a line items payload and redirects back on success.
-
-**Flow:**
-1. User clicks "Buy 10-class card" on `/joinnow`
-2. Frontend calls `POST /functions/v1/create-checkout` with `{ product_id }` (or `class_instance_id` for single classes)
-3. Edge Function resolves the studio's primary provider via `studio_primary_provider()`, creates `payments` row, calls the adapter's `createCheckoutSession()`
-4. Returns `checkout_url` — browser redirects
-5. Webhook promotes the associated `memberships` row (or `bookings` row) from `pending` to `active`/`confirmed`
-
-**Pros:** Self-serve purchasing. Same Edge Function handles class bookings, memberships, guest passes — no duplicate code per flow.
-
-**Cons:** Needs a `products` (or `membership_plans`) table in Supabase; needs the membership-activation webhook handler to be distinct from the booking-confirmation handler. Frontend `/joinnow` needs to read from the DB instead of hardcoded values.
-
-**Context:** Products and prices are hardcoded in `src/pages/JoinNow.tsx`. For now, the CTA is `contact@yogabrie.com`. The Edge Function contract is defined in `docs/MIGRATION-MULTITENANT.md` §4 and typed in `src/types/database.ts` under `EdgeFunctions.CreateCheckoutRequest`.
-
-**Depends on:** ~~`create-checkout` Edge Function built~~ ✅; ~~`0005_payments_provider_agnostic.sql` applied~~ ✅. Ready to implement. Note: `/joinnow` prices are still hardcoded — move to DB before wiring checkout.
+`/joinnow` reads products from DB via `useProducts`; `ProductPurchaseSheet` handles auth + checkout via `useBuyProduct` → `create-checkout` Edge Function with `{ product_id }`. Webhook activates membership on payment success. Dashboard now shows "Membership activated!" toast on `?status=success` return.
 
 ---
 

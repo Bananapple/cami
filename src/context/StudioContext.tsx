@@ -91,6 +91,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
 // useStudio() — throws if studio is not loaded (requires v2 migration).
 // Use only in components written for the v2 architecture.
+// eslint-disable-next-line react-refresh/only-export-components
 export function useStudio(): StudioContextValue {
   const ctx = useContext(StudioContext);
   if (!ctx) {
@@ -104,6 +105,7 @@ export function useStudio(): StudioContextValue {
 
 // useStudioContext() — safe version that returns null pre-migration.
 // Use for components that need to be compatible with both legacy and v2.
+// eslint-disable-next-line react-refresh/only-export-components
 export function useStudioContext(): StudioContextValue | null {
   return useContext(StudioContext);
 }

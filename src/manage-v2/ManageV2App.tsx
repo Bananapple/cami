@@ -11,11 +11,9 @@ import { TodayScreen } from "./screens/TodayScreen";
 import { useStudioContext } from "@/context/StudioContext";
 import { useAuth } from "@/hooks/useAuth";
 import { StaffGate } from "@/manage/components/StaffGate";
-import { useClientsView, SEGMENTS } from "@/manage/hooks/useClientsView";
+import { useClientsView } from "@/manage/hooks/useClientsView";
 import { MemberDrawerV2 } from "./drawers/MemberDrawer";
 import { useMyStudioRole } from "@/manage/hooks/useMyStudioRole";
-import type { NavId } from "./shell/NavRail";
-
 
 export function ManageV2App() {
   const navigate = useNavigate();
@@ -38,7 +36,7 @@ export function ManageV2App() {
     .slice(0, 2)
     .toUpperCase();
 
-  const { members, segmentCounts } = useClientsView();
+  const { members } = useClientsView();
   const [paletteMemberId, setPaletteMemberId] = useState<string | null>(null);
   const { data: myRole } = useMyStudioRole();
 
@@ -65,19 +63,8 @@ export function ManageV2App() {
         setPaletteMemberId(m.user_id);
       },
     }));
-    // Lifecycle deep-links — one entry per non-empty segment. Selecting
-    // navigates to the Clients screen with the lifecycle pill pre-applied.
-    const segmentItems: CommandItem[] = SEGMENTS
-      .filter((s) => s.key !== "all" && (segmentCounts[s.key] ?? 0) > 0)
-      .map((s) => ({
-        id: `clients_lifecycle_${s.key}`,
-        group: "Segments",
-        label: `${s.label} members`,
-        meta: `${segmentCounts[s.key]} matching`,
-        onSelect: () => navigate(`/manage/clients?lifecycle=${s.key}`),
-      }));
-    return [...nav, ...segmentItems, ...memberItems];
-  }, [members, segmentCounts, navigate, signOut]);
+    return [...nav, ...memberItems];
+  }, [members, navigate, signOut]);
 
   return (
     <StaffGate>

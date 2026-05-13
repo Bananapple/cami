@@ -149,7 +149,7 @@ function ClassRow({
   const { tone, label } = (() => {
     if (isCancelled) return { tone: "bad" as const, label: "Cancelled" };
     if (isFull) return { tone: "warn" as const, label: "Full" };
-    return { tone: "good" as const, label: "Confirmed" };
+    return { tone: "good" as const, label: "Scheduled" };
   })();
 
   // Level chip — DATA-1: render level, NOT discipline

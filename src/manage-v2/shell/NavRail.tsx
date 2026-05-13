@@ -132,6 +132,7 @@ export function NavRail({
 
 // ── useIsMobile ────────────────────────────────────────────────────
 // Tiny media-query hook for the burger collapse breakpoint
+// eslint-disable-next-line react-refresh/only-export-components
 export function useIsMobile(breakpoint = 640) {
   const [isMobile, setIsMobile] = useState(
     typeof window !== "undefined" ? window.innerWidth < breakpoint : false

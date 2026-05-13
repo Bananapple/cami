@@ -1,4 +1,4 @@
-import { useClientsView, type MemberSummary, type SegmentKey } from "../hooks/useClientsView";
+import { useClientsView, type MemberSummary } from "../hooks/useClientsView";
 import { useDrawerStack } from "../hooks/useDrawerStack";
 
 function MembershipBadge({ member }: { member: MemberSummary }) {
@@ -46,17 +46,7 @@ function lastSeenLabel(lastBookingAt: string | null, joinedAt: string): string {
 }
 
 export function ClientsView() {
-  const {
-    isLoading,
-    filtered,
-    members,
-    segments,
-    segmentCounts,
-    filter,
-    setLifecycle,
-  } = useClientsView();
-  const activeSegment = filter.lifecycle;
-  const setActiveSegment = setLifecycle;
+  const { isLoading, filtered, members } = useClientsView();
 
   const { push } = useDrawerStack();
 
@@ -65,35 +55,11 @@ export function ClientsView() {
       <header>
         <h1 className="text-2xl font-serif">Clients</h1>
         <p className="text-sm text-muted-foreground mt-0.5">
-          {isLoading ? "Loading..." : `${activeSegment === "all" ? members.length : filtered.length} member${filtered.length !== 1 ? "s" : ""}`}
+          {isLoading ? "Loading..." : `${members.length} member${members.length !== 1 ? "s" : ""}`}
           {" · "}
           <span className="text-xs">use ⌘K to search</span>
         </p>
       </header>
-
-      {/* Segment chips */}
-      <div className="flex flex-wrap gap-2">
-        {segments.map(({ key, label }) => {
-          const count = segmentCounts[key] ?? 0;
-          const isActive = activeSegment === key;
-          return (
-            <button
-              key={key}
-              onClick={() => setActiveSegment(key as SegmentKey)}
-              className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
-                isActive
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "bg-background text-foreground/70 border-border hover:border-primary/50"
-              }`}
-            >
-              {label}
-              <span className={`ml-1.5 ${isActive ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
-                {count}
-              </span>
-            </button>
-          );
-        })}
-      </div>
 
       {/* Member list */}
       {isLoading ? (

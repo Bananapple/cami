@@ -47,7 +47,7 @@ export function CreateClassSheet({
       setCapacity(selectedTemplate.default_max_capacity);
       setPrice(Number(selectedTemplate.default_price) * 100 / 100);
     }
-  }, [templateId]);
+  }, [templateId, selectedTemplate]);
 
   useEffect(() => {
     if (open) {
@@ -59,6 +59,7 @@ export function CreateClassSheet({
       setDate(tomorrow.toISOString().slice(0, 10));
       setTime("09:00");
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   const handleSubmit = async (e: React.FormEvent) => {

@@ -48,6 +48,7 @@ const DateStrip = ({ selectedDate, onSelectDate }: DateStripProps) => {
     // getBoundingClientRect is accurate regardless of offsetParent
     const newScrollLeft = strip.scrollLeft + (btn.getBoundingClientRect().left - strip.getBoundingClientRect().left);
     strip.scrollTo({ left: newScrollLeft, behavior: "smooth" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedStr]);
 
   return (

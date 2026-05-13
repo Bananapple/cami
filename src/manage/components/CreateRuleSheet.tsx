@@ -49,7 +49,7 @@ export function CreateRuleSheet({
       setCapacity(selectedTemplate.default_max_capacity);
       setPrice(Number(selectedTemplate.default_price));
     }
-  }, [templateId]);
+  }, [templateId, selectedTemplate]);
 
   useEffect(() => {
     if (open) {
@@ -59,6 +59,7 @@ export function CreateRuleSheet({
       setDays([]);
       setTime("09:00");
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   const toggleDay = (d: number) => {

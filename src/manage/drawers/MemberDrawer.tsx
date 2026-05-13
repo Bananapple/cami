@@ -17,7 +17,6 @@ import { useMemberBookings, useManagerCancelBooking, type MemberBooking } from "
 import { useStudioContext } from "@/context/StudioContext";
 import { useProducts } from "@/hooks/useProducts";
 import { formatTime, formatDate } from "@/lib/timezone";
-import { inSegment, SEGMENTS, type MemberSummary } from "../hooks/useClientsView";
 import { useNotificationLog, templateLabel } from "../hooks/useNotificationLog";
 
 function MembershipSection({ membership }: { membership: MemberMembership | null }) {
@@ -185,35 +184,6 @@ export function MemberDrawer({
   const now = new Date();
   const confirmBooking = allBookings.find((b) => b.id === confirmBookingId);
 
-  // Compute smart audience segment for this member
-  const lastConfirmedPast = allBookings
-    .filter((b) => b.status === "confirmed" && new Date(b.starts_at) <= now)
-    .sort((a, b) => new Date(b.starts_at).getTime() - new Date(a.starts_at).getTime())[0];
-
-  const memberSnapshot: MemberSummary | null = member
-    ? {
-        studio_member_id: "",
-        user_id: member.user_id,
-        full_name: member.full_name,
-        email: member.email,
-        phone_number: member.phone_number,
-        total_sessions: member.total_sessions,
-        level: member.level,
-        joined_at: member.joined_at ?? new Date().toISOString(),
-        membership_id: member.membership?.id ?? null,
-        membership_status: member.membership ? "active" : null,
-        credits_remaining: member.membership?.credits_remaining ?? null,
-        valid_until: member.membership?.valid_until ?? null,
-        plan_name: member.membership?.plan_name ?? null,
-        plan_type: member.membership?.plan_type ?? null,
-        last_booking_at: lastConfirmedPast?.starts_at ?? null,
-      }
-    : null;
-
-  const activeSegment = memberSnapshot
-    ? SEGMENTS.filter((s) => s.key !== "all").find((s) => inSegment(memberSnapshot, s.key))
-    : null;
-
   const handleConfirmCancel = async () => {
     if (!confirmBookingId) return;
     setConfirmBookingId(null);
@@ -289,13 +259,6 @@ export function MemberDrawer({
                         <span className="text-green-700"> · {member.referrals_converted} converted</span>
                       )}
                     </p>
-                  </div>
-                )}
-                {activeSegment && (
-                  <div>
-                    <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs border border-border text-muted-foreground">
-                      {activeSegment.label}
-                    </span>
                   </div>
                 )}
               </section>

@@ -309,6 +309,7 @@ export function CommandPalette({
 }
 
 // ── Hook: register ⌘K (or Ctrl+K) globally ─────────────────────────
+// eslint-disable-next-line react-refresh/only-export-components
 export function useCommandPaletteShortcut(setOpen: (v: boolean) => void) {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
