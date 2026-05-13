@@ -34,9 +34,15 @@ A pre-launch CSO-mode audit + customer-readiness pass shipped 14 audit findings 
 
 **When to land:** Before public Cami marketing launch (you don't want demo prospects discovering broken yoga routes by URL-guessing).
 
-### ~~Audit #16 — `profiles_staff_read` cross-studio leak~~ — ✅ DONE (2026-05-13, migration 0042)
+### Audit #16 — `profiles_staff_read` cross-studio leak (DEFERRED — approach failed)
 
-Policy now joins through `studios` and requires `s.slug` to match the `x-studio-slug` request header. Staff can only read profiles of members in the studio they're currently operating in — cross-operator PII leak closed.
+**What:** Staff can read profiles of users who share ANY studio with them. With multiple unrelated operators, Studio A's staff could read phone numbers + marketing opt-ins of Studio B's members.
+
+**Attempted fix (2026-05-13, migration 0042 + 0043 revert):** Added a `current_setting('request.header.x-studio-slug', true)` condition to scope the policy to the current studio. This caused `member_activity_summary` (which uses `INNER JOIN profiles`) to return zero rows — the header is null/empty in authenticated PostgREST context, so `s.slug = NULL` was FALSE for all rows and the inner join collapsed.
+
+**Why deferred:** The slug-header approach doesn't work through views that INNER JOIN `profiles`. A correct fix requires either rewriting the policy at the view/function layer (avoiding RLS on raw `profiles`) or introducing an explicit "operator" concept in the schema. Not exploitable on single-tenant Brie deployment.
+
+**When to land:** Before onboarding a second unrelated operator.
 
 ### Webhook audit #1 — per-studio webhook secrets (alternative architecture, OPTIONAL)
 
