@@ -26,7 +26,7 @@ A pre-launch CSO-mode audit + customer-readiness pass shipped 14 audit findings 
 
 **Implemented Option B:** `isMarketingHost()` in `src/marketing/isMarketingHost.ts` checks `window.location.hostname` against `{"heycami.studio", "www.heycami.studio"}`. `App.tsx` renders `MarketingApp` (no StudioProvider, no studio routes, catch-all → `/`) when on the marketing host, and `StudioApp` otherwise.
 
-**Remaining sub-question (deferred):** Centralized staff login on heycami.studio (one login → studio picker → `/manage`). Current behavior: staff log in directly on their studio's URL. Harder to build; defer until second studio is onboarded.
+**Staff login model (decided):** Staff log in directly on their studio's URL. This is intentional — keeps branding to the studio, no generic Cami picker needed. Not building centralized heycami.studio login.
 
 ### Audit #16 — `profiles_staff_read` cross-studio leak (DEFERRED — approach failed)
 
