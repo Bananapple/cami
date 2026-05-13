@@ -111,26 +111,9 @@ Retired with the v2 multi-tenant cutover. All studios now share one Supabase pro
 
 ---
 
-## Shop / Membership purchasing
+## ~~Shop / Membership purchasing~~ — ✅ DONE (Phase 1A 2026-04-30 + success toast 2026-05-13)
 
-**What:** The `/joinnow` page currently shows all 7 products with prices but has no purchase flow. Students can browse but must contact the studio to actually buy. Wire the `create-checkout` Edge Function redirect flow to each product's CTA — same pattern as class bookings, different line items.
-
-**Why:** Conversion drops when there's no buy button. The provider-agnostic `create-checkout` flow (decided 2026-04-23) handles single-class bookings *and* memberships/clip cards through the same Edge Function — the hosted checkout page (Stripe Checkout for MVP, Frisbii/Vipps via the same adapter interface) accepts a line items payload and redirects back on success.
-
-**Flow:**
-1. User clicks "Buy 10-class card" on `/joinnow`
-2. Frontend calls `POST /functions/v1/create-checkout` with `{ product_id }` (or `class_instance_id` for single classes)
-3. Edge Function resolves the studio's primary provider via `studio_primary_provider()`, creates `payments` row, calls the adapter's `createCheckoutSession()`
-4. Returns `checkout_url` — browser redirects
-5. Webhook promotes the associated `memberships` row (or `bookings` row) from `pending` to `active`/`confirmed`
-
-**Pros:** Self-serve purchasing. Same Edge Function handles class bookings, memberships, guest passes — no duplicate code per flow.
-
-**Cons:** Needs a `products` (or `membership_plans`) table in Supabase; needs the membership-activation webhook handler to be distinct from the booking-confirmation handler. Frontend `/joinnow` needs to read from the DB instead of hardcoded values.
-
-**Context:** Products and prices are hardcoded in `src/pages/JoinNow.tsx`. For now, the CTA is `contact@yogabrie.com`. The Edge Function contract is defined in `docs/MIGRATION-MULTITENANT.md` §4 and typed in `src/types/database.ts` under `EdgeFunctions.CreateCheckoutRequest`.
-
-**Depends on:** ~~`create-checkout` Edge Function built~~ ✅; ~~`0005_payments_provider_agnostic.sql` applied~~ ✅. Ready to implement. Note: `/joinnow` prices are still hardcoded — move to DB before wiring checkout.
+`/joinnow` reads products from DB via `useProducts`; `ProductPurchaseSheet` handles auth + checkout via `useBuyProduct` → `create-checkout` Edge Function with `{ product_id }`. Webhook activates membership on payment success. Dashboard now shows "Membership activated!" toast on `?status=success` return.
 
 ---
 

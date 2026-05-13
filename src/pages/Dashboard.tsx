@@ -38,6 +38,18 @@ const Dashboard = () => {
   const [cancelTarget, setCancelTarget] = useState<{ id: string; startsAt: string; hasMembership: boolean } | null>(null);
   const [cancelMembershipOpen, setCancelMembershipOpen] = useState(false);
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const status = params.get("status");
+    if (status === "success") {
+      toast.success("Membership activated!", { description: "Welcome — your plan is now active.", duration: 6000 });
+      window.history.replaceState({}, "", "/dashboard");
+    } else if (status === "cancelled") {
+      toast.info("Purchase not completed", { description: "Your payment was cancelled. No charge was made.", duration: 5000 });
+      window.history.replaceState({}, "", "/dashboard");
+    }
+  }, []);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
