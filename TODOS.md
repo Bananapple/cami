@@ -4,52 +4,15 @@ Deferred work captured during /plan-eng-review on 2026-04-15.
 
 ---
 
-## Deferred 2026-05-12 (defense-in-depth + key rotation)
+## ~~Deferred 2026-05-12 (defense-in-depth + key rotation)~~ — ✅ DONE (2026-05-13)
 
-The cross-tenant-guard incident on 2026-05-12 (PR #9, merged as `e3e53dd`) revealed a class of bug: edge functions using service role to bypass RLS without cross-checking the `x-studio-slug` header. PR #9 fixed `create-checkout` only. The wider track is open. While documenting follow-ups, a separate concern surfaced: the legacy service_role key was pasted into an AI chat conversation during the audience-model seed work on 2026-05-12. Bounded exposure (chat + local laptop + GH secret), but the key has bypass-RLS access to the entire project — yogabrie production data AND brie-demo. Rotation is the right move, deferred to do properly.
+### ~~Migrate legacy API keys → modern Supabase keys + rotate the leaked service_role~~ — ✅ DONE
 
-### Migrate legacy API keys → modern Supabase keys + rotate the leaked service_role
+Rotated via `scripts/rotate-keys.sh` on 2026-05-13. All 6 targets updated (local .env, .env.local, GitHub Actions secrets ×2, Vercel production + preview on brie and cami). Legacy keys disabled in Supabase dashboard after smoke test confirmed booking flow intact. The leaked `eyJ…` service_role is permanently revoked. `SUPABASE_SERVICE_ROLE_KEY` auto-injected env var in edge functions continued to work after legacy disable — no custom-secret refactor needed.
 
-**What:** Move all consumers off the legacy `eyJ…` JWT-based anon + service_role keys (Supabase project Settings → API → "Legacy anon, service_role API keys" tab) and onto the modern `sb_publishable_*` + `sb_secret_*` keys (same page, default tab). Then click "Disable legacy API keys" — at that moment the leaked service_role is permanently revoked.
+### ~~Defense-in-depth follow-ups from PR #9 (cross-tenant guard)~~ — ✅ DONE (PR #11)
 
-**Why:** The legacy `eyJ…` service_role pasted into AI chat on 2026-05-12 grants project-wide RLS bypass. Bounded exposure today (only in chat history + author's laptop + the GH secret, not in any commit/log/share), but it's a master key to all customer data across all studios. Rotation closes the residual risk.
-
-**Scope (4 phases, ~45-60 min):**
-1. **Update non-production consumers first** (zero blast radius):
-   - GH secret `SEED_SUPABASE_SERVICE_ROLE_KEY` → `sb_secret_*` value
-   - GH secret `SEED_SUPABASE_ANON_KEY` → `sb_publishable_*` value
-   - `~/Desktop/Studio/cami/.env.local` → `sb_secret_*`
-   - `~/Desktop/Studio/cami/.env` → `VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_*`
-   - Smoke test via curl + a `seed-setup` dry-run workflow
-2. **Update production frontend** (visible blast radius):
-   - Vercel `brie` project → `VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_*` → redeploy
-   - Vercel `cami` project → same → redeploy
-   - Verify sign-in works on both deployments
-3. **Verify edge function behavior with legacy still on** (baseline). Trigger one real flow (e.g. a brie-demo checkout). Confirm `payment-webhook`, `create-checkout`, `issue-refund` all still work.
-4. **Disable legacy.** Click "Disable legacy API keys" in Supabase dashboard. **Immediately retest the same edge function flow.** If broken: re-enable legacy, then update each edge function to read from a custom secret (`supabase secrets set SB_SECRET_KEY=sb_secret_*` + update function code) rather than the auto-injected `SUPABASE_SERVICE_ROLE_KEY`. Re-disable.
-
-**Open uncertainty:** Whether `SUPABASE_SERVICE_ROLE_KEY` (auto-injected env var in edge functions) auto-aliases to the new `sb_secret_*` value when legacy is disabled. Supabase docs imply yes; I'd test before trusting it. If no, all edge functions (`create-checkout`, `issue-refund`, `validate-discount`, `cancel-membership`, `get-analytics`, `payment-webhook`, `notify-waitlist-offer`, `send-member-message`, `invite-member`) need a custom-secret refactor.
-
-**When to land:** Bundle with the defense-in-depth track below. Or sooner if any sign of broader exposure.
-
-### Defense-in-depth follow-ups from PR #9 (cross-tenant guard)
-
-PR #9 added `validateStudioMatch` inline in `create-checkout` only. The same class of bug exists across other edge functions that derive `studio_id` from a user-supplied resource without cross-checking the `x-studio-slug` header:
-
-- `issue-refund` — derives from `booking.studio_id`. No guard.
-- `cancel-membership` — derives from `membership.studio_id`. No guard.
-- `validate-discount` — derives from `class_instance.studio_id`. No guard.
-- `get-analytics` — accepts `studio_id` directly from request body (UUID-validated only). **Highest exposure** — any authenticated user could request analytics for any studio.
-
-**Work:**
-1. Extract `validateStudioMatch` from `create-checkout/index.ts` into `_shared/`. One canonical implementation.
-2. Apply it to each of the 4 vulnerable edge functions.
-3. Integration tests that explicitly attempt cross-tenant operations (forge a `x-studio-slug` header from studio A while operating on studio B's resource) and assert they fail with 403.
-4. Optional belt: set `app.current_studio_id` as a Postgres session variable on each request and have RLS policies read it (stricter than per-policy header reads).
-
-**Why:** PR #9 closed one door. Four more are open.
-
-**When to land:** Soon. The `get-analytics` exposure in particular means any logged-in user (including test accounts on brie-demo) could enumerate yogabrie's analytics by passing the yogabrie studio_id.
+`validateStudioMatch` extracted to `_shared/guard.ts` and applied to all 8 edge functions: `create-checkout`, `issue-refund`, `cancel-membership`, `validate-discount`, `get-analytics`, `invite-member`, `send-member-message`, `cancel-class-notify`. Adversarial review addressed 4 findings (guard ordering, slug case-sensitivity). Smoke-tested on production.
 
 ---
 
