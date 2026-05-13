@@ -859,6 +859,13 @@
   flex-shrink: 0;
 }
 
+/* —— Scrollbar hide utility ————————————————— */
+.sm-scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.sm-scrollbar-none::-webkit-scrollbar { display: none; }
+
 /* —— Annotation pin ————————————————————————— */
 .sm-pin {
   position: absolute;

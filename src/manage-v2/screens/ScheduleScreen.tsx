@@ -132,6 +132,9 @@ export function ScheduleScreen() {
 }
 
 // ── Horizontal date strip with fill-rate bars ──────────────────────
+// Sticky: stays frozen at top while the class list scrolls beneath.
+// Center-on-select: clicking a chip smooth-scrolls it to the center of
+// the strip — same pattern as the user booking flow DateStrip.
 function ScheduleDateStrip({
   selectedDate,
   onSelect,
@@ -146,9 +149,10 @@ function ScheduleDateStrip({
   isLoading: boolean;
 }) {
   const stripRef = useRef<HTMLDivElement>(null);
-  const todayBtnRef = useRef<HTMLButtonElement>(null);
+  const buttonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const mountedRef = useRef(false);
 
-  // 7 days before today + today + 28 days ahead
+  // 7 days before today + today + 28 days ahead = 36 chips
   const dates = useMemo(() => {
     const today = new Date();
     return Array.from({ length: 36 }, (_, i) => {
@@ -174,127 +178,148 @@ function ScheduleDateStrip({
     return map;
   }, [classes, tz]);
 
-  // Scroll today into view (centered) on mount
+  // Center the selected chip in the strip.
+  // First call (mount): instant scroll to today.
+  // Subsequent calls (user clicks): smooth scroll.
   useEffect(() => {
-    const btn = todayBtnRef.current;
+    const btn = buttonRefs.current[selectedDate];
     const strip = stripRef.current;
     if (!btn || !strip) return;
+
+    const behavior = mountedRef.current ? "smooth" : "instant";
+    mountedRef.current = true;
+
+    const stripRect = strip.getBoundingClientRect();
+    const btnRect = btn.getBoundingClientRect();
     const targetLeft =
       strip.scrollLeft +
-      (btn.getBoundingClientRect().left - strip.getBoundingClientRect().left) -
-      strip.clientWidth / 2 +
-      btn.offsetWidth / 2;
-    strip.scrollTo({ left: Math.max(0, targetLeft), behavior: "instant" });
-  }, []);
+      (btnRect.left + btnRect.width / 2) -
+      (stripRect.left + stripRect.width / 2);
+
+    strip.scrollTo({ left: Math.max(0, targetLeft), behavior });
+  }, [selectedDate]);
 
   return (
     <div
-      ref={stripRef}
       style={{
-        display: "flex",
-        gap: 6,
-        overflowX: "auto",
-        paddingBottom: 16,
-        marginBottom: 4,
-        scrollbarWidth: "none",
-        msOverflowStyle: "none",
+        position: "sticky",
+        top: 0,
+        zIndex: 3,
+        background: "var(--bg)",
+        paddingTop: 10,
+        paddingBottom: 12,
+        marginTop: -10,
+        // Subtle separator once the strip is stuck
+        borderBottom: "1px solid var(--line-soft)",
+        marginBottom: 16,
       }}
     >
-      {dates.map((d) => {
-        const k = dayKey(d, tz);
-        const isSelected = k === selectedDate;
-        const isToday = k === todayKey;
-        const fill = fillMap.get(k);
-        const fillPct = fill && fill.capacity > 0
-          ? Math.min(100, Math.round((fill.booked / fill.capacity) * 100))
-          : null;
+      <div
+        ref={stripRef}
+        className="sm-scrollbar-none"
+        style={{
+          display: "flex",
+          gap: 6,
+          overflowX: "auto",
+        }}
+      >
+        {dates.map((d) => {
+          const k = dayKey(d, tz);
+          const isSelected = k === selectedDate;
+          const isToday = k === todayKey;
+          const fill = fillMap.get(k);
+          const fillPct =
+            fill && fill.capacity > 0
+              ? Math.min(100, Math.round((fill.booked / fill.capacity) * 100))
+              : null;
 
-        const dayLabel = isToday
-          ? "TODAY"
-          : d.toLocaleDateString("en-US", { weekday: "short" }).toUpperCase().slice(0, 3);
+          const dayLabel = isToday
+            ? "TODAY"
+            : d.toLocaleDateString("en-US", { weekday: "short" }).toUpperCase().slice(0, 3);
 
-        return (
-          <button
-            key={k}
-            ref={isToday ? todayBtnRef : undefined}
-            type="button"
-            onClick={() => onSelect(k)}
-            style={{
-              flexShrink: 0,
-              width: 58,
-              padding: "8px 0 7px",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              gap: 1,
-              border: `1px solid ${isSelected ? "var(--action)" : "var(--line)"}`,
-              borderRadius: "var(--r-card)",
-              background: isSelected ? "var(--action)" : "var(--surface)",
-              cursor: "pointer",
-              transition: "background 80ms, border-color 80ms",
-              fontFamily: "inherit",
-            }}
-          >
-            <span
+          return (
+            <button
+              key={k}
+              ref={(el) => { buttonRefs.current[k] = el; }}
+              type="button"
+              onClick={() => onSelect(k)}
               style={{
-                fontSize: 9,
-                fontWeight: 600,
-                letterSpacing: "0.09em",
-                lineHeight: 1.4,
-                color: isSelected
-                  ? "var(--action-on)"
-                  : isToday
-                  ? "var(--action)"
-                  : "var(--ink-muted)",
+                flexShrink: 0,
+                width: 58,
+                padding: "8px 0 7px",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: 1,
+                border: `1px solid ${isSelected ? "var(--action)" : "var(--line)"}`,
+                borderRadius: "var(--r-card)",
+                background: isSelected ? "var(--action)" : "var(--surface)",
+                cursor: "pointer",
+                transition: "background 80ms, border-color 80ms",
+                fontFamily: "inherit",
               }}
             >
-              {dayLabel}
-            </span>
-            <span
-              style={{
-                fontSize: 18,
-                fontWeight: 600,
-                lineHeight: 1.15,
-                letterSpacing: "-0.01em",
-                color: isSelected ? "var(--action-on)" : "var(--ink)",
-              }}
-            >
-              {d.getDate()}
-            </span>
-            <span
-              style={{
-                fontSize: 9,
-                lineHeight: 1.4,
-                color: isSelected ? "rgba(255,255,255,0.7)" : "var(--ink-muted)",
-              }}
-            >
-              {d.toLocaleDateString("en-US", { month: "short" }).toUpperCase()}
-            </span>
-            {/* Fill-rate bar */}
-            <div
-              style={{
-                width: 36,
-                height: 3,
-                borderRadius: 2,
-                marginTop: 5,
-                background: isSelected ? "rgba(255,255,255,0.25)" : "var(--line)",
-                overflow: "hidden",
-              }}
-            >
-              {!isLoading && fillPct !== null && (
-                <div
-                  style={{
-                    height: "100%",
-                    width: `${fillPct}%`,
-                    background: isSelected ? "var(--action-on)" : "var(--action)",
-                    borderRadius: 2,
-                  }}
-                />
-              )}
-            </div>
-          </button>
-        );
-      })}
+              <span
+                style={{
+                  fontSize: 9,
+                  fontWeight: 600,
+                  letterSpacing: "0.09em",
+                  lineHeight: 1.4,
+                  color: isSelected
+                    ? "var(--action-on)"
+                    : isToday
+                    ? "var(--action)"
+                    : "var(--ink-muted)",
+                }}
+              >
+                {dayLabel}
+              </span>
+              <span
+                style={{
+                  fontSize: 18,
+                  fontWeight: 600,
+                  lineHeight: 1.15,
+                  letterSpacing: "-0.01em",
+                  color: isSelected ? "var(--action-on)" : "var(--ink)",
+                }}
+              >
+                {d.getDate()}
+              </span>
+              <span
+                style={{
+                  fontSize: 9,
+                  lineHeight: 1.4,
+                  color: isSelected ? "rgba(255,255,255,0.7)" : "var(--ink-muted)",
+                }}
+              >
+                {d.toLocaleDateString("en-US", { month: "short" }).toUpperCase()}
+              </span>
+              {/* Fill-rate bar */}
+              <div
+                style={{
+                  width: 36,
+                  height: 3,
+                  borderRadius: 2,
+                  marginTop: 5,
+                  background: isSelected ? "rgba(255,255,255,0.25)" : "var(--line)",
+                  overflow: "hidden",
+                }}
+              >
+                {!isLoading && fillPct !== null && (
+                  <div
+                    style={{
+                      height: "100%",
+                      width: `${fillPct}%`,
+                      background: isSelected ? "var(--action-on)" : "var(--action)",
+                      borderRadius: 2,
+                    }}
+                  />
+                )}
+              </div>
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
