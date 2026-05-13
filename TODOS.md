@@ -20,19 +20,13 @@ Rotated via `scripts/rotate-keys.sh` on 2026-05-13. All 6 targets updated (local
 
 A pre-launch CSO-mode audit + customer-readiness pass shipped 14 audit findings + 4 webhook-audit items + 2 customer-readiness items. The items below were intentionally deferred — they are real but not exploitable on the current single-tenant Brie deployment, OR require operational context (a real second customer, design/UX decisions) to land cleanly.
 
-### Architectural — heycami.studio split (DEFERRED, requires UX decision)
+### ~~Architectural — heycami.studio split~~ — ✅ DONE (Option B, hostname-gated routes)
 
 **What:** Today the codebase is a single React app where every Vercel deployment renders the same routes — customer booking flow at `/`, manage UI at `/manage`. When deployed to `heycami.studio` (the platform marketing site), this means hitting `heycami.studio/manage/schedule` renders the yoga manage UI showing brie-demo data. Confusing and architecturally wrong: heycami is the platform, not a yoga studio.
 
-**Two options:**
-- **A. Two codebases:** split the platform marketing site (heycami.studio) into its own repo/codebase. Studio app stays one deployable. Cleanest, biggest effort.
-- **B. One codebase, hostname-gated routes:** in `App.tsx`, gate the studio routes by `window.location.hostname`. If host is `heycami.studio`, render only marketing pages and refuse to mount StudioProvider/booking/manage. Smaller change, slightly less clean.
+**Implemented Option B:** `isMarketingHost()` in `src/marketing/isMarketingHost.ts` checks `window.location.hostname` against `{"heycami.studio", "www.heycami.studio"}`. `App.tsx` renders `MarketingApp` (no StudioProvider, no studio routes, catch-all → `/`) when on the marketing host, and `StudioApp` otherwise.
 
-**Sub-question (separate decision):** the "Log in" button on heycami.studio — should staff log in centrally there (and get routed to their studio's `/manage`), or should they log in directly on their studio's site? Current code assumes the latter (each Vercel deployment is its own login surface; `/manage` gates on `studio_members` membership for whatever studio that deployment is configured for). Centralized auth is better UX for multi-studio operators (one login → studio picker → land in the right `/manage`), harder to build (~couple hours of routing + studio-picker UI).
-
-**Why deferred:** Both options require design + product decisions before code. Doesn't block real-customer onboarding because the staff workflow is "go directly to your studio's URL."
-
-**When to land:** Before public Cami marketing launch (you don't want demo prospects discovering broken yoga routes by URL-guessing).
+**Remaining sub-question (deferred):** Centralized staff login on heycami.studio (one login → studio picker → `/manage`). Current behavior: staff log in directly on their studio's URL. Harder to build; defer until second studio is onboarded.
 
 ### Audit #16 — `profiles_staff_read` cross-studio leak (DEFERRED — approach failed)
 
@@ -64,7 +58,7 @@ A pre-launch CSO-mode audit + customer-readiness pass shipped 14 audit findings 
 
 - **AuthCallback hardcoded background defaults to Cami styling** — `src/pages/AuthCallback.tsx`. Should pull from StudioContext like everything else.
 - **StaffGate cross-studio "Back to dashboard" UX** — `src/manage/components/StaffGate.tsx`. The denial page sends users to `/dashboard` regardless of whether they have ANY relationship to the current studio. Should branch: customer of this studio → `/dashboard`; no relationship → "Sign out" button.
-- **`/manage/schedule` save doesn't dispatch network request** — verified in DevTools Network tab during smoke test 4 on 2026-05-09. Click Save fires no PATCH request; only the page-load GET appears. Time edits silently don't persist. Pre-existing.
+- ~~**`/manage/schedule` save doesn't dispatch network request**~~ — ✅ Fixed (2026-05-10, PR #8). Root cause: time chip's inline Save button used a `+` icon (same as Add), causing users to click the wrong save. Split into `CircleSave` (checkmark) and `CircleAdd` (plus) in `EditSequenceDrawer`. The underlying `updateRule.mutate` path was never broken.
 - **Owner-promotion path required manual SQL** — ✅ Resolved (`scripts/promote-owner.ts`).
 
 ### Tech debt found in passing
