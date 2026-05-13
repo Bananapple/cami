@@ -1,6 +1,7 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import { esc } from "../_shared/email.ts";
+import { validateStudioMatch } from "../_shared/guard.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -71,6 +72,10 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     if (!callerMember) return json(req, { error: "Forbidden" }, 403);
+
+    // --- Cross-tenant guard (after role check: studio_id is user-supplied) ---
+    const guardErr = await validateStudioMatch(req, admin, studio_id);
+    if (guardErr) return guardErr;
 
     // --- Resolve member email + name ---
     let memberEmail: string;

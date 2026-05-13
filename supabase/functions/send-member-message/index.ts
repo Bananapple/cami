@@ -4,6 +4,7 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import { esc } from "../_shared/email.ts";
+import { validateStudioMatch } from "../_shared/guard.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -65,6 +66,10 @@ Deno.serve(async (req) => {
   if (!["owner", "manager"].includes(callerMembership.role)) {
     return json(req, { error: "Forbidden — manager role required" }, 403);
   }
+
+  // --- Cross-tenant guard (after role check: studio_id is user-supplied) ---
+  const guardErr = await validateStudioMatch(req, admin, studio_id);
+  if (guardErr) return guardErr;
 
   // --- Verify the target is actually a member of this studio ---
   // Without this, a manager of Studio A could send branded emails to any user

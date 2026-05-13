@@ -8,6 +8,7 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import { esc } from "../_shared/email.ts";
+import { validateStudioMatch } from "../_shared/guard.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -100,6 +101,10 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders(req), "Content-Type": "application/json" },
       });
     }
+
+    // --- Cross-tenant guard (after role check: studio_id is DB-derived from class_instance_id) ---
+    const guardErr = await validateStudioMatch(req, admin, studioId);
+    if (guardErr) return guardErr;
 
     // --- 2. Fetch studio name + canonical URL + sender email ---
     const { data: studio } = await admin
