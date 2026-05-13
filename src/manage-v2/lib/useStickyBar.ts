@@ -12,7 +12,7 @@ export function useStickyBar(ref: RefObject<HTMLElement>) {
     );
     obs.observe(el);
     return () => obs.disconnect();
-  }, []);
+  }, [ref]);
 
   return show;
 }

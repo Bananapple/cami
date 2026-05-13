@@ -36,6 +36,7 @@ export function DrawerStackProvider({ children }: { children: ReactNode }) {
   return <DrawerStackContext.Provider value={value}>{children}</DrawerStackContext.Provider>;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useDrawerStack() {
   const ctx = useContext(DrawerStackContext);
   if (!ctx) throw new Error("useDrawerStack must be used inside DrawerStackProvider");

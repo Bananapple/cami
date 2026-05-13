@@ -55,7 +55,7 @@ export function useClientsView(initialFilter?: ClientsFilter) {
     },
   });
 
-  const members = query.data ?? [];
+  const members = useMemo(() => query.data ?? [], [query.data]);
 
   const filtered = useMemo(() => {
     const q = filter.text.trim().toLowerCase();

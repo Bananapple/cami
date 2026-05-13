@@ -52,6 +52,7 @@ export function FieldRow({ children }: { children: ReactNode }) {
 }
 
 // Shared input styling — 32px height, 1px line, 6px radius
+// eslint-disable-next-line react-refresh/only-export-components
 export const inputStyle: React.CSSProperties = {
   height: 32,
   padding: "0 10px",

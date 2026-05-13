@@ -230,6 +230,7 @@ function ExpandedTemplate({
       default_price: template.default_price,
       default_instructor_id: template.default_instructor_id ?? "",
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [template.id]);
 
   const save = async () => {

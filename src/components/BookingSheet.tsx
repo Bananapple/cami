@@ -84,6 +84,7 @@ const BookingSheet = ({ isOpen, onClose, templateId }: BookingSheetProps) => {
         }, 50);
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step]);
 
   const isFull = selectedSession

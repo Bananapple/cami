@@ -463,8 +463,8 @@ function Traffic({
   const grandTotal = data?.visitors ?? 0;
   const sources = data?.sources ?? [];
   const sourceConvRateMap = useMemo(
-    () => new Map(sources.map((s) => [s.name, s.convRate])),
-    [sources]
+    () => new Map((data?.sources ?? []).map((s) => [s.name, s.convRate])),
+    [data]
   );
   const windowLabel = (
     { day: "last 30 days", week: "last 30 weeks", month: "last 30 months", year: "last 5 years" } as Record<Period, string>
