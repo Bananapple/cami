@@ -194,7 +194,10 @@
 
 .sm-canvas {
   background: var(--bg);
-  overflow: hidden;
+  /* overflow: clip clips the drawer slide animation without creating a scroll
+     container — overflow: hidden creates an intermediate scroll container that
+     breaks position: sticky inside .sm-content */
+  overflow: clip;
   display: flex;
   position: relative;
 }

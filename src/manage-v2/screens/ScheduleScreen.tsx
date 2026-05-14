@@ -46,6 +46,20 @@ export function ScheduleScreen() {
   const stickyRef = useRef<HTMLDivElement>(null);
   // Suppress observer while a programmatic scroll is in flight
   const clickScrollingRef = useRef(false);
+  const hasScrolledToToday = useRef(false);
+
+  // ── On data load: scroll content to today's section ───────────────
+  useEffect(() => {
+    if (hasScrolledToToday.current || grouped.length === 0) return;
+    const el = dayGroupRefs.current[todayKey];
+    if (!el) return; // today has no classes — stay at top
+    hasScrolledToToday.current = true;
+    const container = document.querySelector(".sm-content") as HTMLElement | null;
+    if (!container) return;
+    const stripHeight = stickyRef.current?.offsetHeight ?? 150;
+    const delta = el.getBoundingClientRect().top - container.getBoundingClientRect().top - stripHeight - 8;
+    if (delta > 10) container.scrollBy({ top: delta, behavior: "instant" });
+  }, [grouped, todayKey]);
 
   // ── Scroll → chip: track which day is at the top of the viewport ──
   useEffect(() => {
@@ -357,11 +371,6 @@ function ClassRow({
 }) {
   const isFull = c.booked_count >= c.max_capacity;
   const isCancelled = c.status === "cancelled";
-  const { tone, label } = (() => {
-    if (isCancelled) return { tone: "bad" as const, label: "Cancelled" };
-    if (isFull) return { tone: "warn" as const, label: "Full" };
-    return { tone: "good" as const, label: "Scheduled" };
-  })();
   const timeStr = formatTime(c.starts_at, tz);
   const durationMin = Math.max(
     1,
@@ -376,7 +385,8 @@ function ClassRow({
       trail={
         <div className="sm-trail-stack">
           <Count value={`${c.booked_count} / ${c.max_capacity}`} tone={isFull ? "warn" : "default"} />
-          <StateBadge tone={tone}>{label}</StateBadge>
+          {isCancelled && <StateBadge tone="bad">Cancelled</StateBadge>}
+          {isFull && !isCancelled && <StateBadge tone="warn">Full</StateBadge>}
         </div>
       }
       selected={selected}
