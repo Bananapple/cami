@@ -1,0 +1,24 @@
+# Cami
+
+> Boutique booking software for independent yoga and fitness studios.
+
+Cami is a booking platform built specifically for independent yoga, pilates, and fitness studios. It handles everything a boutique studio needs: class scheduling, online booking, membership management, clip cards, waitlists, and payments — without the complexity of enterprise tools.
+
+## Who it's for
+
+Independent studio owners who want a beautiful, simple booking experience for their members. Cami is designed for studios with 1–3 locations and a strong personal relationship with their community.
+
+## What it does
+
+- Class scheduling and booking (rolling 14-day window)
+- Membership plans and clip cards with credit tracking
+- Online payments via Stripe
+- Waitlist management with automatic offer notifications
+- Daily brief — a morning email to studio owners summarising member moments (first-timers, milestones, returns, expiring memberships)
+- Studio management dashboard (attendance, check-in, client view)
+
+## Contact
+
+- Website: https://heycami.studio
+- Demo requests: https://heycami.studio (Book a demo button)
+- Email: nico@heycami.studio

@@ -22,6 +22,57 @@
 
     <link rel="canonical" href="https://heycami.studio/" />
 
+    <!-- Structured data for AI search engines -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "SoftwareApplication",
+          "name": "Cami",
+          "url": "https://heycami.studio",
+          "description": "Booking software built for independent yoga and fitness studios. Beautiful class schedules, membership management, and online checkout — without the enterprise complexity.",
+          "applicationCategory": "BusinessApplication",
+          "operatingSystem": "Web",
+          "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "USD",
+            "description": "Contact for pricing"
+          },
+          "audience": {
+            "@type": "Audience",
+            "audienceType": "Independent yoga and fitness studio owners"
+          },
+          "featureList": [
+            "Online class booking",
+            "Membership management",
+            "Clip card support",
+            "Waitlist management",
+            "Studio scheduling",
+            "Online payments"
+          ]
+        },
+        {
+          "@type": "Organization",
+          "name": "Cami",
+          "url": "https://heycami.studio",
+          "description": "Boutique booking software for independent studios.",
+          "contactPoint": {
+            "@type": "ContactPoint",
+            "email": "nico@heycami.studio",
+            "contactType": "sales"
+          }
+        },
+        {
+          "@type": "WebSite",
+          "name": "Cami",
+          "url": "https://heycami.studio"
+        }
+      ]
+    }
+    </script>
+
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,400&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -29,6 +80,12 @@
 
   <body>
     <div id="root"></div>
+    <noscript>
+      <h1>Cami — Boutique checkout for independent studios</h1>
+      <p>Booking software built for independent yoga and fitness studios. Beautiful class schedules, membership management, and online checkout — without the enterprise complexity.</p>
+      <p>Cami helps independent studio owners run their business: class scheduling, membership plans, clip cards, waitlists, and online payments — all in one place. Built for boutique yoga, pilates, and fitness studios.</p>
+      <a href="mailto:nico@heycami.studio">Book a demo</a>
+    </noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
