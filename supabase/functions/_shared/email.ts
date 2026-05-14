@@ -45,43 +45,43 @@ export function buildConfirmationEmail(p: {
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Booking confirmed</title>
 </head>
-<body style="margin:0;padding:0;background:#f5f0eb;font-family:'Georgia',serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f0eb;padding:40px 0;">
+<body style="margin:0;padding:0;background:#e4ddd4;font-family:'Fraunces','Georgia',serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#e4ddd4;padding:40px 0;">
     <tr>
       <td align="center">
-        <table width="560" cellpadding="0" cellspacing="0" style="background:#1a1a1a;border-radius:8px;overflow:hidden;max-width:100%;">
+        <table width="560" cellpadding="0" cellspacing="0" style="background:#faf8f5;border-radius:14px;overflow:hidden;max-width:100%;box-shadow:0 8px 32px rgba(70,55,40,0.10);">
           <tr>
-            <td style="padding:40px 48px 32px;border-bottom:1px solid #2e2e2e;">
-              <p style="margin:0;font-size:13px;letter-spacing:0.15em;text-transform:uppercase;color:#8a7e6e;">${esc(p.studioName)}</p>
-              <h1 style="margin:12px 0 0;font-size:28px;font-weight:400;color:#f5f0eb;line-height:1.2;">Your booking is confirmed</h1>
+            <td style="padding:40px 48px 32px;border-bottom:1px solid rgba(0,0,0,0.08);">
+              <p style="margin:0;font-size:13px;letter-spacing:0.15em;text-transform:uppercase;color:#8a7c66;font-family:sans-serif;">${esc(p.studioName)}</p>
+              <h1 style="margin:12px 0 0;font-size:28px;font-weight:400;color:#1a1611;line-height:1.2;">Your booking is confirmed</h1>
             </td>
           </tr>
           <tr>
             <td style="padding:32px 48px;">
-              <h2 style="margin:0 0 24px;font-size:20px;font-weight:400;color:#f5f0eb;">${esc(p.className)}</h2>
+              <h2 style="margin:0 0 24px;font-size:20px;font-weight:500;color:#1a1611;">${esc(p.className)}</h2>
               <table cellpadding="0" cellspacing="0" width="100%">
                 <tr>
-                  <td style="padding:10px 0;border-bottom:1px solid #2e2e2e;">
-                    <span style="font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:#8a7e6e;font-family:sans-serif;">Date</span>
-                    <p style="margin:4px 0 0;font-size:15px;color:#f5f0eb;">${esc(p.dateStr)}</p>
+                  <td style="padding:10px 0;border-bottom:1px solid rgba(0,0,0,0.06);">
+                    <span style="font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:#8a7c66;font-family:sans-serif;">Date</span>
+                    <p style="margin:4px 0 0;font-size:15px;color:#1a1611;">${esc(p.dateStr)}</p>
                   </td>
                 </tr>
                 <tr>
-                  <td style="padding:10px 0;border-bottom:1px solid #2e2e2e;">
-                    <span style="font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:#8a7e6e;font-family:sans-serif;">Time</span>
-                    <p style="margin:4px 0 0;font-size:15px;color:#f5f0eb;">${esc(p.timeStr)} · ${p.duration} min</p>
+                  <td style="padding:10px 0;border-bottom:1px solid rgba(0,0,0,0.06);">
+                    <span style="font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:#8a7c66;font-family:sans-serif;">Time</span>
+                    <p style="margin:4px 0 0;font-size:15px;color:#1a1611;">${esc(p.timeStr)} · ${p.duration} min</p>
                   </td>
                 </tr>
                 ${p.instructor ? `<tr>
-                  <td style="padding:10px 0;border-bottom:1px solid #2e2e2e;">
-                    <span style="font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:#8a7e6e;font-family:sans-serif;">Instructor</span>
-                    <p style="margin:4px 0 0;font-size:15px;color:#f5f0eb;">${esc(p.instructor)}</p>
+                  <td style="padding:10px 0;border-bottom:1px solid rgba(0,0,0,0.06);">
+                    <span style="font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:#8a7c66;font-family:sans-serif;">Instructor</span>
+                    <p style="margin:4px 0 0;font-size:15px;color:#1a1611;">${esc(p.instructor)}</p>
                   </td>
                 </tr>` : ""}
                 ${p.location ? `<tr>
                   <td style="padding:10px 0;">
-                    <span style="font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:#8a7e6e;font-family:sans-serif;">Location</span>
-                    <p style="margin:4px 0 0;font-size:15px;color:#f5f0eb;">${esc(p.location)}</p>
+                    <span style="font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:#8a7c66;font-family:sans-serif;">Location</span>
+                    <p style="margin:4px 0 0;font-size:15px;color:#1a1611;">${esc(p.location)}</p>
                   </td>
                 </tr>` : ""}
               </table>
@@ -89,14 +89,14 @@ export function buildConfirmationEmail(p: {
           </tr>
           <tr>
             <td style="padding:28px 48px 0;text-align:center;">
-              <a href="${esc(p.calendarUrl)}" style="display:inline-block;background:#8a7e6e;color:#f5f0eb;text-decoration:none;font-family:sans-serif;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;padding:12px 28px;border-radius:6px;">
+              <a href="${esc(p.calendarUrl)}" style="display:inline-block;background:#1a1611;color:#faf8f5;text-decoration:none;font-family:sans-serif;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;padding:12px 28px;border-radius:50px;">
                 Add to Google Calendar
               </a>
             </td>
           </tr>
           <tr>
-            <td style="padding:24px 48px 40px;border-top:1px solid #2e2e2e;margin-top:28px;">
-              <p style="margin:0;font-size:13px;color:#8a7e6e;line-height:1.6;font-family:sans-serif;">
+            <td style="padding:24px 48px 40px;margin-top:28px;">
+              <p style="margin:0;font-size:13px;color:#8a7c66;line-height:1.6;font-family:sans-serif;">
                 Need to cancel? You can cancel your booking from your dashboard. Full refunds are available up to 24 hours before class.
               </p>
             </td>

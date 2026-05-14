@@ -133,6 +133,7 @@ const AuthForm = ({ onSuccess }: AuthFormProps) => {
             pattern="[0-9]*"
             maxLength={6}
             autoFocus
+            autoComplete="one-time-code"
             value={token}
             onChange={handleCodeChange}
             placeholder="123456"
