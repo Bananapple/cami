@@ -1,185 +1,208 @@
 import { useEffect, useRef, useState } from "react";
-import { GlassFilter } from "@/components/ui/liquid-glass-button";
 
-type Phase = "idle" | "text1" | "text2" | "cta" | "nav" | "notifications";
-const PHASES: Phase[] = ["idle", "text1", "text2", "cta", "nav", "notifications"];
+type Phase = "idle" | "text1" | "text2" | "cta" | "nav";
+const PHASES: Phase[] = ["idle", "text1", "text2", "cta", "nav"];
 const gte = (cur: Phase, target: Phase) => PHASES.indexOf(cur) >= PHASES.indexOf(target);
 
-// Lighter, heavier-blur liquid glass
-const liquidGlass: React.CSSProperties = {
-  background: "rgba(60, 57, 54, 0.42)",
-  backdropFilter: 'url("#container-glass") blur(64px) saturate(200%)',
-  WebkitBackdropFilter: 'url("#container-glass") blur(64px) saturate(200%)',
-  borderRadius: 22,
-  border: "1px solid rgba(255,255,255,0.16)",
-  boxShadow: [
-    "0 4px 24px rgba(0,0,0,0.18)",
-    "inset 1px 1px 1px -0.5px rgba(255,255,255,0.55)",
-    "inset -1px -1px 1px -0.5px rgba(255,255,255,0.25)",
-    "inset 0 0 8px 4px rgba(255,255,255,0.07)",
-  ].join(", "),
-  width: "min(360px, calc(100vw - 32px))",
-};
+// ─── Demo request modal ──────────────────────────────────────────────────────
 
-// iOS app icon style — square with rounded corners + soft shine border
-const appIcon = (bg: string): React.CSSProperties => ({
-  width: 46, height: 46, borderRadius: 11, flexShrink: 0,
-  background: bg,
-  display: "flex", alignItems: "center", justifyContent: "center",
-  boxShadow: [
-    "inset 0 1px 0 rgba(255,255,255,0.50)",
-    "inset 0 -1px 0 rgba(0,0,0,0.18)",
-    "inset 1px 0 0 rgba(255,255,255,0.22)",
-    "inset -1px 0 0 rgba(0,0,0,0.10)",
-    "0 2px 8px rgba(0,0,0,0.28)",
-    "0 0 0 0.5px rgba(255,255,255,0.18)",
-  ].join(", "),
-});
+function DemoModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [name, setName] = useState("");
+  const [studio, setStudio] = useState("");
+  const [city, setCity] = useState("");
+  const [message, setMessage] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState(false);
 
-// ─── Notification cards ───────────────────────────────────────────────────────
+  const reset = () => {
+    setName(""); setStudio(""); setCity(""); setMessage("");
+    setSubmitting(false); setSubmitted(false); setError(false);
+  };
 
-function EmailCard() {
-  return (
-    <div style={liquidGlass} className="px-4 py-3.5 flex items-start gap-3">
-      {/* iOS Mail icon */}
-      <div style={appIcon("linear-gradient(155deg, #74c2f5 0%, #1e8cf0 45%, #0e5fd8 100%)")}>
-        <svg width="27" height="21" viewBox="0 0 27 21" fill="none">
-          <rect x="0.5" y="0.5" width="26" height="20" rx="2.5" fill="white" fillOpacity="0.95"/>
-          <path d="M1 3l12.5 9L26 3" stroke="#4da8f5" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          <rect x="0.5" y="0.5" width="26" height="20" rx="2.5" stroke="rgba(255,255,255,0.4)" strokeWidth="0.5" fill="none"/>
-        </svg>
-      </div>
-      <div className="flex-1 min-w-0 pt-0.5">
-        <div className="flex items-baseline justify-between gap-2">
-          <span className="text-[11.5px] font-semibold" style={{ color: "rgba(255,255,255,0.55)" }}>Mail</span>
-          <span className="text-[11px]" style={{ color: "rgba(255,255,255,0.35)" }}>now</span>
-        </div>
-        <div className="text-[15px] font-semibold text-white leading-snug mt-0.5">Would you mind leaving us a review?</div>
-        <div className="text-[13px] mt-0.5" style={{ color: "rgba(255,255,255,0.5)" }}>To: Emma · Tiny Haven</div>
-      </div>
-    </div>
-  );
-}
+  const handleClose = () => { reset(); onClose(); };
 
-function TrafficCard() {
-  const sources = [
-    { name: "TikTok",    color: "#ffffff", pct: 62 },
-    { name: "Instagram", color: "#E1306C", pct: 48 },
-    { name: "Facebook",  color: "#4B9CF5", pct: 35 },
-    { name: "Google",    color: "#7DC8A4", pct: 78 },
-  ];
-  return (
-    <div style={liquidGlass} className="px-4 py-3.5 flex items-start gap-3">
-      <div style={appIcon("linear-gradient(145deg, hsl(42,85%,60%), hsl(28,75%,42%))")}>
-        <svg width="22" height="18" viewBox="0 0 22 18" fill="none">
-          <path d="M2 14l4.5-6 4 3.5L16 4l4 5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-        </svg>
-      </div>
-      <div className="flex-1 min-w-0 pt-0.5">
-        <div className="flex items-baseline justify-between gap-2">
-          <span className="text-[11.5px] font-semibold" style={{ color: "rgba(255,255,255,0.55)" }}>Cami · Traffic</span>
-          <span className="text-[11px]" style={{ color: "rgba(255,255,255,0.35)" }}>this week</span>
-        </div>
-        <div className="mt-2 space-y-1.5">
-          {sources.map((s) => (
-            <div key={s.name} className="flex items-center gap-2">
-              <span className="text-[11.5px] w-[64px] flex-shrink-0" style={{ color: "rgba(255,255,255,0.55)" }}>{s.name}</span>
-              <div className="flex-1 h-[4px] rounded-full" style={{ background: "rgba(255,255,255,0.1)" }}>
-                <div className="h-full rounded-full" style={{ width: `${s.pct}%`, backgroundColor: s.color, opacity: 0.85 }} />
-              </div>
-              <span className="text-[10.5px] w-6 text-right tabular-nums" style={{ color: "rgba(255,255,255,0.38)" }}>{s.pct}%</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    setError(false);
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-demo-request`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          },
+          body: JSON.stringify({ name, studio, city, message }),
+        }
+      );
+      if (!res.ok) throw new Error();
+      setSubmitted(true);
+    } catch {
+      setError(true);
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
-function AudienceCard() {
-  const segments = [
-    { label: "Lapsing regulars",        count: 12, dot: "#f87171" },
-    { label: "First-timers this month", count: 8,  dot: "#7DC8A4" },
-    { label: "High-LTV referrers",      count: 5,  dot: "hsl(42 58% 60%)" },
-  ];
-  return (
-    <div style={liquidGlass} className="px-4 py-3.5 flex items-start gap-3">
-      <div style={appIcon("linear-gradient(145deg, hsl(155,45%,52%), hsl(42,70%,48%))")}>
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="white">
-          <path d="M10 0L11.8 6.5H18.5L13 10.5L15 17L10 13L5 17L7 10.5L1.5 6.5H8.2L10 0Z"/>
-        </svg>
-      </div>
-      <div className="flex-1 min-w-0 pt-0.5">
-        <div className="flex items-center justify-between gap-2 mb-2">
-          <span className="text-[11.5px] font-semibold" style={{ color: "rgba(255,255,255,0.55)" }}>Smart Audiences</span>
-          <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold"
-            style={{ background: "hsl(42 58% 46% / 0.32)", color: "hsl(42 58% 78%)" }}>AI</span>
-        </div>
-        <div className="space-y-1.5">
-          {segments.map((s) => (
-            <div key={s.label} className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: s.dot }} />
-                <span className="text-[13px]" style={{ color: "rgba(255,255,255,0.78)" }}>{s.label}</span>
-              </div>
-              <span className="text-[13px] font-semibold tabular-nums" style={{ color: "rgba(255,255,255,0.45)" }}>{s.count}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
+  if (!open) return null;
 
-const CARDS = [EmailCard, TrafficCard, AudienceCard];
-
-// ─── Notification sequence ───────────────────────────────────────────────────
-// Flow: A shown → A exits up while B advances from behind → B is in place → repeat
-// No persistent back card; next card only mounts during the transition window.
-
-function NotificationSequence() {
-  const [front, setFront] = useState(0);
-  const [exiting, setExiting] = useState(false);
-
-  useEffect(() => {
-    const hold = 3800;
-    const exitDur = 720;
-    const t1 = setTimeout(() => setExiting(true), hold);
-    const t2 = setTimeout(() => { setExiting(false); setFront((f) => f + 1); }, hold + exitDur);
-    return () => { clearTimeout(t1); clearTimeout(t2); };
-  }, [front]);
-
-  const FrontCard = CARDS[front % CARDS.length];
-  const NextCard  = CARDS[(front + 1) % CARDS.length];
+  const inputStyle: React.CSSProperties = {
+    width: "100%",
+    padding: "10px 14px",
+    borderRadius: 10,
+    border: "1px solid rgba(0,0,0,0.12)",
+    background: "rgba(0,0,0,0.03)",
+    fontSize: 15,
+    fontFamily: "-apple-system, 'Inter', system-ui, sans-serif",
+    color: "#1a1611",
+    outline: "none",
+    transition: "border-color 0.15s",
+    boxSizing: "border-box",
+  };
 
   return (
-    <div className="relative" style={{ width: "min(360px, calc(100vw - 32px))", height: 115 }}>
-
-      {/* Next card — only in DOM during transition, advances from back position */}
-      {exiting && (
-        <div
-          style={{
-            position: "absolute", inset: 0, zIndex: 1,
-            animation: "ios-notify-advance 0.72s cubic-bezier(0.25,0.1,0.25,1) forwards",
-          }}
-        >
-          <NextCard />
-        </div>
-      )}
-
-      {/* Current card — exits up; when promoted (front > 0, not exiting) just sits there */}
+    <div
+      style={{
+        position: "fixed", inset: 0, zIndex: 100,
+        background: "rgba(0,0,0,0.55)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        padding: "16px",
+        animation: "blur-fade-in 0.18s ease forwards",
+      }}
+      onClick={(e) => { if (e.target === e.currentTarget) handleClose(); }}
+    >
       <div
-        key={front}
         style={{
-          position: "absolute", inset: 0, zIndex: 2,
-          animation: exiting
-            ? "ios-notify-out 0.72s cubic-bezier(0.4,0,1,1) forwards"
-            : front === 0
-              ? "ios-notify-in 0.75s cubic-bezier(0.34,1.1,0.64,1) forwards"
-              : "none",
+          background: "#faf8f5",
+          borderRadius: 20,
+          width: "100%",
+          maxWidth: 460,
+          padding: "32px",
+          position: "relative",
+          animation: "demo-modal-in 0.22s cubic-bezier(0.34,1.1,0.64,1) forwards",
+          fontFamily: "-apple-system, 'Inter', system-ui, sans-serif",
+          boxShadow: "0 24px 64px rgba(0,0,0,0.24), 0 4px 16px rgba(0,0,0,0.10)",
         }}
       >
-        <FrontCard />
+        {/* Close button */}
+        <button
+          onClick={handleClose}
+          style={{
+            position: "absolute", top: 16, right: 16,
+            width: 32, height: 32, borderRadius: "50%",
+            border: "none", background: "rgba(0,0,0,0.07)",
+            cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+            color: "#888", fontSize: 18, lineHeight: 1,
+          }}
+          aria-label="Close"
+        >
+          ×
+        </button>
+
+        {submitted ? (
+          <div style={{ textAlign: "center", padding: "24px 0" }}>
+            <div style={{ fontSize: 40, marginBottom: 16 }}>✓</div>
+            <h2 style={{ margin: "0 0 8px", fontSize: 20, fontWeight: 600, color: "#1a1611", fontFamily: "Fraunces, Georgia, serif" }}>
+              Thanks, we'll be in touch.
+            </h2>
+            <p style={{ margin: 0, fontSize: 15, color: "#888" }}>
+              We'll reach out to {name} shortly.
+            </p>
+          </div>
+        ) : (
+          <>
+            <h2 style={{ margin: "0 0 4px", fontSize: 22, fontWeight: 600, color: "#1a1611", fontFamily: "Fraunces, Georgia, serif", letterSpacing: "-0.02em" }}>
+              Book a demo
+            </h2>
+            <p style={{ margin: "0 0 24px", fontSize: 14, color: "#888" }}>
+              We'll reach out within one business day.
+            </p>
+
+            <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div>
+                  <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#888", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                    Your name
+                  </label>
+                  <input
+                    required
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Emma"
+                    style={inputStyle}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#888", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                    Studio name
+                  </label>
+                  <input
+                    required
+                    value={studio}
+                    onChange={(e) => setStudio(e.target.value)}
+                    placeholder="Tiny Haven"
+                    style={inputStyle}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#888", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                  City
+                </label>
+                <input
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                  placeholder="Oslo"
+                  style={inputStyle}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#888", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                  Message
+                </label>
+                <textarea
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  placeholder="Tell us a bit about your studio…"
+                  rows={3}
+                  style={{ ...inputStyle, resize: "vertical", minHeight: 80 }}
+                />
+              </div>
+
+              {error && (
+                <p style={{ margin: 0, fontSize: 13, color: "#e05050" }}>
+                  Something went wrong — try again or email nico@heycami.studio directly.
+                </p>
+              )}
+
+              <button
+                type="submit"
+                disabled={submitting}
+                style={{
+                  marginTop: 4,
+                  padding: "12px 24px",
+                  borderRadius: 50,
+                  border: "none",
+                  background: "#1a1611",
+                  color: "white",
+                  fontSize: 15,
+                  fontWeight: 500,
+                  fontFamily: "-apple-system, 'Inter', system-ui, sans-serif",
+                  cursor: submitting ? "wait" : "pointer",
+                  opacity: submitting ? 0.6 : 1,
+                  transition: "opacity 0.15s",
+                }}
+              >
+                {submitting ? "Sending…" : "Send"}
+              </button>
+            </form>
+          </>
+        )}
       </div>
     </div>
   );
@@ -190,33 +213,33 @@ function NotificationSequence() {
 export default function CamiHome() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [phase, setPhase] = useState<Phase>("idle");
+  const [demoOpen, setDemoOpen] = useState(false);
 
   useEffect(() => {
-    // Video starts immediately on load
+    document.documentElement.classList.add("deploy-cami");
+    return () => document.documentElement.classList.remove("deploy-cami");
+  }, []);
+
+  useEffect(() => {
     videoRef.current?.play().catch(() => {});
 
     const timers = [
-      setTimeout(() => setPhase("text1"),         1000),
-      setTimeout(() => setPhase("text2"),         2600),
-      setTimeout(() => setPhase("cta"),           4200),
-      setTimeout(() => setPhase("nav"),           5100),
-      setTimeout(() => setPhase("notifications"), 7000),
+      setTimeout(() => setPhase("text1"), 1000),
+      setTimeout(() => setPhase("text2"), 2600),
+      setTimeout(() => setPhase("cta"),   4200),
+      setTimeout(() => setPhase("nav"),   5100),
     ];
     return () => timers.forEach(clearTimeout);
   }, []);
 
-  const showText1        = gte(phase, "text1");
-  const showText2        = gte(phase, "text2");
-  const showCta          = gte(phase, "cta");
-  const showNav          = gte(phase, "nav");
-  const showNotifs       = gte(phase, "notifications");
+  const showText1 = gte(phase, "text1");
+  const showText2 = gte(phase, "text2");
+  const showCta   = gte(phase, "cta");
 
   return (
     <div className="relative h-screen w-full overflow-hidden" style={{ background: "#e4ddd4", fontFamily: "Fraunces, Georgia, serif" }}>
-      {/* GlassFilter SVG — referenced by notification backdropFilter */}
-      <GlassFilter />
 
-      {/* ── Video — auto-starts on load ── */}
+      {/* ── Video ── */}
       <video
         ref={videoRef}
         className="absolute inset-0 w-full h-full object-cover object-[30%_center] md:object-center"
@@ -226,16 +249,8 @@ export default function CamiHome() {
         preload="auto"
       />
 
-      {/* ── "Cami" — visible from load, slides to top-left when Studio AI appears ── */}
-      <div
-        className="absolute z-30 pointer-events-none"
-        style={{
-          top: showText1 ? "1.4rem" : "1.75rem",
-          left: showText1 ? "2rem" : "50%",
-          transform: showText1 ? "translateX(0)" : "translateX(-50%)",
-          transition: "left 0.6s cubic-bezier(0.4,0,0.2,1), transform 0.6s cubic-bezier(0.4,0,0.2,1), top 0.4s ease",
-        }}
-      >
+      {/* ── "Cami" — always top-left, no animation ── */}
+      <div className="absolute z-30 pointer-events-none" style={{ top: "1.4rem", left: "2rem" }}>
         <span
           className="font-serif text-[1.4rem] text-white"
           style={{ letterSpacing: "-0.01em", textShadow: "0 1px 12px rgba(0,0,0,0.2)" }}
@@ -244,9 +259,7 @@ export default function CamiHome() {
         </span>
       </div>
 
-      {/* ── Hero headline — mobile: two independently positioned blocks ── */}
-
-      {/* Mobile: "Studio AI" at shoulder level */}
+      {/* ── Mobile hero ── */}
       <div
         className="absolute md:hidden left-0 right-0 z-20 flex justify-center px-6"
         style={{ top: "18vh" }}
@@ -259,11 +272,10 @@ export default function CamiHome() {
             opacity: showText1 ? undefined : 0,
           }}
         >
-          Studio AI
+          Boutique checkout
         </h1>
       </div>
 
-      {/* Mobile: "that has your back" + CTA at chest level */}
       <div
         className="absolute md:hidden left-0 right-0 z-20 flex flex-col items-center px-6"
         style={{ top: "50vh" }}
@@ -277,7 +289,7 @@ export default function CamiHome() {
             opacity: showText2 ? undefined : 0,
           }}
         >
-          that has your back
+          for independent studios.
         </p>
         <div
           className="mt-7"
@@ -286,17 +298,19 @@ export default function CamiHome() {
             opacity: showCta ? undefined : 0,
           }}
         >
-          <button className="text-sm font-medium px-6 py-3 rounded-full" style={{ background: "white", color: "#1a1611" }}>
+          <button
+            onClick={() => setDemoOpen(true)}
+            className="text-sm font-medium px-6 py-3 rounded-full"
+            style={{ background: "white", color: "#1a1611" }}
+          >
             Book a demo
           </button>
         </div>
       </div>
 
-      {/* Desktop: right half, vertically centered */}
-      <div
-        className="absolute inset-y-0 left-[50%] right-0 z-20 hidden md:flex flex-col justify-center items-center pr-16 pl-4"
-      >
-        <div className="text-right w-full" style={{ maxWidth: 480 }}>
+      {/* ── Desktop hero ── */}
+      <div className="absolute inset-y-0 left-0 right-0 z-20 hidden md:flex flex-col justify-center items-end pr-20">
+        <div className="text-right">
           <h1 className="font-serif leading-[1.12]" style={{ fontSize: "clamp(2.4rem, 3.8vw, 3.6rem)" }}>
             <span
               className="block text-white"
@@ -305,7 +319,7 @@ export default function CamiHome() {
                 opacity: showText1 ? undefined : 0,
               }}
             >
-              Studio AI
+              Boutique checkout
             </span>
             <span
               className="block text-white/85"
@@ -314,7 +328,7 @@ export default function CamiHome() {
                 opacity: showText2 ? undefined : 0,
               }}
             >
-              that has your back
+              for independent studios.
             </span>
           </h1>
           <div
@@ -324,50 +338,55 @@ export default function CamiHome() {
               opacity: showCta ? undefined : 0,
             }}
           >
-            <button className="text-sm font-medium px-6 py-3 rounded-full" style={{ background: "white", color: "#1a1611" }}>
+            <button
+              onClick={() => setDemoOpen(true)}
+              className="text-sm font-medium px-6 py-3 rounded-full"
+              style={{ background: "white", color: "#1a1611" }}
+            >
               Book a demo
             </button>
           </div>
         </div>
       </div>
 
-      {/* ── Notifications — bottom-center on mobile, right half at 74% on desktop ── */}
-      {showNotifs && (
-        <div className="absolute z-20 flex justify-center left-0 right-0 bottom-6 md:bottom-auto md:top-[74%] md:left-[50%] md:right-0">
-          <NotificationSequence />
-        </div>
-      )}
-
-      {/* ── Social pill — desktop only ── */}
+      {/* ── Decorative triangle — desktop only ── */}
       <div
-        className="absolute z-20 hidden md:flex items-center gap-3.5 px-5 py-3"
+        className="absolute z-10 hidden md:block pointer-events-none"
         style={{
-          bottom: 12, right: 12,
-          background: "url('/social-pill-bg.png') center/cover no-repeat",
-          borderRadius: 20,
-          boxShadow: "0 2px 16px rgba(0,0,0,0.14)",
+          bottom: 0, right: 0,
+          width: 320, height: 130,
+          background: "#c8b89a",
+          clipPath: "polygon(100% 0, 100% 100%, 0 100%)",
         }}
+      />
+      {/* ── Social icons on triangle — desktop only ── */}
+      <div
+        className="absolute z-20 hidden md:flex items-center gap-4"
+        style={{ bottom: 20, right: 22 }}
       >
-        {/* Info icon */}
-        <svg width="26" height="26" viewBox="0 0 26 26" fill="none">
-          <circle cx="13" cy="13" r="11" stroke="rgba(255,255,255,0.55)" strokeWidth="1.4"/>
-          <circle cx="13" cy="8.5" r="1.2" fill="rgba(255,255,255,0.55)"/>
-          <rect x="11.5" y="11.5" width="3" height="7.5" rx="1.5" fill="rgba(255,255,255,0.55)"/>
-        </svg>
-        <div style={{ width: 1, height: 18, background: "rgba(255,255,255,0.25)" }} />
-        {/* Instagram */}
         <a href="#" aria-label="Instagram">
-          <img src="/logo-instagram.png" width="28" height="28" style={{ borderRadius: 7 }} alt="Instagram" />
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="2" y="2" width="20" height="20" rx="5"/>
+            <circle cx="12" cy="12" r="5"/>
+            <circle cx="17.5" cy="6.5" r="1.2" fill="white" stroke="none"/>
+          </svg>
         </a>
-        {/* Facebook */}
         <a href="#" aria-label="Facebook">
-          <img src="/logo-facebook.png" width="28" height="28" style={{ borderRadius: 7 }} alt="Facebook" />
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="white">
+            <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/>
+          </svg>
         </a>
-        {/* LinkedIn */}
         <a href="#" aria-label="LinkedIn">
-          <img src="/logo-linkedin.png" width="28" height="28" style={{ borderRadius: 7 }} alt="LinkedIn" />
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="white">
+            <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-4 0v7h-4V9h4v2a6 6 0 0 1 2-2z"/>
+            <rect x="2" y="9" width="4" height="12"/>
+            <circle cx="4" cy="4" r="2"/>
+          </svg>
         </a>
       </div>
+
+      {/* ── Demo modal ── */}
+      <DemoModal open={demoOpen} onClose={() => setDemoOpen(false)} />
     </div>
   );
 }
