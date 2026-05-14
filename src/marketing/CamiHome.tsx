@@ -270,6 +270,7 @@ export default function CamiHome() {
             fontSize: "clamp(2.6rem, 10vw, 3.6rem)",
             animation: showText1 ? "blur-fade-in 1.1s cubic-bezier(0.4,0,0.2,1) forwards" : "none",
             opacity: showText1 ? undefined : 0,
+            textShadow: "2px 4px 18px rgba(185,158,122,0.45), 0 1px 3px rgba(0,0,0,0.12)",
           }}
         >
           Boutique checkout
@@ -287,6 +288,7 @@ export default function CamiHome() {
             color: "rgba(255,255,255,0.85)",
             animation: showText2 ? "blur-fade-in 1.1s cubic-bezier(0.4,0,0.2,1) forwards" : "none",
             opacity: showText2 ? undefined : 0,
+            textShadow: "2px 4px 18px rgba(185,158,122,0.45), 0 1px 3px rgba(0,0,0,0.12)",
           }}
         >
           for independent studios.
@@ -301,7 +303,7 @@ export default function CamiHome() {
           <button
             onClick={() => setDemoOpen(true)}
             className="text-sm font-medium px-6 py-3 rounded-full"
-            style={{ background: "white", color: "#1a1611" }}
+            style={{ background: "white", color: "#1a1611", boxShadow: "2px 4px 18px rgba(185,158,122,0.45), 0 1px 3px rgba(0,0,0,0.12)" }}
           >
             Book a demo
           </button>
@@ -317,6 +319,7 @@ export default function CamiHome() {
               style={{
                 animation: showText1 ? "blur-fade-in 1.1s cubic-bezier(0.4,0,0.2,1) forwards" : "none",
                 opacity: showText1 ? undefined : 0,
+                textShadow: "2px 4px 18px rgba(185,158,122,0.45), 0 1px 3px rgba(0,0,0,0.12)",
               }}
             >
               Boutique checkout
@@ -326,6 +329,7 @@ export default function CamiHome() {
               style={{
                 animation: showText2 ? "blur-fade-in 1.1s cubic-bezier(0.4,0,0.2,1) forwards" : "none",
                 opacity: showText2 ? undefined : 0,
+                textShadow: "2px 4px 18px rgba(185,158,122,0.45), 0 1px 3px rgba(0,0,0,0.12)",
               }}
             >
               for independent studios.
@@ -341,7 +345,7 @@ export default function CamiHome() {
             <button
               onClick={() => setDemoOpen(true)}
               className="text-sm font-medium px-6 py-3 rounded-full"
-              style={{ background: "white", color: "#1a1611" }}
+              style={{ background: "white", color: "#1a1611", boxShadow: "2px 4px 18px rgba(185,158,122,0.45), 0 1px 3px rgba(0,0,0,0.12)" }}
             >
               Book a demo
             </button>
