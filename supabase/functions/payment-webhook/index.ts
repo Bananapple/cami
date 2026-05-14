@@ -30,16 +30,17 @@ Deno.serve(async (req) => {
 
   // Read body as text (needed for signature verification)
   const payload = await req.text();
-  const signature =
-    req.headers.get("stripe-signature") ??
-    req.headers.get("frisbii-signature") ??
-    req.headers.get("x-webhook-signature") ??
-    "";
 
-  // Parse + verify the webhook
+  // Parse + verify the webhook. Adapter pulls the headers it needs from req.headers
+  // (Stripe → stripe-signature; Vipps → Authorization + x-ms-* + URL/method).
   let event;
   try {
-    event = await adapter.parseWebhookEvent(payload, signature);
+    event = await adapter.parseWebhookEvent({
+      payload,
+      headers: req.headers,
+      url,
+      method: req.method,
+    });
   } catch (err) {
     console.error(`${provider} webhook parse error:`, err);
     return new Response("Invalid signature", { status: 400 });
