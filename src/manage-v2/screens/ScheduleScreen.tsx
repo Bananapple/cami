@@ -17,7 +17,7 @@ import { EditSequenceDrawer } from "../drawers/EditSequenceDrawer";
 export function ScheduleScreen() {
   const studioCtx = useStudioContext();
   const studioTz = studioCtx?.studio?.timezone ?? "Europe/Oslo";
-  const { classes, isLoading } = useSchedule(4, 7);
+  const { classes, isLoading } = useSchedule(4, 30);
 
   const [activeClassId, setActiveClassId] = useState<string | null>(null);
   const [activeMemberId, setActiveMemberId] = useState<string | null>(null);
@@ -101,33 +101,45 @@ export function ScheduleScreen() {
 
   return (
     <>
-      <PageHeader
-        title="Schedule"
-        subtitle={isLoading ? "Loading…" : selectedDateLabel}
-        actions={
-          <>
-            <Button
-              variant="secondary"
-              icon={<SlidersHorizontal size={14} />}
-              onClick={() => setEditSequenceOpen(true)}
-              title="Edit sequence"
-            />
-            <Button variant="primary" onClick={() => setAddClassOpen(true)}>
-              <Plus size={13} />
-              event
-            </Button>
-          </>
-        }
-      />
-
-      <ScheduleDateStrip
-        stickyRef={stickyRef}
-        selectedDate={selectedDateKey}
-        onSelect={handleChipSelect}
-        classes={classes ?? []}
-        tz={studioTz}
-        isLoading={isLoading}
-      />
+      {/* Frozen header: title + date strip stay pinned while class list scrolls */}
+      <div
+        ref={stickyRef}
+        style={{
+          position: "sticky",
+          top: 0,
+          zIndex: 3,
+          background: "var(--bg)",
+          paddingBottom: 12,
+          marginBottom: 16,
+          borderBottom: "1px solid var(--line-soft)",
+        }}
+      >
+        <PageHeader
+          title="Schedule"
+          subtitle={isLoading ? "Loading…" : selectedDateLabel}
+          actions={
+            <>
+              <Button
+                variant="secondary"
+                icon={<SlidersHorizontal size={14} />}
+                onClick={() => setEditSequenceOpen(true)}
+                title="Edit sequence"
+              />
+              <Button variant="primary" onClick={() => setAddClassOpen(true)}>
+                <Plus size={13} />
+                event
+              </Button>
+            </>
+          }
+        />
+        <ScheduleDateStrip
+          selectedDate={selectedDateKey}
+          onSelect={handleChipSelect}
+          classes={classes ?? []}
+          tz={studioTz}
+          isLoading={isLoading}
+        />
+      </div>
 
       {!isLoading && grouped.length === 0 && (
         <RowList>
@@ -188,14 +200,12 @@ export function ScheduleScreen() {
 
 // ── Horizontal date strip with fill-rate bars ──────────────────────
 function ScheduleDateStrip({
-  stickyRef,
   selectedDate,
   onSelect,
   classes,
   tz,
   isLoading,
 }: {
-  stickyRef: React.RefObject<HTMLDivElement>;
   selectedDate: string;
   onSelect: (key: string) => void;
   classes: ScheduleClass[];
@@ -206,12 +216,12 @@ function ScheduleDateStrip({
   const buttonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const mountedRef = useRef(false);
 
-  // 7 days before today + today + 28 days ahead = 36 chips
+  // 30 days back + today + 28 days ahead = 59 chips
   const dates = useMemo(() => {
     const today = new Date();
-    return Array.from({ length: 36 }, (_, i) => {
+    return Array.from({ length: 59 }, (_, i) => {
       const d = new Date(today);
-      d.setDate(today.getDate() - 7 + i);
+      d.setDate(today.getDate() - 30 + i);
       return d;
     });
   }, []);
@@ -248,21 +258,7 @@ function ScheduleDateStrip({
   }, [selectedDate]);
 
   return (
-    <div
-      ref={stickyRef}
-      style={{
-        position: "sticky",
-        top: 0,
-        zIndex: 3,
-        background: "var(--bg)",
-        paddingTop: 10,
-        paddingBottom: 12,
-        marginTop: -10,
-        borderBottom: "1px solid var(--line-soft)",
-        marginBottom: 16,
-      }}
-    >
-      <div ref={stripRef} className="sm-scrollbar-none" style={{ display: "flex", gap: 6, overflowX: "auto" }}>
+    <div ref={stripRef} className="sm-scrollbar-none" style={{ display: "flex", gap: 6, overflowX: "auto" }}>
         {dates.map((d) => {
           const k = dayKey(d, tz);
           const isSelected = k === selectedDate;
@@ -315,7 +311,6 @@ function ScheduleDateStrip({
             </button>
           );
         })}
-      </div>
     </div>
   );
 }
