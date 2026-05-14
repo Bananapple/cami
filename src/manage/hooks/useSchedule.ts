@@ -36,18 +36,20 @@ export type ClassTemplate = {
 export type Instructor = { id: string; display_name: string };
 export type Location = { id: string; name: string; timezone: string | null };
 
-export function useSchedule(weeksAhead = 4) {
+export function useSchedule(weeksAhead = 4, daysBefore = 0) {
   const studioCtx = useStudioContext();
   const studioId = studioCtx?.studio?.id;
   const qc = useQueryClient();
 
   const tz = studioCtx?.studio?.timezone ?? "Europe/Oslo";
-  const start = todayInTimezone(tz);
-  const end = new Date(start);
+  const todayDate = todayInTimezone(tz);
+  const start = new Date(todayDate);
+  start.setDate(start.getDate() - daysBefore);
+  const end = new Date(todayDate);
   end.setDate(end.getDate() + weeksAhead * 7);
 
   const classesQuery = useQuery({
-    queryKey: ["manage", "schedule", studioId, weeksAhead],
+    queryKey: ["manage", "schedule", studioId, weeksAhead, daysBefore],
     enabled: !!studioId,
     refetchInterval: 60_000,
     queryFn: async (): Promise<ScheduleClass[]> => {

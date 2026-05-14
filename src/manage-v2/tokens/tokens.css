@@ -202,6 +202,9 @@
   flex: 1;
   padding: 32px 40px 48px;
   overflow: auto;
+  /* position: relative so absolute-positioned screen wrappers (e.g.
+     ScheduleScreen two-pane layout) are contained here */
+  position: relative;
 }
 
 /* —— Page header ————————————————————————————— */
@@ -858,6 +861,39 @@
   font-size: 15px; font-weight: 500;
   flex-shrink: 0;
 }
+
+/* —— Schedule screen two-pane layout ———————— */
+/* position:absolute;inset:0 fills .sm-content entirely so the header
+   and body can be independent flex children — header is frozen, body scrolls */
+.sm-schedule-pane {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+}
+.sm-schedule-header {
+  flex-shrink: 0;
+  padding: 32px 40px 12px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--line-soft);
+  z-index: 3;
+}
+.sm-schedule-body {
+  flex: 1;
+  overflow: auto;
+  padding: 16px 40px 48px;
+}
+@media (max-width: 640px) {
+  .sm-schedule-header { padding: 20px 14px 12px; }
+  .sm-schedule-body   { padding: 12px 14px 80px; }
+}
+
+/* —— Scrollbar hide utility ————————————————— */
+.sm-scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.sm-scrollbar-none::-webkit-scrollbar { display: none; }
 
 /* —— Annotation pin ————————————————————————— */
 .sm-pin {
