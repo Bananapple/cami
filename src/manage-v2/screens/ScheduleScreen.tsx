@@ -41,64 +41,53 @@ export function ScheduleScreen() {
     ? (classes ?? []).find((c) => c.id === editClassId) ?? null
     : null;
 
-  // Refs for each day-section header so we can scroll-to and observe
+  // Refs for layout + scroll tracking
   const dayGroupRefs = useRef<Record<string, HTMLDivElement | null>>({});
-  const stickyRef = useRef<HTMLDivElement>(null);
-  // Suppress observer while a programmatic scroll is in flight
+  const headerRef = useRef<HTMLDivElement>(null);
+  const scrollBodyRef = useRef<HTMLDivElement>(null);
   const clickScrollingRef = useRef(false);
   const hasScrolledToToday = useRef(false);
 
-  // ── On data load: scroll content to today's section ───────────────
+  // ── On data load: instant-scroll body to today's section ──────────
   useEffect(() => {
     if (hasScrolledToToday.current || grouped.length === 0) return;
     const el = dayGroupRefs.current[todayKey];
-    if (!el) return; // today has no classes — stay at top
+    if (!el) return;
     hasScrolledToToday.current = true;
-    const container = document.querySelector(".sm-content") as HTMLElement | null;
-    if (!container) return;
-    const stripHeight = stickyRef.current?.offsetHeight ?? 150;
-    const delta = el.getBoundingClientRect().top - container.getBoundingClientRect().top - stripHeight - 8;
-    if (delta > 10) container.scrollBy({ top: delta, behavior: "instant" });
+    const body = scrollBodyRef.current;
+    if (!body) return;
+    const delta = el.getBoundingClientRect().top - body.getBoundingClientRect().top - 8;
+    if (delta > 10) body.scrollBy({ top: delta, behavior: "instant" });
   }, [grouped, todayKey]);
 
-  // ── Scroll → chip: track which day is at the top of the viewport ──
+  // ── Scroll → chip: track which day header is at/near the top ──────
   useEffect(() => {
-    const container = document.querySelector(".sm-content") as HTMLElement | null;
-    if (!container) return;
-
+    const body = scrollBodyRef.current;
+    if (!body) return;
     const onScroll = () => {
       if (clickScrollingRef.current) return;
-      const stripBottom =
-        container.getBoundingClientRect().top + (stickyRef.current?.offsetHeight ?? 90) + 12;
-
-      // Find the last day header whose top edge is at or above the trigger line
+      const triggerY = body.getBoundingClientRect().top + 16;
       let active: string | null = null;
       for (const [key, el] of Object.entries(dayGroupRefs.current)) {
         if (!el) continue;
-        if (el.getBoundingClientRect().top <= stripBottom) active = key;
+        if (el.getBoundingClientRect().top <= triggerY) active = key;
       }
-      if (active && active !== selectedDateRef.current) {
-        setSelectedDateKey(active);
-      }
+      if (active && active !== selectedDateRef.current) setSelectedDateKey(active);
     };
-
-    container.addEventListener("scroll", onScroll, { passive: true });
-    return () => container.removeEventListener("scroll", onScroll);
+    body.addEventListener("scroll", onScroll, { passive: true });
+    return () => body.removeEventListener("scroll", onScroll);
   }, []); // register once; handler reads mutable refs
 
-  // ── Chip → scroll: smooth-scroll content to that day's section ────
+  // ── Chip → scroll: scroll body to that day's section ──────────────
   const handleChipSelect = useCallback((key: string) => {
     setSelectedDateKey(key);
     const el = dayGroupRefs.current[key];
-    if (!el) return; // empty day — just highlight chip, no scroll
-
-    const container = document.querySelector(".sm-content") as HTMLElement | null;
-    if (!container) return;
-
+    if (!el) return;
+    const body = scrollBodyRef.current;
+    if (!body) return;
     clickScrollingRef.current = true;
-    const stripHeight = stickyRef.current?.offsetHeight ?? 90;
-    const delta = el.getBoundingClientRect().top - container.getBoundingClientRect().top - stripHeight - 8;
-    container.scrollTo({ top: container.scrollTop + delta, behavior: "smooth" });
+    const delta = el.getBoundingClientRect().top - body.getBoundingClientRect().top - 8;
+    body.scrollTo({ top: body.scrollTop + delta, behavior: "smooth" });
     setTimeout(() => { clickScrollingRef.current = false; }, 1000);
   }, []);
 
@@ -115,76 +104,68 @@ export function ScheduleScreen() {
 
   return (
     <>
-      {/* Frozen header: title + date strip stay pinned while class list scrolls */}
-      <div
-        ref={stickyRef}
-        style={{
-          position: "sticky",
-          top: 0,
-          zIndex: 3,
-          background: "var(--bg)",
-          paddingBottom: 12,
-          marginBottom: 16,
-          borderBottom: "1px solid var(--line-soft)",
-        }}
-      >
-        <PageHeader
-          title="Schedule"
-          subtitle={isLoading ? "Loading…" : selectedDateLabel}
-          actions={
-            <>
-              <Button
-                variant="secondary"
-                icon={<SlidersHorizontal size={14} />}
-                onClick={() => setEditSequenceOpen(true)}
-                title="Edit sequence"
-              />
-              <Button variant="primary" onClick={() => setAddClassOpen(true)}>
-                <Plus size={13} />
-                event
-              </Button>
-            </>
-          }
-        />
-        <ScheduleDateStrip
-          selectedDate={selectedDateKey}
-          onSelect={handleChipSelect}
-          classes={classes ?? []}
-          tz={studioTz}
-          isLoading={isLoading}
-        />
-      </div>
-
-      {!isLoading && grouped.length === 0 && (
-        <RowList>
-          <EmptyState
-            title="No classes scheduled in this window"
-            hint="Add a recurring schedule rule from Studio settings, or create a one-off event above."
+      <div className="sm-schedule-pane">
+        <div ref={headerRef} className="sm-schedule-header">
+          <PageHeader
+            title="Schedule"
+            subtitle={isLoading ? "Loading…" : selectedDateLabel}
+            actions={
+              <>
+                <Button
+                  variant="secondary"
+                  icon={<SlidersHorizontal size={14} />}
+                  onClick={() => setEditSequenceOpen(true)}
+                  title="Edit sequence"
+                />
+                <Button variant="primary" onClick={() => setAddClassOpen(true)}>
+                  <Plus size={13} />
+                  event
+                </Button>
+              </>
+            }
           />
-        </RowList>
-      )}
+          <ScheduleDateStrip
+            selectedDate={selectedDateKey}
+            onSelect={handleChipSelect}
+            classes={classes ?? []}
+            tz={studioTz}
+            isLoading={isLoading}
+          />
+        </div>
 
-      {grouped.map(({ key, label, isToday, items }) => (
-        <DayGroup
-          key={key}
-          label={label}
-          isToday={isToday}
-          count={items.length}
-          sectionRef={(el) => { dayGroupRefs.current[key] = el; }}
-        >
-          <RowList>
-            {items.map((c) => (
-              <ClassRow
-                key={c.id}
-                c={c}
-                tz={c.location_timezone ?? studioTz}
-                selected={activeClassId === c.id}
-                onClick={() => setActiveClassId(c.id)}
+        <div ref={scrollBodyRef} className="sm-schedule-body">
+          {!isLoading && grouped.length === 0 && (
+            <RowList>
+              <EmptyState
+                title="No classes scheduled in this window"
+                hint="Add a recurring schedule rule from Studio settings, or create a one-off event above."
               />
-            ))}
-          </RowList>
-        </DayGroup>
-      ))}
+            </RowList>
+          )}
+
+          {grouped.map(({ key, label, isToday, items }) => (
+            <DayGroup
+              key={key}
+              label={label}
+              isToday={isToday}
+              count={items.length}
+              sectionRef={(el) => { dayGroupRefs.current[key] = el; }}
+            >
+              <RowList>
+                {items.map((c) => (
+                  <ClassRow
+                    key={c.id}
+                    c={c}
+                    tz={c.location_timezone ?? studioTz}
+                    selected={activeClassId === c.id}
+                    onClick={() => setActiveClassId(c.id)}
+                  />
+                ))}
+              </RowList>
+            </DayGroup>
+          ))}
+        </div>
+      </div>
 
       <ClassDrawerV2
         cls={activeClass}
