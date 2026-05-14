@@ -233,7 +233,7 @@ async function gatherSignals(
   // ── Clip inactive: filter by freshness + require contact info ──
   // Need last_booking_at — fetch from bookings
   const clipUserIds = ((clipRaw ?? []) as any[]).map((r) => r.user_id);
-  let lastBookingMap: Record<string, string> = {};
+  const lastBookingMap: Record<string, string> = {};
   if (clipUserIds.length > 0) {
     const { data: lbData } = await sb
       .from("bookings")
