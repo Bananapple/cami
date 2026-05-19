@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Business Context
 
-This is a **multi-tenant SaaS platform** for yoga studios in Scandinavia, Europe and the US. A single Supabase project serves all studios, with every tenanted table scoped by `studio_id` and RLS enforcing isolation. The owner sells websites + booking engines as a flat monthly SaaS fee. Student payments flow directly to each studio (no marketplace layer) via a **provider-agnostic adapter pattern** — Stripe Checkout in MVP, Frisbii next (Brie already uses it), Vipps later for Norwegian market fit. Adding a provider is an adapter file + one enum value; no schema changes.
+This is a **multi-tenant SaaS platform** for yoga studios in Scandinavia, Europe and the US. A single Supabase project serves all studios, with every tenanted table scoped by `studio_id` and RLS enforcing isolation. The owner sells websites + booking engines as a flat monthly SaaS fee. Student payments flow directly to each studio (no marketplace layer) via a **provider-agnostic adapter pattern** — Stripe Checkout for card payments globally, Vipps ePayment for Norwegian mobile payments. Adding a provider is an adapter file + one enum value; no schema changes.
 
 **Architectural state**: YogaBrie (`xskqpxfjhhxontirezjd`, eu-north-1) has completed the v2 cutover as of 2026-04-24. The multi-tenant schema is live. The legacy `sessions` table and `session_id`/`session_date` columns on `bookings` are still present but inert — drop them once rollback confidence is established. Full migration record: `docs/MIGRATION-MULTITENANT.md`.
 
@@ -16,7 +16,7 @@ This is a **multi-tenant SaaS platform** for yoga studios in Scandinavia, Europe
 - Cancel + refund via `issue-refund` Edge Function (24h window policy)
 - **Membership purchase** (Phase 1A, 2026-04-30): DB-driven products catalog; users buy subscriptions/clip cards via Stripe Checkout from `/joinnow`; webhook calls `activate_membership()` RPC on success; subscription renewal/cancellation handled via `invoice.paid` / `customer.subscription.deleted`
 - **Book with membership** (Phase 1B, 2026-04-30): `create-checkout` detects active membership before creating Stripe session; calls `book_with_credit()` for subscription/clip-card holders (no Stripe redirect); `issue-refund` returns credits on cancellation within window; `BookingSheet` adapts UI to show "Included" or "X credits remaining"
-- **Frisbii payment adapter** (2026-05-01, untested live): `_shared/providers/frisbii.ts` implements full `PaymentProviderAdapter`; supports one-time charges and webhook reconciliation via invoice handle = payment_id trick; subscription checkout deferred
+- **Vipps ePayment adapter** (2026-05-14, Phase 1 — one-time only): `_shared/providers/vipps.ts` implements `PaymentProviderAdapter` for Norwegian mobile payments. Drop-ins and clip cards work via `/epayment/v1/payments` with auto-capture on the `AUTHORIZED` webhook. `reference = payment_id` for trivial reconciliation. Recurring (Vipps Recurring API) deferred to Phase 2 — Norwegian members on memberships still pay by card via Stripe
 - **Schedule & class management** (2026-05-02): Manager can create/edit `class_templates` + `schedule_rules` via `CreateRuleSheet`; `/classes` public page is DB-driven via `usePublicClasses`; `BookingSheet` accepts `templateId` prop for pre-filtered class selection; `template_id` on `ClassInstance` type
 - **Instructor & location management** (2026-05-02): Manager can CRUD instructors (with specialty field) and locations from StudioView; `/coaches` public page is DB-driven via `usePublicInstructors`; `instructors.specialty` column added (`0019`)
 - **Waitlist** (2026-05-02): Full state machine (`waiting→offered→accepted/expired`); `expire_stale_waitlist_offers()` pg_cron sweeper runs every minute; `notify-waitlist-offer` Edge Function deployed + wired via DB webhook (fires on `waitlists UPDATE` where status becomes 'offered'); idempotent email send via `notification_log`; manager ClassDrawer shows Attending/Waitlist/Cancelled tabs with counts and post-class no-show summary
@@ -64,7 +64,7 @@ Full step-by-step checklist (SQL → Supabase redirect URL → Vercel → Stripe
 - Supabase — single multi-tenant project (`xskqpxfjhhxontirezjd`), v2 schema live
 - TanStack Query for server state
 - react-hook-form + zod for forms
-- **Provider-agnostic payment layer**: canonical `payments` table + `PaymentProviderAdapter` interface. Stripe adapter (live) + Frisbii adapter (implemented, untested) in `_shared/providers/`. Vipps planned. Secrets live in Edge Function env only. Frisbii uses invoice handle = payment_id for webhook reconciliation (no Stripe-style session ID); signature is in the JSON payload, not a header.
+- **Provider-agnostic payment layer**: canonical `payments` table + `PaymentProviderAdapter` interface. Stripe adapter (live, all payments) + Vipps adapter (Phase 1, one-time only) in `_shared/providers/`. Frisbii was implemented and then removed before going live (2026-05-14). Secrets live in Edge Function env only. Vipps uses `reference = payment_id` for webhook reconciliation (Microsoft Azure-style HMAC signature in Authorization header, computed over method + path + x-ms-date + host + x-ms-content-sha256).
 - `ErrorBoundary` (`src/components/ErrorBoundary.tsx`) wraps the full React tree in `App.tsx` — catches render panics and shows a reload fallback.
 - Supabase client (`src/integrations/supabase/client.ts`) passes `x-studio-slug: VITE_STUDIO_SLUG` as a global header on every request. This is required for anon RLS policies to scope reads to the correct tenant.
 
@@ -152,7 +152,7 @@ All user-facing hooks (`useBookings`, `useMembership`, `usePaymentMethods`, `use
 |---|---|
 | `studios` | Tenant root (slug, branding, timezone, currency) |
 | `studio_members` | user↔studio with role + per-studio state (total_sessions, level, referral_code) |
-| `studio_payment_providers` | Per-studio provider enrolment (Stripe/Frisbii/Vipps account IDs) |
+| `studio_payment_providers` | Per-studio provider enrolment (Stripe Connect acct / Vipps MSN) |
 | `profiles` | Global PII only (name, phone, marketing opt-ins) |
 | `locations`, `instructors` | Rooms/branches and staff per studio |
 | `class_templates` | What a class IS |

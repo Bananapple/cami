@@ -1,8 +1,8 @@
 // Shared payment provider adapter interface.
-// Every provider (Stripe, Frisbii, Vipps) implements PaymentProviderAdapter.
+// Every provider (Stripe, Vipps) implements PaymentProviderAdapter.
 // Adding a provider: implement this interface + register in index.ts.
 
-export type PaymentProvider = "stripe" | "frisbii" | "vipps";
+export type PaymentProvider = "stripe" | "vipps";
 
 export type PaymentStatus =
   | "requires_action"
@@ -14,7 +14,7 @@ export type PaymentStatus =
   | "partially_refunded";
 
 export interface CreateCheckoutParams {
-  studio_provider_account_id: string | null;  // Stripe Connect acct_xxx / Frisbii merchant id (null = platform account)
+  studio_provider_account_id: string | null;  // Stripe Connect acct_xxx / Vipps MSN (null = platform account)
   customer_email?: string;
   customer_name?: string;
   amount: number;                      // in smallest currency unit (øre for NOK)
@@ -89,10 +89,20 @@ export interface CancelSubscriptionResult {
   current_period_end: number;
 }
 
+// Context passed to parseWebhookEvent — adapters pick the headers/metadata they
+// need. Stripe just reads `stripe-signature`; Vipps needs Authorization +
+// x-ms-date + x-ms-content-sha256 plus method/path for canonical-string HMAC.
+export interface WebhookRequest {
+  payload: string;
+  headers: Headers;
+  url: URL;
+  method: string;
+}
+
 export interface PaymentProviderAdapter {
   readonly name: PaymentProvider;
   createCheckoutSession(params: CreateCheckoutParams): Promise<CheckoutResult>;
-  parseWebhookEvent(payload: string, signature: string): Promise<CanonicalWebhookEvent>;
+  parseWebhookEvent(req: WebhookRequest): Promise<CanonicalWebhookEvent>;
   issueRefund(params: RefundParams): Promise<RefundResult>;
   // Schedules the subscription to cancel at the end of the current paid period.
   // The provider continues to honour the subscription until then; webhook

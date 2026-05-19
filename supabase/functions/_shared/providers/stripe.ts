@@ -9,6 +9,7 @@ import type {
   RefundResult,
   CancelSubscriptionParams,
   CancelSubscriptionResult,
+  WebhookRequest,
 } from "./types.ts";
 
 const SECRET_KEY = Deno.env.get("STRIPE_SECRET_KEY") ?? "";
@@ -114,10 +115,11 @@ export class StripeProvider implements PaymentProviderAdapter {
     };
   }
 
-  async parseWebhookEvent(payload: string, signature: string): Promise<CanonicalWebhookEvent> {
+  async parseWebhookEvent(req: WebhookRequest): Promise<CanonicalWebhookEvent> {
+    const signature = req.headers.get("stripe-signature") ?? "";
     let event: Stripe.Event;
     try {
-      event = await this.stripe.webhooks.constructEventAsync(payload, signature, WEBHOOK_SECRET);
+      event = await this.stripe.webhooks.constructEventAsync(req.payload, signature, WEBHOOK_SECRET);
     } catch (err) {
       throw new Error(`Webhook signature verification failed: ${err}`);
     }
