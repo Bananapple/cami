@@ -575,14 +575,20 @@
 .sm-count.warn .n { color: var(--warn); }
 
 /* —— Drawer ————————————————————————————————— */
+/* position: fixed (not absolute) so the drawer anchors to the viewport,
+   not to .sm-content (which is the nearest positioned scroll container).
+   With absolute, scrolling .sm-content moved the drawer's top:0 reference
+   off-screen — the drawer appeared "stuck higher" as the page scrolled.
+   left: 220px on the scrim keeps the NavRail clickable behind it. */
 .sm-drawer-scrim {
-  position: absolute; inset: 0;
+  position: fixed;
+  top: 0; right: 0; bottom: 0; left: 220px;
   background: rgba(20, 18, 16, 0.18);
   backdrop-filter: blur(1px);
   z-index: 5;
 }
 .sm-drawer {
-  position: absolute;
+  position: fixed;
   top: 0; right: 0; bottom: 0;
   width: 520px;
   background: var(--surface);
@@ -597,10 +603,9 @@
    is reachable with a thumb. */
 @media (max-width: 640px) {
   .sm-drawer-scrim {
-    position: fixed;
+    left: 0;
   }
   .sm-drawer {
-    position: fixed;
     top: auto;
     left: 0; right: 0; bottom: 0;
     width: 100%;
