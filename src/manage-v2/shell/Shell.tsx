@@ -1,13 +1,15 @@
 import { useState, type ReactNode } from "react";
 import "../tokens/tokens.css";
 import { NavRail, type NavId, useIsMobile } from "./NavRail";
-import { NavIcon } from "./Icons";
+import { FloatingCmdButton } from "./FloatingCmdButton";
 import { CommandPalette, useCommandPaletteShortcut, type CommandItem } from "../components/CommandPalette";
 
 // ── Shell ──────────────────────────────────────────────────────────
-// Desktop: 220px fixed rail + scrolling content
-// Mobile (<640px): rail hidden; fixed burger top-right of viewport;
-// tap → rail slides in from left at 85vw with backdrop scrim.
+// Desktop: 220px fixed rail + scrolling content.
+// Mobile (<640px): rail hidden. A floating round button at the bottom
+// center opens the CommandPalette, which already exposes every nav
+// destination (Home/Today/Schedule/Clients/Studio) + Sign out + member
+// search. No separate mobile drawer.
 
 export function Shell({
   active,
@@ -33,7 +35,6 @@ export function Shell({
   children: ReactNode;
 }) {
   const [paletteOpen, setPaletteOpen] = useState(false);
-  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const isMobile = useIsMobile();
   useCommandPaletteShortcut(setPaletteOpen);
 
@@ -54,45 +55,21 @@ export function Shell({
           />
         )}
 
-        {isMobile && mobileNavOpen && (
-          <NavRail
-            active={active}
-            onNavigate={onNavigate}
-            onSearchClick={() => {
-              setPaletteOpen(true);
-              setMobileNavOpen(false);
-            }}
-            brandName={brandName}
-            userInitials={userInitials}
-            userName={userName}
-            onUserClick={onUserClick}
-            onSignOut={onSignOut}
-            hiddenIds={hiddenIds}
-            mobileOpen
-            onMobileClose={() => setMobileNavOpen(false)}
-          />
-        )}
-
         <main className="sm-canvas">
           <div className="sm-content">{children}</div>
         </main>
       </div>
 
-      {isMobile && !mobileNavOpen && (
-        <button
-          type="button"
-          onClick={() => setMobileNavOpen(true)}
-          aria-label="Open menu"
-          className="sm-burger sm-burger-fixed"
-        >
-          <NavIcon name="menu" size={18} />
-        </button>
+      {isMobile && (
+        <FloatingCmdButton onClick={() => setPaletteOpen(true)} hidden={paletteOpen} />
       )}
 
       <CommandPalette
         open={paletteOpen}
         onClose={() => setPaletteOpen(false)}
         items={commandItems}
+        brandName={isMobile ? brandName : undefined}
+        userInitials={isMobile ? userInitials : undefined}
       />
     </div>
   );
