@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { SectionEyebrow } from "./SectionEyebrow";
+import { useIsMobile } from "../shell/NavRail";
 
 // ── CommandPalette ─────────────────────────────────────────────────
 // ⌘K-triggered search overlay. Surface treatment matches v2:
@@ -28,16 +29,25 @@ export function CommandPalette({
   onClose,
   items,
   placeholder = "Search members, classes, settings…",
+  brandName,
+  userInitials,
 }: {
   open: boolean;
   onClose: () => void;
   items: CommandItem[];
   placeholder?: string;
+  /** Mobile-only: shown as a thin header strip above the search input
+   *  so the staff member can confirm which studio they're operating on
+   *  (the desktop NavRail does this; on mobile the rail is hidden). */
+  brandName?: string;
+  /** Mobile-only: initials shown in the header strip, opposite brandName. */
+  userInitials?: string;
 }) {
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const isMobile = useIsMobile();
 
   // Filter + group items by current query
   const filtered = useMemo(() => {
@@ -118,26 +128,30 @@ export function CommandPalette({
 
   return (
     <div
+      className={isMobile ? "sm-palette-scrim sm-palette-scrim--mobile" : "sm-palette-scrim"}
       style={{
         position: "fixed",
         inset: 0,
         zIndex: 100,
-        background: "rgba(20, 18, 16, 0.06)",
-        backdropFilter: "blur(2px)",
+        background: isMobile ? "rgba(20, 18, 16, 0.18)" : "rgba(20, 18, 16, 0.06)",
+        backdropFilter: isMobile ? "blur(10px)" : "blur(2px)",
         display: "flex",
-        alignItems: "flex-start",
+        alignItems: isMobile ? "flex-end" : "flex-start",
         justifyContent: "center",
-        padding: "10vh 16px 16px",
+        padding: isMobile
+          ? "16px 12px calc(92px + env(safe-area-inset-bottom)) 12px"
+          : "10vh 16px 16px",
       }}
       onClick={onClose}
     >
       <div
+        className={isMobile ? "sm-palette-panel sm-palette-panel--mobile" : "sm-palette-panel"}
         role="dialog"
         aria-modal="true"
         aria-label="Search"
         style={{
           width: "100%",
-          maxWidth: 560,
+          maxWidth: isMobile ? "none" : 560,
           background: "var(--surface)",
           border: "1px solid var(--line)",
           borderRadius: "var(--r-large)",
@@ -145,9 +159,19 @@ export function CommandPalette({
           display: "flex",
           flexDirection: "column",
           maxHeight: "70vh",
+          transformOrigin: isMobile ? "bottom center" : "top center",
         }}
         onClick={(e) => e.stopPropagation()}
       >
+        {/* Mobile-only: brand + user initials strip so the staff member
+            can confirm tenant + account without the NavRail. */}
+        {isMobile && (brandName || userInitials) && (
+          <div className="sm-palette-mobile-head">
+            <span className="brand">{brandName}</span>
+            {userInitials && <span className="avatar">{userInitials}</span>}
+          </div>
+        )}
+
         {/* Search input */}
         <div
           style={{

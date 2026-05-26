@@ -227,52 +227,97 @@
 }
 .sm-pagehead .actions { display: flex; gap: 8px; align-items: center; }
 
-/* —— Mobile burger ———————————————————————————— */
-.sm-burger {
-  flex-shrink: 0;
-  width: 38px;
-  height: 38px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+/* —— Floating command button (mobile) —————————————————————————
+   Round button anchored bottom-center. Opens the CommandPalette.
+   While the palette is open the button hides (is-hidden); the
+   palette grows out of its position via transform-origin: bottom
+   center for a visual "expand" effect. */
+.sm-cmd-floating {
+  position: fixed;
+  bottom: calc(20px + env(safe-area-inset-bottom));
+  left: 50%;
+  transform: translateX(-50%);
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: var(--r-input);
+  box-shadow: 0 4px 16px rgba(20, 18, 16, 0.18);
+  display: flex;
+  align-items: center;
+  justify-content: center;
   color: var(--ink);
   cursor: pointer;
   padding: 0;
-}
-.sm-burger:hover { background: var(--surface-2); }
-.sm-burger-fixed {
-  position: fixed;
-  bottom: 20px;
-  right: 16px;
   z-index: 25;
-  box-shadow: 0 2px 8px rgba(20, 18, 16, 0.14);
+  transition: transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 140ms ease-out;
+}
+.sm-cmd-floating:active { transform: translateX(-50%) scale(0.94); }
+.sm-cmd-floating.is-hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-50%) scale(0.3);
 }
 
-/* —— Mobile rail slide-in ———————————————————— */
-@keyframes sm-rail-slide-in {
-  from { transform: translateX(-100%); }
-  to { transform: translateX(0); }
+/* —— Command palette morph (mobile) ——————————————————————————
+   Palette panel grows out of the floating button's position. The
+   button uses transform-origin: bottom center so it's anchored to
+   where the round button sits; scale + radius animate together to
+   read as "circle expanding into card". */
+@keyframes sm-palette-grow {
+  from {
+    transform: scale(0.16);
+    border-radius: 999px;
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    border-radius: var(--r-large);
+    opacity: 1;
+  }
 }
-@keyframes sm-rail-scrim-fade {
-  from { opacity: 0; }
-  to { opacity: 1; }
+.sm-palette-panel--mobile {
+  animation: sm-palette-grow 240ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
-.sm-rail-mobile-open {
-  animation: sm-rail-slide-in 180ms ease-out;
-  box-shadow: 0 12px 40px rgba(20, 18, 16, 0.18);
+
+/* Mobile palette header strip — brand on left, user initials on right.
+   Surfaces the same info the desktop NavRail does (which is hidden on
+   mobile) so staff can confirm tenant + account at a glance. */
+.sm-palette-mobile-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 16px;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--line-soft);
+  font-size: 12.5px;
 }
-.sm-rail-scrim {
-  animation: sm-rail-scrim-fade 180ms ease-out;
+.sm-palette-mobile-head .brand {
+  color: var(--ink);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.sm-palette-mobile-head .avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ink-soft);
 }
 
 /* —— Mobile content padding ——————————————————— */
-/* shift only the page title/subtitle right of the fixed burger */
+/* Bottom padding accounts for the floating command button at the
+   bottom-center (56px + 20px gap + iOS safe-area). */
 @media (max-width: 640px) {
   .sm-content {
-    padding: 20px 14px 80px;
+    padding: 20px 14px calc(96px + env(safe-area-inset-bottom));
   }
   .sm-pagehead {
     margin-bottom: 18px;

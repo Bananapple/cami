@@ -21,8 +21,6 @@ export function NavRail({
   onUserClick,
   onSignOut,
   hiddenIds = [],
-  mobileOpen,
-  onMobileClose,
 }: {
   active: NavId;
   onNavigate: (id: NavId) => void;
@@ -33,100 +31,63 @@ export function NavRail({
   onUserClick?: () => void;
   onSignOut?: () => void;
   hiddenIds?: NavId[];
-  /** Mobile-only: rail is hidden by default; this opens an overlay */
-  mobileOpen?: boolean;
-  onMobileClose?: () => void;
 }) {
   return (
-    <>
-      {/* Mobile scrim */}
-      {mobileOpen && (
-        <div
-          onClick={onMobileClose}
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(20, 18, 16, 0.18)",
-            backdropFilter: "blur(1px)",
-            zIndex: 30,
-          }}
-          className="sm-rail-scrim"
-        />
-      )}
-      <aside
-        className={"sm-rail" + (mobileOpen ? " sm-rail-mobile-open" : "")}
-        style={
-          mobileOpen
-            ? {
-                position: "fixed",
-                top: 0,
-                left: 0,
-                bottom: 0,
-                width: "85vw",
-                maxWidth: 360,
-                zIndex: 31,
-              }
-            : undefined
-        }
-      >
-        <div className="sm-brand">
-          <span className="sm-logo" aria-hidden="true" />
-          <b>{brandName}</b>
-        </div>
-        <nav className="sm-nav">
-          {ITEMS.filter((it) => !hiddenIds.includes(it.id)).map((it) => (
-            <button
-              key={it.id}
-              type="button"
-              className={"sm-nav-item " + (active === it.id ? "on" : "")}
-              onClick={() => {
-                onNavigate(it.id);
-                onMobileClose?.();
-              }}
-            >
-              <span className="ic">
-                <NavIcon name={it.icon} />
-              </span>
-              {it.label}
-            </button>
-          ))}
-          {onSignOut && (
-            <button
-              type="button"
-              className="sm-nav-item"
-              onClick={onSignOut}
-            >
-              <span className="ic">
-                <NavIcon name="sign-out" />
-              </span>
-              Sign out
-            </button>
-          )}
-        </nav>
-        <button type="button" className="sm-nav-search" onClick={onSearchClick}>
-          <NavIcon name="search" />
-          Search
-          <kbd>⌘K</kbd>
-        </button>
-        <div className="sm-rail-foot">
+    <aside className="sm-rail">
+      <div className="sm-brand">
+        <span className="sm-logo" aria-hidden="true" />
+        <b>{brandName}</b>
+      </div>
+      <nav className="sm-nav">
+        {ITEMS.filter((it) => !hiddenIds.includes(it.id)).map((it) => (
+          <button
+            key={it.id}
+            type="button"
+            className={"sm-nav-item " + (active === it.id ? "on" : "")}
+            onClick={() => onNavigate(it.id)}
+          >
+            <span className="ic">
+              <NavIcon name={it.icon} />
+            </span>
+            {it.label}
+          </button>
+        ))}
+        {onSignOut && (
           <button
             type="button"
-            onClick={onUserClick}
-            style={{
-              all: "unset",
-              cursor: onUserClick ? "pointer" : "default",
-              display: "flex",
-              gap: 8,
-              alignItems: "center",
-              width: "100%",
-            }}
+            className="sm-nav-item"
+            onClick={onSignOut}
           >
-            <div className="av">{userInitials}</div>
-            <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{userName}</span>
+            <span className="ic">
+              <NavIcon name="sign-out" />
+            </span>
+            Sign out
           </button>
-        </div>
-      </aside>
-    </>
+        )}
+      </nav>
+      <button type="button" className="sm-nav-search" onClick={onSearchClick}>
+        <NavIcon name="search" />
+        Search
+        <kbd>⌘K</kbd>
+      </button>
+      <div className="sm-rail-foot">
+        <button
+          type="button"
+          onClick={onUserClick}
+          style={{
+            all: "unset",
+            cursor: onUserClick ? "pointer" : "default",
+            display: "flex",
+            gap: 8,
+            alignItems: "center",
+            width: "100%",
+          }}
+        >
+          <div className="av">{userInitials}</div>
+          <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{userName}</span>
+        </button>
+      </div>
+    </aside>
   );
 }
 
